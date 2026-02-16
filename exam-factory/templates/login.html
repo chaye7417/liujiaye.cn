@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}登录 - 试卷工厂{% endblock %}
+
+{% block body %}
+<div class="login-wrapper">
+    <div class="card login-card">
+        <h1>试卷工厂</h1>
+        <p class="subtitle">输入邮箱，验证码登录</p>
+
+        <div id="alert" class="alert"></div>
+
+        <form id="loginForm" onsubmit="return false;">
+            <div class="form-group">
+                <label for="email">邮箱地址</label>
+                <input type="email" id="email" placeholder="your@email.com" required>
+            </div>
+
+            <div class="form-group">
+                <label for="code">验证码</label>
+                <div class="code-input-group">
+                    <input type="text" id="code" placeholder="6 位验证码" maxlength="6" required>
+                    <button type="button" class="btn btn-secondary" id="sendCodeBtn" onclick="sendCode()">
+                        发送验证码
+                    </button>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" id="loginBtn" onclick="login()">
+                登录
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let countdown = 0;
+
+    function showAlert(msg, type) {
+        const el = document.getElementById('alert');
+        el.textContent = msg;
+        el.className = `alert show alert-${type}`;
+        if (type === 'success') setTimeout(() => el.classList.remove('show'), 3000);
+    }
+
+    async function sendCode() {
+        const email = document.getElementById('email').value.trim();
+        if (!email) { showAlert('请输入邮箱', 'error'); return; }
+
+        const btn = document.getElementById('sendCodeBtn');
+        btn.disabled = true;
+
+        try {
+            const form = new FormData();
+            form.append('email', email);
+            const res = await fetch('/api/auth/send-code', { method: 'POST', body: form });
+            const data = await res.json();
+
+            if (res.ok) {
+                showAlert('验证码已发送，请查收邮件', 'success');
+                countdown = 60;
+                const timer = setInterval(() => {
+                    countdown--;
+                    btn.textContent = `${countdown}s`;
+                    if (countdown <= 0) {
+                        clearInterval(timer);
+                        btn.textContent = '发送验证码';
+                        btn.disabled = false;
+                    }
+                }, 1000);
+            } else {
+                showAlert(data.detail || '发送失败', 'error');
+                btn.disabled = false;
+            }
+        } catch (e) {
+            showAlert('网络错误', 'error');
+            btn.disabled = false;
+        }
+    }
+
+    async function login() {
+        const email = document.getElementById('email').value.trim();
+        const code = document.getElementById('code').value.trim();
+        if (!email || !code) { showAlert('请填写邮箱和验证码', 'error'); return; }
+
+        const btn = document.getElementById('loginBtn');
+        btn.disabled = true;
+        btn.textContent = '登录中...';
+
+        try {
+            const form = new FormData();
+            form.append('email', email);
+            form.append('code', code);
+            const res = await fetch('/api/auth/login', { method: 'POST', body: form });
+            const data = await res.json();
+
+            if (res.ok) {
+                window.location.href = '/workspace';
+            } else {
+                showAlert(data.detail || '登录失败', 'error');
+                btn.disabled = false;
+                btn.textContent = '登录';
+            }
+        } catch (e) {
+            showAlert('网络错误', 'error');
+            btn.disabled = false;
+            btn.textContent = '登录';
+        }
+    }
+
+    // 回车提交
+    document.getElementById('code').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') login();
+    });
+</script>
+{% endblock %}

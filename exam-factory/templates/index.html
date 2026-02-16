@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}试卷工厂 - 智能试卷排版{% endblock %}
+
+{% block body %}
+<nav class="navbar">
+    <a href="/" class="logo">试卷工厂</a>
+    <div>
+        <a href="/workspace" class="btn btn-primary" style="font-size:14px; padding:6px 16px;">开始使用</a>
+    </div>
+</nav>
+
+<div class="hero">
+    <h1>上传文件，<span>一键生成</span>专业试卷</h1>
+    <p>上传 Word 或 PDF 文件，AI 自动识别题目结构，生成排版精美的 PDF 试卷。支持选择题、简答题、综合题等多种题型。</p>
+    <a href="/workspace" class="btn btn-primary" style="padding: 14px 36px; font-size: 17px;">
+        免费开始
+    </a>
+</div>
+
+<div class="features">
+    <div class="feature">
+        <div class="icon">&#128196;</div>
+        <h3>智能识别</h3>
+        <p>支持 Word、PDF 等格式，AI 自动识别题目、选项和答案</p>
+    </div>
+    <div class="feature">
+        <div class="icon">&#9998;</div>
+        <h3>在线编辑</h3>
+        <p>AI 生成初稿后可在线预览和编辑，确认无误再生成 PDF</p>
+    </div>
+    <div class="feature">
+        <div class="icon">&#128195;</div>
+        <h3>专业排版</h3>
+        <p>LaTeX 排版引擎，自动计分、主题色可选，输出印刷级 PDF</p>
+    </div>
+</div>
+{% endblock %}

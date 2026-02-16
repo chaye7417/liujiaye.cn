@@ -1,0 +1,474 @@
+% styles.sty - Exam Paper Maker Style File
+% A modular LaTeX exam typesetting system
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{styles}
+
+%=============================================================================
+% Package Imports
+%=============================================================================
+
+% xeCJK quote configuration (auto-convert English quotes to Chinese)
+\xeCJKsetup{
+  AutoFakeBold = true,
+}
+\RequirePackage{csquotes}
+\MakeOuterQuote{"}
+
+\RequirePackage[explicit,clearempty,pagestyles]{titlesec}
+\RequirePackage{fancyhdr}
+\RequirePackage{lastpage}
+\RequirePackage{graphicx}
+\RequirePackage[export]{adjustbox}
+
+% Save original \includegraphics (for internal use without centering)
+\let\origincludegraphics\includegraphics
+
+% Redefine \includegraphics to center by default and prevent page breaks
+\renewcommand{\includegraphics}[2][]{%
+  \par\nopagebreak[4]%
+  {\centering\origincludegraphics[#1]{#2}\par}%
+  \nopagebreak[4]%
+}
+\RequirePackage[table]{xcolor}
+\RequirePackage{tikz}
+\RequirePackage{pgffor}
+\RequirePackage{musixtex}
+\RequirePackage{enumitem}
+\RequirePackage{ifthen}
+\RequirePackage{colortbl}
+\RequirePackage[most]{tcolorbox}
+\RequirePackage{exam-zh-choices}
+\RequirePackage{tikzpagenodes}
+\usetikzlibrary{positioning}
+\usetikzlibrary{shadows.blur}
+\usetikzlibrary{calc}
+
+%=============================================================================
+% Theme Colors (Customizable)
+%=============================================================================
+\definecolor{themecolor}{HTML}{4e9b86}
+
+% Command to change theme color
+\newcommand{\setthemecolor}[1]{%
+  \definecolor{themecolor}{HTML}{#1}%
+}
+
+% Title label spacing
+\newlength{\titlelabelspace}
+\setlength{\titlelabelspace}{15mm}
+
+%=============================================================================
+% Music Symbols (Optional Module)
+%=============================================================================
+\newcommand{\flat}{$\flat$}       % Flat ♭ (usage: C\flat)
+\newcommand{\sharp}{$\sharp$}     % Sharp ♯ (usage: F\sharp)
+\newcommand{\natural}{$\natural$} % Natural ♮ (usage: B\natural)
+
+%=============================================================================
+% Scoring System
+%=============================================================================
+\newcounter{exampoints}
+\setcounter{exampoints}{0}
+
+\newcommand{\currentexamid}{}
+
+% Usage: \points{5} displays "(5分)" and adds to total
+\newcommand{\points}[1]{%
+  \addtocounter{exampoints}{#1}%
+  \textcolor{themecolor}{（#1分）}%
+}
+
+% Save current exam total points
+\newcommand{\saveexampoints}{%
+  \immediate\write\@auxout{\string\newlabel{exampoints-\currentexamid}{{\theexampoints}{\thepage}}}%
+}
+
+% Get exam total points
+\newcommand{\getexampoints}{%
+  \@ifundefined{r@exampoints-\currentexamid}{??}{\ref{exampoints-\currentexamid}}%
+}
+
+%=============================================================================
+% Multiple Choice Command
+%=============================================================================
+% Usage: \choice{A}{B}{C}{D}{correct_number}
+% Example: \choice{Wrong}{Wrong}{Correct}{Wrong}{3}
+\newcommand{\choice}[5]{%
+  \begin{choices}
+    \item \ifthenelse{\boolean{showanswer}}{\ifthenelse{\equal{#5}{1}}{\textbf{\textcolor{themecolor}{#1}}}{#1}}{#1}
+    \item \ifthenelse{\boolean{showanswer}}{\ifthenelse{\equal{#5}{2}}{\textbf{\textcolor{themecolor}{#2}}}{#2}}{#2}
+    \item \ifthenelse{\boolean{showanswer}}{\ifthenelse{\equal{#5}{3}}{\textbf{\textcolor{themecolor}{#3}}}{#3}}{#3}
+    \item \ifthenelse{\boolean{showanswer}}{\ifthenelse{\equal{#5}{4}}{\textbf{\textcolor{themecolor}{#4}}}{#4}}{#4}
+  \end{choices}
+}
+
+%=============================================================================
+% Boolean Switches
+%=============================================================================
+\newboolean{showanswer}      % Answer display
+\newboolean{showquestion}    % Question display
+\newboolean{mainfileloaded}  % Main file marker
+
+% Default settings
+\setboolean{showquestion}{true}
+\setboolean{showanswer}{false}
+\setboolean{mainfileloaded}{false}
+
+%=============================================================================
+% Subfile Local Settings
+%=============================================================================
+% Only effective when compiling subfile independently
+\newcommand{\localshowanswer}[1]{%
+  \ifthenelse{\boolean{mainfileloaded}}{}{%
+    \setboolean{showanswer}{#1}%
+  }%
+}
+\newcommand{\localshowquestion}[1]{%
+  \ifthenelse{\boolean{mainfileloaded}}{}{%
+    \setboolean{showquestion}{#1}%
+  }%
+}
+
+%=============================================================================
+% Title and School Info
+%=============================================================================
+\newcommand{\myschool}{Exam Collection}
+\newcommand{\setschool}[1]{\renewcommand{\myschool}{#1}}
+\newcommand{\mytitle}{}
+\newcommand{\settitle}[1]{\renewcommand{\mytitle}{#1}}
+\newcommand{\mytoday}{\number\year.\number\month.\number\day}
+
+%=============================================================================
+% Header and Footer Styles
+%=============================================================================
+\pagestyle{fancy}
+\fancyhf{}
+
+\fancyfoot[C]{\kaishu\mytitle\quad 第\,\thepage\,页\quad 共\,\pageref{LastPage}\,页\quad\textcolor{themecolor}{\myschool}}
+
+\fancypagestyle{plain}{%
+  \fancyhf{}
+  \fancyfoot[C]{\kaishu\mytitle\quad 第\thepage 页\quad 共\,\pageref{LastPage}\,页\quad\textcolor{themecolor}{\myschool}}
+}
+
+\renewcommand{\headrulewidth}{0pt}
+
+%=============================================================================
+% Section Style
+%=============================================================================
+\renewcommand{\thesection}{\chinese{section}}
+
+\newboolean{firstsection}
+\setboolean{firstsection}{true}
+
+% Auto page break before sections (except first)
+\let\oldsection\section
+\renewcommand{\section}{%
+  \ifthenelse{\boolean{firstsection}}{%
+    \setboolean{firstsection}{false}%
+  }{%
+    \clearpage%
+  }%
+  \oldsection%
+}
+
+\titleformat{\section}
+{\normalfont\zihao{-4}\bfseries\raggedright}
+{}
+{-0.1em}
+{%
+  \begin{tikzpicture}
+  \fill[xshift=-6.5mm,yshift=-4.5mm,themecolor!30,rounded corners=3pt] (0,0) rectangle (2,.75);
+  \fill [thick,themecolor!30,rounded corners=3pt,xshift=-4mm,yshift=-4.5mm] (1.5mm,0) -- (1.5mm,0.7mm) -- (16.7mm,1.2mm) -- (\textwidth-1mm,1.5mm) -- (\textwidth-1mm,0) -- cycle;
+  \node[right] at (\titlelabelspace,0) {\color{themecolor}#1};
+  \node at (.35,0) {\color{themecolor}第\thesection 部分};
+  \end{tikzpicture}
+  \vspace*{0cm}
+}
+
+\titlespacing*{\section}
+{0pt}{*2.0}{*1.5}
+
+%=============================================================================
+% Question and Answer Commands
+%=============================================================================
+\newcommand{\question}[1]{\ifthenelse{\boolean{showquestion}} {#1}{}\par\nopagebreak[4]}
+\newcommand{\answer}[1]{\nopagebreak[3]\ifthenelse{\boolean{showanswer}}{\textbf{\textcolor{themecolor}{【答案】}}{\kaishu #1}}{}\par}
+
+% Conditional page breaks
+\newcommand{\clearpageQ}{\ifthenelse{\boolean{showanswer}}{}{\clearpage}}  % Question mode only
+\newcommand{\clearpageA}{\ifthenelse{\boolean{showanswer}}{\clearpage}{}}  % Answer mode only
+
+%=============================================================================
+% Question Environments
+%=============================================================================
+\newcommand*\cir[1]{\tikz[baseline=(char.base)]{%
+    \node[circle,fill=themecolor,draw=themecolor,minimum size=0.65cm,align=center,inner sep=-1.0pt,font=\bfseries\sffamily\small\color{white}] (char){#1};}
+}
+\newenvironment{questions}{\begin{enumerate}[label=\protect\cir{\arabic*},itemindent=0em,leftmargin=1.2cm,itemsep=1em]\setlength{\columnsep}{4.5em}}
+  {\end{enumerate}}
+
+% Single question environment (no number)
+\newenvironment{singleqs}{%
+    \begin{list}{}{%
+        \setlength{\leftmargin}{0cm}%
+        \setlength{\itemindent}{0em}%
+        \setlength{\labelwidth}{0pt}%
+        \setlength{\labelsep}{0pt}%
+        \setlength{\itemsep}{1em}%
+    }%
+}{\end{list}}
+
+%=============================================================================
+% Answer Area Commands
+%=============================================================================
+% Horizontal lines answer area
+\newcommand{\answerlines}[1]{
+  \nopagebreak[4]%
+  \ifthenelse{\NOT \boolean{showanswer}}{
+    \vspace{0.5em}
+    \begingroup
+    \setlength{\parskip}{0.7cm}
+    \par\noindent\vspace{0.1cm}
+    \foreach \n in {1,...,#1}{%
+      \noindent\makebox[\linewidth]{%
+      \color{themecolor!30}\rule{0cm}{0pt}\rule{\dimexpr\linewidth-0.5cm}{0.4pt}}\par
+    }
+    \endgroup
+    \vspace{0.5em}
+  }{}
+}
+
+% Essay box environment (no auto-annotation)
+\newtcolorbox{essaybox}[1]{
+  enhanced,
+  title={\centering\textbf{\large #1}},
+  fonttitle=\normalfont,
+  coltitle=black,
+  colback=themecolor!8,
+  colbacktitle=themecolor!8,
+  colframe=themecolor!70,
+  boxrule=0.5pt,
+  arc=12pt,
+  outer arc=12pt,
+  borderline={0.5pt}{0pt}{themecolor!70, dashed},
+  frame hidden,
+  titlerule=0pt,
+  toptitle=0.5em,
+  bottomtitle=0.8em,
+  top=0.3em,
+  bottom=0.5em,
+  left=1em,
+  right=1em,
+  before skip=0.5em,
+  after skip=0.5em,
+  before upper={\begin{itemize}[itemsep=1pt,leftmargin=1.5em,labelsep=0.6em,label=\textcolor{themecolor}{\textbullet}]},
+  after upper={\end{itemize}},
+  breakable,
+}
+
+% Piano staff answer area (Music Module)
+\newcommand{\pianostaff}[1]{
+  \nopagebreak[4]%
+  \ifthenelse{\NOT \boolean{showanswer}}{
+    \vspace{0.5em}
+    \foreach \n in {1,...,#1}{%
+      \begin{center}
+        \origincludegraphics[width=0.9\textwidth]{"piano staff.pdf"}
+        \vspace{0.5em}
+      \end{center}
+    }
+    \vspace{0.5em}
+  }{}
+}
+
+% Regular staff answer area (Music Module)
+\newcommand{\stafflines}[1]{
+  \nopagebreak[4]%
+  \ifthenelse{\NOT \boolean{showanswer}}{
+    \vspace{0.5em}
+    \foreach \n in {1,...,#1}{%
+      \begin{center}
+        \origincludegraphics[width=0.9\textwidth]{"blank staff.pdf"}
+        \vspace{0.5em}
+      \end{center}
+    }
+    \vspace{0.5em}
+  }{}
+}
+
+% Short staff (Music Module)
+\newcommand{\staffshort}[1][0.1]{
+  \nopagebreak[4]%
+  \ifthenelse{\NOT \boolean{showanswer}}{
+    \vspace{0.3em}
+    \begin{center}
+      \origincludegraphics[width=#1\textwidth,height=!]{"blank staff2.pdf"}
+    \end{center}
+    \vspace{0.3em}
+  }{}
+}
+
+%=============================================================================
+% Fill-in Tables
+%=============================================================================
+% Two-column fill-in table
+\newenvironment{filltable}{%
+  \nopagebreak[4]%
+  \vspace{0.3em}
+  \begin{center}
+  \renewcommand{\arraystretch}{1.6}
+  \arrayrulecolor{themecolor!30}
+  \begin{tabular}{l@{\quad}p{0.28\textwidth}p{0.02\textwidth}l@{\quad}p{0.28\textwidth}}
+}{%
+  \end{tabular}
+  \end{center}
+  \vspace{0.3em}
+}
+
+% One row with two fill-in pairs
+\newcommand{\fillpair}[4]{%
+  #1 & \ifthenelse{\boolean{showanswer}}{#2}{\hspace{0pt}} & & #3 & \ifthenelse{\boolean{showanswer}}{#4}{\hspace{0pt}} \\ \cline{2-2}\cline{5-5}
+}
+
+% Left column only
+\newcommand{\fillleft}[2]{%
+  #1 & \ifthenelse{\boolean{showanswer}}{#2}{\hspace{0pt}} & & & \\ \cline{2-2}
+}
+
+% Right column only
+\newcommand{\fillright}[2]{%
+  & & & #1 & \ifthenelse{\boolean{showanswer}}{#2}{\hspace{0pt}} \\ \cline{5-5}
+}
+
+%=============================================================================
+% Three-column Fill-in Table
+%=============================================================================
+\newenvironment{filltable3}{%
+  \nopagebreak[4]%
+  \vspace{0.3em}
+  \begin{center}
+  \renewcommand{\arraystretch}{1.6}
+  \arrayrulecolor{themecolor!30}
+  \begin{tabular}{l@{\;}p{0.12\textwidth}p{0.02\textwidth}l@{\;}p{0.12\textwidth}p{0.02\textwidth}l@{\;}p{0.12\textwidth}}
+}{%
+  \end{tabular}
+  \end{center}
+  \vspace{0.3em}
+}
+
+% One row with three fill-in pairs
+\newcommand{\filltriple}[6]{%
+  #1 & \ifthenelse{\boolean{showanswer}}{#2}{\hspace{0pt}} & & #3 & \ifthenelse{\boolean{showanswer}}{#4}{\hspace{0pt}} & & #5 & \ifthenelse{\boolean{showanswer}}{#6}{\hspace{0pt}} \\ \cline{2-2}\cline{5-5}\cline{8-8}
+}
+
+%=============================================================================
+% Translation Fill-in Table (for specialized use)
+%=============================================================================
+\newcommand{\translatearea}[1]{%
+  \nopagebreak[4]%
+  \ifthenelse{\NOT \boolean{showanswer}}{%
+    \vspace{0.3em}
+    \begin{center}
+    \renewcommand{\arraystretch}{1.6}
+    \arrayrulecolor{themecolor!30}
+    \begin{tabular}{l@{\quad}p{0.28\textwidth}p{0.02\textwidth}l@{\quad}p{0.28\textwidth}}
+    #1
+    \end{tabular}
+    \end{center}
+    \vspace{0.3em}
+  }{}%
+}
+
+\newcommand{\translateanswer}[1]{%
+  \ifthenelse{\boolean{showanswer}}{%
+    \vspace{0.3em}
+    \begin{center}
+    \renewcommand{\arraystretch}{1.6}
+    \arrayrulecolor{themecolor!30}
+    \begin{tabular}{l@{\quad}p{0.28\textwidth}p{0.02\textwidth}l@{\quad}p{0.28\textwidth}}
+    #1
+    \end{tabular}
+    \end{center}
+    \vspace{0.3em}
+  }{}%
+}
+
+%=============================================================================
+% Title Decoration
+%=============================================================================
+\newcommand{\decoratedtitle}[1]{%
+  \setboolean{firstsection}{true}%
+  \thispagestyle{plain}%
+  \pagebg
+  \begin{center}
+    {\fontsize{22}{22}\selectfont\bfseries
+     \begin{tikzpicture}[baseline]
+       % White outline effect
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0,0.07) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0.07,0) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0,-0.07) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (-0.07,0) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0.05,0.05) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (-0.05,0.05) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0.05,-0.05) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (-0.05,-0.05) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0.03,0.06) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0.06,0.03) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (-0.03,0.06) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (-0.06,0.03) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0.03,-0.06) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0.06,-0.03) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (-0.03,-0.06) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (-0.06,-0.03) {#1};
+       % Main text
+       \node[text=themecolor, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0,0) {#1};
+     \end{tikzpicture}
+     \par}
+  \end{center}
+  \vspace{1em}
+}
+
+% Page background
+\newcommand{\pagebg}{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north,inner sep=0pt,outer sep=0pt] at (current page.north) {%
+      \origincludegraphics[width=\paperwidth,keepaspectratio]{NWBUV-B006-Horz.png}%
+    };
+  \end{tikzpicture}%
+}
+
+% Safe image include (with existence check)
+\newcommand{\safeincludegraphics}[2][]{%
+  \IfFileExists{#2}{%
+    \origincludegraphics[#1]{#2}%
+  }{%
+    \fbox{\phantom{\rule{5cm}{2cm}}Image not found}%
+  }%
+}
+
+%=============================================================================
+% Exam Header Command
+%=============================================================================
+% Usage: \testheader{Title}
+\newcommand{\testheader}[1]{%
+  \ifx\currentexamid\empty\else\saveexampoints\fi%
+  \clearpage%
+  \setcounter{section}{0}%
+  \setcounter{exampoints}{0}%
+  \settitle{#1}%
+  \renewcommand{\currentexamid}{#1}%
+  \decoratedtitle{\mytitle}%
+  \begin{flushright}%
+    {\kaishu{命题教师：教研组}}\par
+    {\mytoday}
+  \end{flushright}
+  \begin{center}
+    \textbf{\textcolor{themecolor}{（满分\getexampoints 分，考试时间60分钟）}}
+  \end{center}
+}
+
+% Save last exam points at document end
+\AtEndDocument{\saveexampoints}
+
+\endinput

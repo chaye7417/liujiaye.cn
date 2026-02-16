@@ -1,1 +1,10 @@
 .DS_Store
+
+# 试卷工厂
+exam-factory/__pycache__/
+exam-factory/**/__pycache__/
+exam-factory/*.pyc
+exam-factory/.venv/
+exam-factory/venv/
+exam-factory/data/
+exam-factory/.env

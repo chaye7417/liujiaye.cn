@@ -1,0 +1,606 @@
+{% extends "base.html" %}
+{% block title %}工作台 - 试卷工厂{% endblock %}
+
+{% block head %}
+<style>
+    /* AI 流式输出区域 */
+    .stream-box {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        border-radius: 8px;
+        padding: 20px;
+        font-family: "SF Mono", "Fira Code", "Consolas", monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        min-height: 200px;
+        max-height: 400px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+        margin-bottom: 16px;
+    }
+    .stream-box .cursor {
+        display: inline-block;
+        width: 8px;
+        height: 16px;
+        background: var(--primary);
+        animation: blink 1s step-end infinite;
+        vertical-align: text-bottom;
+    }
+    @keyframes blink {
+        50% { opacity: 0; }
+    }
+    /* 进度条 */
+    .progress-wrap {
+        margin: 20px 0;
+    }
+    .progress-bar-outer {
+        width: 100%;
+        height: 8px;
+        background: var(--border);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .progress-bar-inner {
+        height: 100%;
+        background: var(--primary);
+        border-radius: 4px;
+        width: 0%;
+        transition: width 0.4s ease;
+    }
+    .progress-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 8px;
+        font-size: 14px;
+        color: var(--text-muted);
+    }
+    .progress-info .pct {
+        font-weight: 600;
+        color: var(--primary);
+    }
+    /* 下载按钮组 */
+    .download-group {
+        display: flex;
+        gap: 16px;
+        margin-top: 24px;
+    }
+    .download-card {
+        flex: 1;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+        text-align: center;
+        transition: all 0.2s;
+    }
+    .download-card:hover {
+        border-color: var(--primary);
+        box-shadow: 0 4px 12px rgba(78, 155, 134, 0.15);
+    }
+    .download-card .icon {
+        font-size: 40px;
+        margin-bottom: 8px;
+    }
+    .download-card .label {
+        font-size: 16px;
+        font-weight: 500;
+        margin-bottom: 12px;
+        color: var(--text);
+    }
+    .download-card .btn {
+        width: 100%;
+    }
+    /* 步骤 1.5 - AI 解析面板 */
+    .parse-panel {
+        display: none;
+    }
+    .parse-panel.show {
+        display: block;
+    }
+    .parse-status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 16px;
+        font-size: 15px;
+        color: var(--text);
+    }
+    .parse-status .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--primary);
+        animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.8); }
+    }
+    .parse-status.done .dot {
+        background: var(--success);
+        animation: none;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<nav class="navbar">
+    <a href="/" class="logo">试卷工厂</a>
+    <div class="user-info">
+        <span id="userEmail"></span>
+        <button class="btn-logout" onclick="logout()">退出</button>
+    </div>
+</nav>
+
+<div class="container">
+    <!-- 步骤指示器 -->
+    <div class="steps">
+        <div class="step active" id="step1">
+            <span class="num">1</span> 上传文件
+        </div>
+        <div class="step-line"></div>
+        <div class="step" id="step2">
+            <span class="num">2</span> AI 解析
+        </div>
+        <div class="step-line"></div>
+        <div class="step" id="step3">
+            <span class="num">3</span> 编辑内容
+        </div>
+        <div class="step-line"></div>
+        <div class="step" id="step4">
+            <span class="num">4</span> 下载 PDF
+        </div>
+    </div>
+
+    <div id="alert" class="alert"></div>
+
+    <!-- 第 1 步：上传 -->
+    <div id="panel1" class="card">
+        <h2>上传试卷文件</h2>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="title">试卷标题 *</label>
+                <input type="text" id="title" placeholder="如：2024年期末考试 - 高等数学">
+            </div>
+            <div class="form-group">
+                <label for="school">学校名称（可选）</label>
+                <input type="text" id="school" placeholder="如：中央音乐学院">
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>主题色</label>
+            <div class="color-options">
+                <div class="color-option selected" data-color="4e9b86" style="background:#4e9b86" title="青绿色"></div>
+                <div class="color-option" data-color="1971c2" style="background:#1971c2" title="蓝色"></div>
+                <div class="color-option" data-color="c92a2a" style="background:#c92a2a" title="红色"></div>
+                <div class="color-option" data-color="2f9e44" style="background:#2f9e44" title="绿色"></div>
+                <div class="color-option" data-color="7048e8" style="background:#7048e8" title="紫色"></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>上传文件 *</label>
+            <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                <div class="icon">&#128194;</div>
+                <div class="text">点击或拖拽文件到此处</div>
+                <div class="hint">支持 .docx .pdf .txt .md，最大 20MB</div>
+                <div class="filename" id="fileName"></div>
+            </div>
+            <input type="file" id="fileInput" accept=".docx,.pdf,.txt,.md" style="display:none" onchange="fileSelected(this)">
+        </div>
+
+        <button class="btn btn-primary btn-block" id="uploadBtn" onclick="uploadFile()">
+            上传并解析
+        </button>
+    </div>
+
+    <!-- 第 2 步：AI 流式解析 -->
+    <div id="panel2" class="card parse-panel">
+        <h2>AI 正在解析试卷</h2>
+        <div class="parse-status" id="parseStatus">
+            <div class="dot"></div>
+            <span id="parseStatusText">AI 正在分析试卷内容...</span>
+        </div>
+        <div class="stream-box" id="streamBox"><span class="cursor"></span></div>
+        <div class="progress-wrap">
+            <div class="progress-bar-outer">
+                <div class="progress-bar-inner" id="parseProgress"></div>
+            </div>
+            <div class="progress-info">
+                <span id="parseMsg">正在连接 AI...</span>
+                <span class="pct" id="parsePct">0%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 第 3 步：编辑 Markdown -->
+    <div id="panel3" class="card" style="display:none">
+        <h2>编辑试卷内容</h2>
+        <p style="color:var(--text-muted); font-size:14px; margin-bottom:16px;">
+            AI 已识别出以下内容，你可以直接编辑修改，确认无误后生成 PDF。
+        </p>
+
+        <div class="form-group">
+            <textarea id="markdownEditor" placeholder="Markdown 内容"></textarea>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-secondary" onclick="goBack()">重新上传</button>
+            <button class="btn btn-primary" style="flex:1" id="generateBtn" onclick="generatePDF()">
+                生成试卷 PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- 生成 PDF 进度 -->
+    <div id="panel3b" class="card parse-panel">
+        <h2>正在生成 PDF</h2>
+        <div class="parse-status" id="pdfStatus">
+            <div class="dot"></div>
+            <span id="pdfStatusText">准备中...</span>
+        </div>
+        <div class="progress-wrap">
+            <div class="progress-bar-outer">
+                <div class="progress-bar-inner" id="pdfProgress"></div>
+            </div>
+            <div class="progress-info">
+                <span id="pdfMsg">LaTeX 编译中...</span>
+                <span class="pct" id="pdfPct">0%</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 第 4 步：下载 -->
+    <div id="panel4" class="card" style="display:none">
+        <h2 style="color: var(--success);">&#10003; PDF 生成成功</h2>
+        <p style="margin: 16px 0; color: var(--text-muted);">
+            试题卷和答案卷已生成，点击下方按钮分别下载。
+        </p>
+
+        <div class="download-group">
+            <div class="download-card">
+                <div class="icon">&#128196;</div>
+                <div class="label">试题卷</div>
+                <a id="examLink" class="btn btn-primary" target="_blank">下载试题卷</a>
+            </div>
+            <div class="download-card">
+                <div class="icon">&#128221;</div>
+                <div class="label">答案卷</div>
+                <a id="answerLink" class="btn btn-secondary" target="_blank">下载答案卷</a>
+            </div>
+        </div>
+
+        <div class="btn-group" style="margin-top:24px">
+            <button class="btn btn-secondary" onclick="goToEdit()">返回编辑</button>
+            <button class="btn btn-secondary" onclick="goBack()">制作新试卷</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentTaskId = null;
+    let selectedTheme = '4e9b86';
+
+    // 检查登录状态
+    (async () => {
+        try {
+            const res = await fetch('/api/me');
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('userEmail').textContent = data.email;
+            }
+        } catch (e) {}
+    })();
+
+    function showAlert(msg, type) {
+        const el = document.getElementById('alert');
+        el.textContent = msg;
+        el.className = `alert show alert-${type}`;
+        if (type === 'success') setTimeout(() => el.classList.remove('show'), 5000);
+    }
+
+    function hideAlert() {
+        document.getElementById('alert').className = 'alert';
+    }
+
+    // 主题色选择
+    document.querySelectorAll('.color-option').forEach(el => {
+        el.addEventListener('click', () => {
+            document.querySelectorAll('.color-option').forEach(e => e.classList.remove('selected'));
+            el.classList.add('selected');
+            selectedTheme = el.dataset.color;
+        });
+    });
+
+    // 文件拖拽
+    const uploadArea = document.getElementById('uploadArea');
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file) {
+            document.getElementById('fileInput').files = e.dataTransfer.files;
+            fileSelected(document.getElementById('fileInput'));
+        }
+    });
+
+    function fileSelected(input) {
+        const file = input.files[0];
+        if (file) {
+            document.getElementById('fileName').textContent = file.name;
+        }
+    }
+
+    function setStep(n) {
+        [1,2,3,4].forEach(i => {
+            const el = document.getElementById(`step${i}`);
+            el.classList.remove('active', 'done');
+            if (i < n) el.classList.add('done');
+            if (i === n) el.classList.add('active');
+        });
+    }
+
+    function showPanel(id) {
+        ['panel1','panel2','panel3','panel3b','panel4'].forEach(p => {
+            const el = document.getElementById(p);
+            el.style.display = 'none';
+            el.classList.remove('show');
+        });
+        const target = document.getElementById(id);
+        target.style.display = 'block';
+        target.classList.add('show');
+    }
+
+    // ============ 第 1 步：上传文件 ============
+
+    async function uploadFile() {
+        const title = document.getElementById('title').value.trim();
+        const file = document.getElementById('fileInput').files[0];
+
+        if (!title) { showAlert('请输入试卷标题', 'error'); return; }
+        if (!file) { showAlert('请选择文件', 'error'); return; }
+
+        hideAlert();
+        const btn = document.getElementById('uploadBtn');
+        btn.disabled = true;
+        btn.textContent = '上传中...';
+
+        const form = new FormData();
+        form.append('file', file);
+        form.append('title', title);
+        form.append('school', document.getElementById('school').value.trim());
+        form.append('theme', selectedTheme);
+
+        try {
+            const res = await fetch('/api/upload', { method: 'POST', body: form });
+            const data = await res.json();
+
+            if (res.ok) {
+                currentTaskId = data.task_id;
+                startAIParse();
+            } else {
+                showAlert(data.detail || '上传失败', 'error');
+                btn.disabled = false;
+                btn.textContent = '上传并解析';
+            }
+        } catch (e) {
+            showAlert('网络错误，请重试', 'error');
+            btn.disabled = false;
+            btn.textContent = '上传并解析';
+        }
+    }
+
+    // ============ 第 2 步：AI 流式解析 ============
+
+    async function startAIParse() {
+        setStep(2);
+        showPanel('panel2');
+
+        const streamBox = document.getElementById('streamBox');
+        const parseProgress = document.getElementById('parseProgress');
+        const parseMsg = document.getElementById('parseMsg');
+        const parsePct = document.getElementById('parsePct');
+        const parseStatus = document.getElementById('parseStatus');
+        const parseStatusText = document.getElementById('parseStatusText');
+
+        streamBox.innerHTML = '<span class="cursor"></span>';
+        parseProgress.style.width = '0%';
+        parsePct.textContent = '0%';
+        parseMsg.textContent = '正在连接 AI...';
+        parseStatus.classList.remove('done');
+        parseStatusText.textContent = 'AI 正在分析试卷内容...';
+
+        let collected = '';
+        let charCount = 0;
+
+        try {
+            const res = await fetch(`/api/tasks/${currentTaskId}/parse`);
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || 'AI 解析请求失败');
+            }
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const jsonStr = line.slice(6);
+                    let event;
+                    try {
+                        event = JSON.parse(jsonStr);
+                    } catch (e) { continue; }
+
+                    if (event.type === 'chunk') {
+                        collected += event.text;
+                        charCount += event.text.length;
+                        // 更新流式显示
+                        const cursor = streamBox.querySelector('.cursor');
+                        const textNode = document.createTextNode(event.text);
+                        streamBox.insertBefore(textNode, cursor);
+                        streamBox.scrollTop = streamBox.scrollHeight;
+                        // 模拟进度（基于字符数估算，假设总共约 3000 字）
+                        const pct = Math.min(95, Math.round(charCount / 30));
+                        parseProgress.style.width = pct + '%';
+                        parsePct.textContent = pct + '%';
+                        parseMsg.textContent = `已接收 ${charCount} 字符...`;
+                    } else if (event.type === 'done') {
+                        // 解析完成
+                        parseProgress.style.width = '100%';
+                        parsePct.textContent = '100%';
+                        parseMsg.textContent = '解析完成';
+                        parseStatus.classList.add('done');
+                        parseStatusText.textContent = 'AI 解析完成';
+                        streamBox.querySelector('.cursor').remove();
+
+                        // 短暂停留后跳转到编辑
+                        setTimeout(() => {
+                            document.getElementById('markdownEditor').value = event.markdown;
+                            showPanel('panel3');
+                            setStep(3);
+                        }, 800);
+                    } else if (event.type === 'error') {
+                        throw new Error(event.message);
+                    }
+                }
+            }
+        } catch (e) {
+            showAlert('AI 解析失败: ' + e.message, 'error');
+            showPanel('panel1');
+            setStep(1);
+            document.getElementById('uploadBtn').disabled = false;
+            document.getElementById('uploadBtn').textContent = '上传并解析';
+        }
+    }
+
+    // ============ 第 3 步：生成 PDF ============
+
+    async function generatePDF() {
+        const md = document.getElementById('markdownEditor').value;
+        if (!md.trim()) {
+            showAlert('Markdown 内容不能为空', 'error');
+            return;
+        }
+
+        hideAlert();
+        setStep(4);
+        showPanel('panel3b');
+
+        const pdfProgress = document.getElementById('pdfProgress');
+        const pdfMsg = document.getElementById('pdfMsg');
+        const pdfPct = document.getElementById('pdfPct');
+        const pdfStatus = document.getElementById('pdfStatus');
+        const pdfStatusText = document.getElementById('pdfStatusText');
+
+        pdfProgress.style.width = '0%';
+        pdfPct.textContent = '0%';
+        pdfMsg.textContent = '准备中...';
+        pdfStatus.classList.remove('done');
+        pdfStatusText.textContent = '正在生成 PDF...';
+
+        const form = new FormData();
+        form.append('markdown', md);
+
+        try {
+            const res = await fetch(`/api/tasks/${currentTaskId}/generate-pdf`, {
+                method: 'POST', body: form,
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || 'PDF 生成请求失败');
+            }
+
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const jsonStr = line.slice(6);
+                    let event;
+                    try {
+                        event = JSON.parse(jsonStr);
+                    } catch (e) { continue; }
+
+                    if (event.type === 'progress') {
+                        pdfProgress.style.width = event.pct + '%';
+                        pdfPct.textContent = event.pct + '%';
+                        pdfMsg.textContent = event.msg;
+                        pdfStatusText.textContent = event.msg;
+                    } else if (event.type === 'done') {
+                        pdfProgress.style.width = '100%';
+                        pdfPct.textContent = '100%';
+                        pdfMsg.textContent = '生成完成';
+                        pdfStatus.classList.add('done');
+                        pdfStatusText.textContent = 'PDF 生成完成';
+
+                        document.getElementById('examLink').href = event.exam_url;
+                        document.getElementById('answerLink').href = event.answer_url;
+
+                        setTimeout(() => {
+                            showPanel('panel4');
+                        }, 500);
+                    } else if (event.type === 'error') {
+                        throw new Error(event.message);
+                    }
+                }
+            }
+        } catch (e) {
+            showAlert('PDF 生成失败: ' + e.message, 'error');
+            showPanel('panel3');
+            setStep(3);
+        }
+    }
+
+    // ============ 导航 ============
+
+    function goBack() {
+        currentTaskId = null;
+        hideAlert();
+        showPanel('panel1');
+        document.getElementById('uploadBtn').disabled = false;
+        document.getElementById('uploadBtn').textContent = '上传并解析';
+        document.getElementById('fileInput').value = '';
+        document.getElementById('fileName').textContent = '';
+        setStep(1);
+    }
+
+    function goToEdit() {
+        hideAlert();
+        showPanel('panel3');
+        setStep(3);
+    }
+
+    async function logout() {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        window.location.href = '/';
+    }
+</script>
+{% endblock %}

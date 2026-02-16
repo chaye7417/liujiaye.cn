@@ -1,0 +1,64 @@
+% main.tex - Main Entry File for Exam Paper Collection
+% Compile with: xelatex main.tex (run twice for cross-references)
+
+%! TEX program = xelatex
+
+%=============================================================================
+% Document Class
+%=============================================================================
+\documentclass[11pt,a4paper]{ctexart}
+
+%=============================================================================
+% Page Layout
+%=============================================================================
+\usepackage{geometry}
+\geometry{top=2cm,bottom=2.5cm,right=1.8cm,left=1.8cm}
+
+%=============================================================================
+% Load Style Package
+%=============================================================================
+\usepackage{styles}
+\usepackage{subfiles}
+
+%=============================================================================
+% Global Settings
+%=============================================================================
+% Mark this as main file (subfile local settings will be ignored)
+\setboolean{mainfileloaded}{true}
+
+% Global answer/question display settings
+% Change these to generate different versions:
+%   - Question paper: showanswer=false, showquestion=true
+%   - Answer key: showanswer=true, showquestion=true
+\setboolean{showquestion}{true}
+\setboolean{showanswer}{false}
+
+%=============================================================================
+% Optional: Customize Theme Color
+%=============================================================================
+% Uncomment to change theme color (default: #4e9b86 teal)
+% \setthemecolor{1971c2}  % Blue
+% \setthemecolor{c92a2a}  % Red
+% \setthemecolor{2f9e44}  % Green
+
+%=============================================================================
+% Optional: Set School/Institution Name
+%=============================================================================
+\setschool{Exam Collection}
+
+%=============================================================================
+% Document Content
+%=============================================================================
+\begin{document}
+
+%-----------------------------------------------------------------------------
+% Include Subfiles
+% Add your exam subfiles here
+%-----------------------------------------------------------------------------
+
+\subfile{content/exam1}
+\subfile{content/exam2}
+% \subfile{content/exam3}
+% Add more subfiles as needed...
+
+\end{document}
