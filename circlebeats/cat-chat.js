@@ -2,7 +2,7 @@ let currentModel = null;
 let typingInterval = null;
 
 // ChatGPT API 配置
-const OPENAI_API_KEY = "";
+const OPENAI_API_KEY = "";  // TODO: 配置 API Key
 
 // 初始化 Live2D 小猫 - 适配到可视化器面板内
 function initLive2D() {
