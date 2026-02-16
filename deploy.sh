@@ -17,7 +17,10 @@ rsync -avz --delete --exclude='.git' website/ $SERVER:/home/ubuntu/website/
 echo "=== 4. 同步 CircleBeats ==="
 rsync -avz --delete --exclude='.git' circlebeats/ $SERVER:/home/ubuntu/website/circlebeats/
 
-echo "=== 5. 同步试卷工厂 ==="
+echo "=== 5. 同步 Crystal Balls ==="
+rsync -avz --delete --exclude='.git' crystal-balls/ $SERVER:/home/ubuntu/website/crystal-balls/
+
+echo "=== 6. 同步试卷工厂 ==="
 rsync -avz --delete \
     --exclude='.git' \
     --exclude='__pycache__' \
@@ -26,7 +29,7 @@ rsync -avz --delete \
     --exclude='.env' \
     exam-factory/ $SERVER:/home/ubuntu/exam-factory/
 
-echo "=== 6. 重启试卷工厂服务 ==="
+echo "=== 7. 重启试卷工厂服务 ==="
 ssh $SERVER 'sudo systemctl restart exam-factory'
 
 echo "=== 部署完成 ==="
