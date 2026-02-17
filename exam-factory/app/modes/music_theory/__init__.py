@@ -1,151 +1,31 @@
-"""AI 提示词模块 - 三个模式对应的 system prompt 和 user content 构建器。"""
+"""乐理出题模式 — system prompt + 题型汇总 + user content 构建器。
 
+题型文件自动扫描：在此目录下新建 .py 文件并定义 PROMPT 和 SCORE 即可。
+"""
+
+import importlib
+import pkgutil
+from pathlib import Path
 from typing import Optional
 
-from app.music_theory import QUESTION_TYPE_PROMPTS, QUESTION_TYPE_SCORES
+# ---------------------------------------------------------------------------
+# 自动扫描同目录下的题型模块
+# ---------------------------------------------------------------------------
+_pkg_path = str(Path(__file__).parent)
 
+QUESTION_TYPE_PROMPTS: dict[str, str] = {}
+QUESTION_TYPE_SCORES: dict[str, float] = {}
 
-# =============================================================================
-# Mode 1: 排版模式（Format）— 原有功能
-# =============================================================================
+for _finder, _name, _ispkg in pkgutil.iter_modules([_pkg_path]):
+    _mod = importlib.import_module(f"{__name__}.{_name}")
+    if hasattr(_mod, "PROMPT") and hasattr(_mod, "SCORE"):
+        QUESTION_TYPE_PROMPTS[_name] = _mod.PROMPT
+        QUESTION_TYPE_SCORES[_name] = _mod.SCORE
 
-FORMAT_PROMPT = """你是一个试卷格式化专家。用户会给你一份试卷的原始文本内容，你需要将其转换为标准的 Markdown 格式。
-
-## 输出格式要求
-
-必须严格按照以下格式输出，不要添加任何额外说明：
-
-```
----
-title: 试卷标题（从内容中提取）
----
-
-# 第一大题的题型名称（如：选择题）
-
-## [分数分]
-题目内容？
-- A. 选项A
-- B. 选项B
-- C. 选项C
-- D. 选项D
-> 答案: B
-
-# 第二大题的题型名称（如：简答题）
-
-## [分数分]
-题目内容？
-> 行数: 3
-> 答案: 答案内容
-
-# 第三大题的题型名称（如：综合题）
-
-## [分数分]
-> 要求框: 任务标题
-> - 要求 1
-> - 要求 2
-
-题目内容？
-> 行数: 15
-> 答案: 参考答案
-```
-
-## 规则
-
-1. **题目格式**：每题用 `## [n分]` 开头，n 是分值
-2. **选择题**：必须有 A/B/C/D 四个选项，格式 `- A. 内容`
-3. **简答题**：用 `> 行数: n` 指定答题行数（根据题目难度估算：简单题 2-3 行，中等 4-6 行，复杂 8-15 行）
-4. **综合大题**：可以用 `> 要求框: 标题` 加要求列表（仅用于最后的大题）
-5. **答案**：每题必须有 `> 答案: 内容`
-6. **分值**：如果原文有分值就用原文的，没有的话根据题型合理分配
-7. **题型分组**：相同题型的题放在同一个 `#` 标题下
-8. **不要编造**：忠实还原原始内容，不要添加或修改题目
-9. **标题**：从试卷内容中提取标题放到 YAML 头部的 title 字段
-
-## 音乐类试题特殊格式
-
-如果遇到需要五线谱答题的题目：
-- 普通五线谱：`> 五线谱: n`（n 为谱表行数）
-- 钢琴大谱表：`> 钢琴谱: n`（n 为谱表组数）
-"""
-
-
-# =============================================================================
-# Mode 2: 通用出题模式（Generate）
-# =============================================================================
-
-GENERATE_PROMPT = """你是一个专业的试卷命题专家。用户会提供参考资料，你需要根据指定的题型、数量和难度自动出题。
-
-## 输出格式要求
-
-必须严格按照以下 Markdown 格式输出，不要添加任何额外说明：
-
-```
----
-title: 试卷标题
----
-
-# 题型名称（如：选择题）
-
-## [分数分]
-题目内容？
-- A. 选项A
-- B. 选项B
-- C. 选项C
-- D. 选项D
-> 答案: B
-
-# 题型名称（如：填空题）
-
-## [分数分]
-题目内容？（空格用下划线 ______ 表示）
-> 行数: 1
-> 答案: 答案内容
-
-# 题型名称（如：简答题）
-
-## [分数分]
-题目内容？
-> 行数: 5
-> 答案: 参考答案
-
-# 题型名称（如：论述题）
-
-## [分数分]
-题目内容？
-> 行数: 10
-> 答案: 参考答案
-```
-
-## 出题规则
-
-1. **题目格式**：每题用 `## [n分]` 开头，n 是分值
-2. **选择题**：必须有 A/B/C/D 四个选项，格式 `- A. 内容`；合理分配分值（一般 2-3 分/题）
-3. **填空题**：空格用 `______` 表示；分值一般 2-3 分/题
-4. **简答题**：用 `> 行数: n` 指定答题行数（一般 3-6 行）；分值一般 5-10 分/题
-5. **论述题**：用 `> 行数: n` 指定答题行数（一般 8-15 行）；分值一般 10-20 分/题
-6. **答案**：每题必须有 `> 答案: 内容`，答案要准确、完整
-7. **题型分组**：相同题型的题放在同一个 `#` 标题下
-8. **出题质量**：
-   - 题目必须基于提供的参考资料，不要超出范围
-   - 选择题的干扰项要有一定迷惑性，不能太离谱
-   - 难度要符合用户要求
-   - 题目之间不要重复考查同一知识点
-   - 题目表述要清晰、无歧义
-9. **标题**：放到 YAML 头部的 title 字段
-
-## 音乐类试题特殊格式
-
-如果遇到需要五线谱答题的题目：
-- 普通五线谱：`> 五线谱: n`（n 为谱表行数）
-- 钢琴大谱表：`> 钢琴谱: n`（n 为谱表组数）
-"""
-
-
-# =============================================================================
-# Mode 3: 乐理出题模式（Music Theory）
-# =============================================================================
-
-MUSIC_THEORY_PROMPT = r"""你是一个专业的乐理统考命题专家，精通基本乐理、和声学，同时能编写 LilyPond 乐谱代码。
+# ---------------------------------------------------------------------------
+# System Prompt（LilyPond 语法 + 出题通用规则 + 真题范例）
+# ---------------------------------------------------------------------------
+SYSTEM_PROMPT = r"""你是一个专业的乐理统考命题专家，精通基本乐理、和声学，同时能编写 LilyPond 乐谱代码。
 你的出题水平对标中国各省音乐类统考（联考）乐理科目的真题水平。
 
 ## 输出格式要求
@@ -475,74 +355,15 @@ title: 试卷标题
 """
 
 
-# =============================================================================
+# ---------------------------------------------------------------------------
 # User Content 构建器
-# =============================================================================
+# ---------------------------------------------------------------------------
 
-def build_format_user_content(file_content: str) -> str:
-    """构建排版模式的 user content。
-
-    Args:
-        file_content: 提取的试卷文本
-
-    Returns:
-        格式化后的 user content
-    """
-    return f"请将以下试卷内容转换为标准 Markdown 格式：\n\n{file_content}"
-
-
-def build_generate_user_content(
-    file_content: str,
-    generation_params: dict,
-) -> str:
-    """构建通用出题模式的 user content。
-
-    Args:
-        file_content: 参考资料文本
-        generation_params: 出题参数（题型、数量、难度等）
-
-    Returns:
-        格式化后的 user content
-    """
-    # 解析参数
-    question_types = generation_params.get("question_types", {})
-    difficulty = generation_params.get("difficulty", "中等")
-    extra_requirements = generation_params.get("extra_requirements", "")
-    title = generation_params.get("title", "")
-
-    # 构建题型要求
-    type_lines = []
-    for qtype, count in question_types.items():
-        if count and int(count) > 0:
-            type_lines.append(f"- {qtype}：{count} 题")
-
-    type_desc = "\n".join(type_lines) if type_lines else "- 由你自行安排题型和数量"
-
-    parts = [
-        f"请根据以下参考资料出一套试卷。",
-        f"\n## 出题要求\n",
-        f"**题型和数量：**\n{type_desc}",
-        f"\n**难度：**{difficulty}",
-    ]
-
-    if title:
-        parts.append(f"\n**试卷标题：**{title}")
-
-    if extra_requirements:
-        parts.append(f"\n**补充要求：**{extra_requirements}")
-
-    parts.append(f"\n## 参考资料\n\n{file_content}")
-
-    return "\n".join(parts)
-
-
-def build_music_theory_user_content(
+def build_user_content(
     generation_params: dict,
     file_content: Optional[str] = None,
 ) -> str:
-    """构建乐理出题模式的 user content。
-
-    根据 selected_types 列表拼接所选题型的 prompt 片段。
+    """根据用户选择的题型列表拼接 user content。
 
     Args:
         generation_params: 出题参数（selected_types、难度等）
@@ -556,7 +377,6 @@ def build_music_theory_user_content(
     extra_requirements = generation_params.get("extra_requirements", "")
     title = generation_params.get("title", "")
 
-    # 拼接已选题型的 prompt 片段
     section_parts: list[str] = []
     total_score = 0.0
     section_num = 0
@@ -569,7 +389,6 @@ def build_music_theory_user_content(
         section_parts.append(f"\n**第{section_num}部分：**\n{prompt_text}")
 
         if key == "choice":
-            # 选择题分值由用户指定题数决定
             single_n = int(generation_params.get("choice_single_n", 5))
             multi_n = int(generation_params.get("choice_multi_n", 5))
             choice_score = single_n * 0.6 + multi_n * 0.8

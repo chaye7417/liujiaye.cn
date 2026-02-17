@@ -8,7 +8,7 @@ from typing import AsyncGenerator, Optional
 
 import httpx
 from app.config import AI_MODELS, DEFAULT_MODEL
-from app.prompts import (
+from app.modes import (
     FORMAT_PROMPT,
     GENERATE_PROMPT,
     MUSIC_THEORY_PROMPT,
