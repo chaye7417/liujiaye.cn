@@ -218,6 +218,8 @@ title: 试卷标题
    - 五线谱答题：`> 五线谱: n`
    - 钢琴谱答题：`> 钢琴谱: n`
 6. **答案**：每题必须有 `> 答案: 内容`
+   - 涉及音符/节奏/音程/和弦/音阶的答案，尽量用 LilyPond 谱例展示（而非纯文字），方便看答案时直观对照
+   - 答案中的 LilyPond 代码块格式同题目
 7. **LilyPond 代码要求**：
    - 代码必须语法正确，可直接编译
    - 不要包含 `\include` 语句（系统会自动添加）
@@ -281,6 +283,8 @@ title: 试卷标题
 
 ### 范例四：音程构成写作题（山西2020风格）
 
+注意：10个音程必须用 `\bar "" \break` 分成两行，每行5个，避免排版拥挤。
+
 ```
 ## [10分]
 以下列音为根音构成指定音程：
@@ -294,13 +298,21 @@ title: 试卷标题
   fis'1^\markup { \small "增四度" }
   a1^\markup { \small "大七度" }
   d'1^\markup { \small "纯五度" }
+  \bar "" \break
+  g'1^\markup { \small "小二度" }
+  bes'1^\markup { \small "减五度" }
+  e'1^\markup { \small "增二度" }
+  f'1^\markup { \small "小七度" }
+  aes'1^\markup { \small "纯四度" }
 }
 ```
-> 五线谱: 1
-> 答案: (1) c'-e' (2) ees'-ces'' (3) fis'-bis' (4) a-gis' (5) d'-a'
+> 五线谱: 2
+> 答案: (1) c'-e' (2) ees'-ces'' (3) fis'-bis' (4) a-gis' (5) d'-a' (6) g'-aes' (7) bes'-fes'' (8) e'-fisis' (9) f'-ees'' (10) aes'-des''
 ```
 
 ### 范例五：和弦构成写作题（山西2020风格）
+
+注意：10个和弦标注文字很长，必须用 `\bar "" \break` 分组，每行2个，共5行，避免排版拥挤。
 
 ```
 ## [10分]
@@ -312,13 +324,22 @@ title: 试卷标题
   \omit Staff.BarLine
   e'1^\markup { \small "以此音为根音构成大三和弦" }
   a'1^\markup { \small "以此音为三音构成小三和弦" }
+  \bar "" \break
   g'1^\markup { \small "以此音为五音构成减三和弦" }
   bes'1^\markup { \small "以此音为根音构成属七和弦" }
+  \bar "" \break
   d'1^\markup { \small "以此音为七音构成减七和弦" }
+  f'1^\markup { \small "以此音为根音构成增三和弦" }
+  \bar "" \break
+  cis'1^\markup { \small "以此音为五音构成小七和弦" }
+  aes'1^\markup { \small "以此音为三音构成半减七和弦" }
+  \bar "" \break
+  b1^\markup { \small "以此音为根音构成减三和弦" }
+  c'1^\markup { \small "以此音为五音构成大三和弦" }
 }
 ```
-> 五线谱: 1
-> 答案: (1) e'-gis'-b' (2) fis'-a'-cis'' (3) aes-ces'-g' (4) bes'-d''-f''-aes'' (5) dis'-fis'-a'-d''
+> 五线谱: 5
+> 答案: (1) e'-gis'-b' (2) fis'-a'-cis'' (3) aes-ces'-g' (4) bes'-d''-f''-aes'' (5) dis'-fis'-a'-d'' (6) f'-a'-cis'' (7) e'-gis'-cis''-d'' (8) f'-aes'-ces''-ees'' (9) b-d'-f' (10) aes-c'-ees'
 ```
 
 ### 范例六：音阶写作题（山西2018风格）
@@ -375,46 +396,33 @@ title: 试卷标题
 
 ```
 ## [2分]
-将下列音符按2/4拍正确组合（不改变音的先后顺序，只调整记谱方式使之符合拍号要求）：
-原始序列：♩ ♪ ♪ ♩ ♪ ♪ ♩ ♩
-> 行数: 2
-> 答案: ♩ ♪♪ | ♩ ♪♪ | ♩ ♩ |（每小节两拍，八分音符用连线组合在同一拍内）
+将下列节奏按2/4拍正确组合（不改变音的先后顺序，只调整记谱方式使之符合拍号要求）：
+```lilypond
+{
+  \clef treble
+  \omit Staff.TimeSignature
+  \omit Staff.BarLine
+  c'4 c'8 c'8 c'4 c'8 c'8 c'4 c'4
+}
+```
+> 五线谱: 1
+> 答案:
+```lilypond
+{
+  \clef treble
+  \time 2/4
+  c'4 c'8 c'8 | c'4 c'8 c'8 | c'4 c'4 |
+}
+```
 ```
 
-## 两种试卷格式说明
-
-### 河北式（快速练习，15分/30分钟）
-
-| 题型 | 分值 | 说明 |
-|------|------|------|
-| 单项选择题 | 3分（5题×0.6） | 术语、音值组合、音程、调式、和弦 |
-| 多项选择题 | 4分（5题×0.8） | 更复杂，可选多个正确答案 |
-| 写作分析题 | 8分 | 音程/和弦构成+解决 + 旋律调性分析 |
-
-**河北式特点：**
-- 选择题大量使用谱例，选项也可以是谱例
-- 单选题考查基础概念、音值组合法、音程转位、等音等
-- 多选题考查较复杂的概念关联，如和声小调性质、调式音级特征等
-- 写作分析题固定为：音程/和弦构成与解决 + 旋律调性分析
-
-### 山西式（全面测试，80分/60分钟）
-
-| 大题 | 分值 | 内容 |
-|------|------|------|
-| 一、术语与音名标记 | 10分 | 记号/术语中文含义(5分) + 五线谱音名写作(5分) |
-| 二、节奏组合 | 10分 | 按拍号正确组合节奏序列(5组，每组2分) |
-| 三、音程构成 | 10分 | 以指定音为根音构成10种音程(每个1分) |
-| 四、和弦构成 | 10分 | 以指定音构成10种和弦(每个1分) |
-| 五、音阶写作 | 10分 | 写5种指定音阶(每个2分) |
-| 六、音程调性判断 | 10分 | 判断音程所属调式(5组，每组2分) |
-| 七、和弦调性判断 | 10分 | 判断和弦所属调式(5组，每组2分) |
-| 八、旋律调性分析 | 10分 | 分析旋律调式调性(5条，每条2分) |
-
-**山西式特点：**
-- 8大题固定结构，全面覆盖乐理知识
-- 写作题要求在五线谱上完成，需给出谱例
-- 调性判断题需列出所有可能的自然/和声调式
-- 音阶包括：自然/和声/旋律大小调、五声调式、教会调式
+**节奏组合题 LilyPond 要点：**
+- 使用正常音符头（`\clef treble`），不要用斜线音符或 `\clef percussion`
+- 题目中用 `c'` 表示所有音（只关注时值）
+- 题目隐藏拍号和小节线：`\omit Staff.TimeSignature` + `\omit Staff.BarLine`
+- 必须有 `> 五线谱: 1` 给学生留出答题空间
+- 答案用 `> 答案:` 后跟 LilyPond 代码块（显示拍号和小节线），答案谱例只出现在答案卷
+- 禁止使用 Unicode 音符符号（♩♪𝅗𝅥等），必须用 LilyPond 谱例
 
 ## 各题型详细出题规则
 
@@ -430,12 +438,14 @@ title: 试卷标题
 - 学生需在五线谱上写出另一个音
 - 音程类型覆盖：纯音程、大小音程、增减音程
 - 需包含升降号变化音
+- **排版要求：10个音程用 `\bar "" \break` 分成两行，每行5个**
 
 ### 和弦构成题规则
 - 给定一个音，标注它在和弦中的位置（根音/三音/五音/七音）和和弦类型
 - 学生需写出完整和弦
 - 和弦类型覆盖：大三、小三、增三、减三、属七、小七、半减七、减七
 - 需包含不同转位要求
+- **排版要求：10个和弦用 `\bar "" \break` 分组，每行2个（标注文字长），共5行**
 
 ### 音阶写作题规则
 - 指定调名和调式类型
@@ -453,8 +463,12 @@ title: 试卷标题
 - 覆盖：自然/和声/旋律大小调、五声调式、近关系转调
 
 ### 节奏组合题规则
-- 给出一系列散乱的音符时值
-- 学生按指定拍号（2/4, 3/4, 4/4, 3/8, 6/8）正确划分小节、组合音值
+- **必须使用 LilyPond 谱例**展示节奏，禁止使用 Unicode 符号（♩♪𝅗𝅥等）
+- 使用正常音符头（`\clef treble`），不要用斜线音符
+- 所有音符用 `c'` 表示（只关注时值，不关注音高）
+- 题目中隐藏拍号和小节线（`\omit Staff.TimeSignature` + `\omit Staff.BarLine`）
+- **答案也必须用 LilyPond 谱例**（显示拍号和正确的小节线划分）
+- 拍号覆盖：2/4, 3/4, 4/4, 3/8, 6/8
 - 考查音值组合法则：同拍内的音符需连线、附点使用等
 """
 
@@ -520,123 +534,145 @@ def build_generate_user_content(
     return "\n".join(parts)
 
 
-def _build_hebei_user_content(
+# 每种题型的 prompt 片段（含规则和分值说明）
+QUESTION_TYPE_PROMPTS: dict[str, str] = {
+    "terms": (
+        "**术语与记号**（5分）\n"
+        "- 给5个音乐记号或术语，写出中文含义\n"
+        "- 覆盖：速度术语(Allegro/Adagio等)、力度术语(pp/mf/ff等)、"
+        "表情术语(dolce/espressivo等)、记号(𝄐/D.C./D.S.等)"
+    ),
+    "note_names": (
+        "**音名标记**（5分）\n"
+        "- 用LilyPond谱例给出5个音符（含升降号），学生写出音名\n"
+        "- 音域覆盖高低音谱号"
+    ),
+    "rhythm": (
+        "**音值组合**（10分，5组×2分）\n"
+        "- 必须用LilyPond谱例展示节奏（\\clef treble，正常音符头），禁止用Unicode符号\n"
+        "- 题目用c'表示所有音（只关注时值），隐藏拍号和小节线\n"
+        "- 拍号覆盖：2/4、3/4、4/4、3/8、6/8\n"
+        "- 学生按音值组合法则重新组合\n"
+        "- 答案也必须用LilyPond谱例（显示拍号和正确的小节线划分）"
+    ),
+    "intervals": (
+        "**音程构成**（10分，10个×1分）\n"
+        "- 用LilyPond谱例给出10个音符，每个标注要构成的音程名称\n"
+        "- 音程类型覆盖：纯四/纯五/大小二/大小三/大小六/大小七/增四/减五/增二等\n"
+        "- 需包含升降号变化音\n"
+        "- **排版：用 \\bar \"\" \\break 分两行，每行5个**"
+    ),
+    "chords": (
+        "**和弦构成**（10分，10个×1分）\n"
+        "- 用LilyPond谱例给出10个音符\n"
+        "- 标注：以此音为根音/三音/五音/七音构成XX和弦\n"
+        "- 和弦类型覆盖：大三/小三/增三/减三/属七/小七/半减七/减七\n"
+        "- 需包含不同转位要求\n"
+        "- **排版：用 \\bar \"\" \\break 分组，每行2个（标注文字长），共5行**"
+    ),
+    "scales": (
+        "**音阶写作**（10分，5个×2分）\n"
+        "- 类型覆盖：自然/和声/旋律大小调、五声调式(宫商角徵羽)、教会调式\n"
+        "- 调号含升降号（如bB和声大调、#F宫五声调式等）\n"
+        "- 写上行音阶，旋律大/小调需写上下行"
+    ),
+    "interval_keys": (
+        "**音程调性判断**（10分，5组×2分）\n"
+        "- 用LilyPond谱例给出5个音程\n"
+        "- 学生需列出所有包含此音程的自然/和声大小调及级数\n"
+        "- 需标明具体是自然大调、和声大调、自然小调还是和声小调"
+    ),
+    "chord_keys": (
+        "**和弦调性判断**（10分，5组×2分）\n"
+        "- 用LilyPond谱例给出5个和弦（三和弦或七和弦）\n"
+        "- 学生需列出所有包含此和弦的自然/和声大小调及级数\n"
+        "- 需标明具体是自然大调、和声大调、自然小调还是和声小调"
+    ),
+    "melody": (
+        "**旋律调性分析**（10分，5条×2分）\n"
+        "- 用LilyPond谱例给出5条旋律（各4-8小节）\n"
+        "- 覆盖：自然/和声/旋律大小调、五声调式、含转调的旋律\n"
+        "- 旋律应包含调式特征音"
+    ),
+    "choice": (
+        "**选择题**\n"
+        "- 单选题（每题0.6分）：4个选项，1个正确答案\n"
+        "- 多选题（每题0.8分）：4个选项，2-3个正确答案\n"
+        "- 应大量使用谱例（至少30%的选择题含谱例）\n"
+        "- 知识点覆盖：音值组合法、音程性质与转位、调式音级、等音、"
+        "和弦结构、拍号、术语、和声调式性质等\n"
+        "- 干扰项要有迷惑性，考查常见错误认知"
+    ),
+}
+
+# 每种题型的默认分值（用于预估总分）
+QUESTION_TYPE_SCORES: dict[str, float] = {
+    "terms": 5,
+    "note_names": 5,
+    "rhythm": 10,
+    "intervals": 10,
+    "chords": 10,
+    "scales": 10,
+    "interval_keys": 10,
+    "chord_keys": 10,
+    "melody": 10,
+    "choice": 0,  # 选择题分值由用户指定题数决定
+}
+
+
+def build_music_theory_user_content(
     generation_params: dict,
     file_content: Optional[str] = None,
 ) -> str:
-    """构建河北式乐理试卷的 user content。
+    """构建乐理出题模式的 user content。
+
+    根据 selected_types 列表拼接所选题型的 prompt 片段。
 
     Args:
-        generation_params: 出题参数
+        generation_params: 出题参数（selected_types、难度等）
         file_content: 可选的参考资料文本
 
     Returns:
         格式化后的 user content
     """
+    selected = generation_params.get("selected_types", [])
     difficulty = generation_params.get("difficulty", "中级")
     extra_requirements = generation_params.get("extra_requirements", "")
     title = generation_params.get("title", "")
-    question_types = generation_params.get("question_types", {})
 
-    # 河北式允许用户自定义题型数量，但有默认结构
-    single_choice_n = int(question_types.get("单项选择题", 5))
-    multi_choice_n = int(question_types.get("多项选择题", 5))
+    # 拼接已选题型的 prompt 片段
+    section_parts: list[str] = []
+    total_score = 0.0
+    section_num = 0
+
+    for key in selected:
+        prompt_text = QUESTION_TYPE_PROMPTS.get(key)
+        if not prompt_text:
+            continue
+        section_num += 1
+        section_parts.append(f"\n**第{section_num}部分：**\n{prompt_text}")
+
+        if key == "choice":
+            # 选择题分值由用户指定题数决定
+            single_n = int(generation_params.get("choice_single_n", 5))
+            multi_n = int(generation_params.get("choice_multi_n", 5))
+            choice_score = single_n * 0.6 + multi_n * 0.8
+            total_score += choice_score
+            section_parts.append(
+                f"- 本卷要求：单选{single_n}题 + 多选{multi_n}题，"
+                f"共{choice_score:.1f}分"
+            )
+        else:
+            total_score += QUESTION_TYPE_SCORES.get(key, 0)
+
+    if not section_parts:
+        return "请至少选择一种题型。"
 
     parts = [
-        "请出一套河北式乐理试卷（15分/30分钟）。",
+        f"请出一套乐理试卷，包含以下 {section_num} 种题型。",
         "\n## 试卷结构\n",
-        f"**一、单项选择题**（{single_choice_n}题，每题0.6分，共{single_choice_n * 0.6:.1f}分）",
-        "- 每题4个选项，只有1个正确答案",
-        "- 至少2题包含LilyPond谱例",
-        "- 知识点覆盖：音值组合法、音程性质与转位、调式音级、等音、和弦识别、拍号、术语",
-        f"\n**二、多项选择题**（{multi_choice_n}题，每题0.8分，共{multi_choice_n * 0.8:.1f}分）",
-        "- 每题4个选项，有2-3个正确答案",
-        "- 至少1题包含LilyPond谱例",
-        "- 知识点更复杂：和声调式性质、调式音级关系、音程/和弦在调式中的功能等",
-        "\n**三、写作分析题**（共8分）",
-        "- 第1部分（3.6分）：给4个音，分别要求构成指定音程或和弦，写出所属调性，不协和音程需解决",
-        "  - 用LilyPond谱例给出题目音",
-        "  - 学生在五线谱上完成",
-        "- 第2部分（4.4分）：给3条旋律（LilyPond谱例），分析调式调性",
-        "  - 每条旋律4-8小节",
-        "  - 覆盖大调、小调、五声调式",
-    ]
-
-    total = single_choice_n * 0.6 + multi_choice_n * 0.8 + 8
-    parts.append(f"\n**总分：{total:.1f}分**")
-    parts.append(f"\n**难度：**{difficulty}")
-
-    if title:
-        parts.append(f"\n**试卷标题：**{title}")
-
-    if extra_requirements:
-        parts.append(f"\n**补充要求：**{extra_requirements}")
-
-    if file_content:
-        parts.append(f"\n## 参考资料\n\n{file_content}")
-
-    parts.append(
-        "\n## 重要提醒\n"
-        "- 涉及谱例的题目必须使用 ```lilypond``` 代码块\n"
-        "- LilyPond 代码必须语法正确\n"
-        "- 不要在 LilyPond 代码中写 \\include 或 \\version\n"
-        "- 答案必须准确\n"
-        "- 严格按照河北式试卷格式：单选→多选→写作分析\n"
-        "- 选择题要有足够的谱例题"
-    )
-
-    return "\n".join(parts)
-
-
-def _build_shanxi_user_content(
-    generation_params: dict,
-    file_content: Optional[str] = None,
-) -> str:
-    """构建山西式乐理试卷的 user content。
-
-    Args:
-        generation_params: 出题参数
-        file_content: 可选的参考资料文本
-
-    Returns:
-        格式化后的 user content
-    """
-    difficulty = generation_params.get("difficulty", "中级")
-    extra_requirements = generation_params.get("extra_requirements", "")
-    title = generation_params.get("title", "")
-
-    parts = [
-        "请出一套山西式乐理试卷（80分/60分钟）。",
-        "\n## 试卷结构（固定8大题，每题10分）\n",
-        "**一、音乐记号或术语与音名标记**（10分）",
-        "- 第1小题（5分）：给5个音乐记号或术语，写出中文含义",
-        "  - 覆盖：速度术语(Allegro/Adagio等)、力度术语(pp/mf/ff等)、表情术语(dolce/espressivo等)、记号(𝄐/D.C./D.S.等)",
-        "- 第2小题（5分）：在五线谱上标出5个音的音名（含升降号）",
-        "  - 用LilyPond谱例给出音符，学生写音名",
-        "\n**二、按指定拍号正确组合节奏序列**（10分，5组×2分）",
-        "- 给出散乱的音符时值序列和目标拍号",
-        "- 拍号覆盖：2/4、3/4、4/4、3/8、6/8",
-        "- 学生按音值组合法则重新组合",
-        "\n**三、以下列音为根音构成指定音程**（10分，10个×1分）",
-        "- 用LilyPond谱例给出10个音符，每个标注要构成的音程名称",
-        "- 音程类型覆盖：纯四/纯五/大小二/大小三/大小六/大小七/增四/减五/增二等",
-        "\n**四、以下列音构成指定和弦**（10分，10个×1分）",
-        "- 用LilyPond谱例给出10个音符",
-        "- 标注：以此音为根音/三音/五音/七音构成XX和弦",
-        "- 和弦类型覆盖：大三/小三/增三/减三/属七/小七/半减七/减七",
-        "\n**五、写出指定音阶**（10分，5个×2分）",
-        "- 类型覆盖：自然/和声/旋律大小调、五声调式(宫商角徵羽)、教会调式",
-        "- 调号含升降号（如bB和声大调、#F宫五声调式等）",
-        "\n**六、判断音程所属调性**（10分，5组×2分）",
-        "- 用LilyPond谱例给出5个音程",
-        "- 学生需列出所有包含此音程的自然/和声大小调及级数",
-        "\n**七、判断和弦所属调性**（10分，5组×2分）",
-        "- 用LilyPond谱例给出5个和弦（三和弦或七和弦）",
-        "- 学生需列出所有包含此和弦的自然/和声大小调及级数",
-        "\n**八、旋律调式调性分析**（10分，5条×2分）",
-        "- 用LilyPond谱例给出5条旋律（各4-8小节）",
-        "- 覆盖：自然/和声/旋律大小调、五声调式、含转调的旋律",
-        "\n**总分：80分**",
+        *section_parts,
+        f"\n**总分：{total_score:.1f}分**",
         f"\n**难度：**{difficulty}",
     ]
 
@@ -655,33 +691,11 @@ def _build_shanxi_user_content(
         "- LilyPond 代码必须语法正确\n"
         "- 不要在 LilyPond 代码中写 \\include 或 \\version\n"
         "- 答案必须准确\n"
-        "- 严格按照山西式8大题结构，每题10分，共80分\n"
+        "- 严格按照上述试卷结构出题，题型顺序与上方一致\n"
         "- 音程/和弦构成题必须用LilyPond谱例给出题目音\n"
         "- 旋律调性分析题必须用LilyPond谱例给出旋律\n"
+        "- 节奏组合题必须用LilyPond谱例，禁止使用Unicode音符符号\n"
         "- 调性判断题的答案必须列出所有可能的调式"
     )
 
     return "\n".join(parts)
-
-
-def build_music_theory_user_content(
-    generation_params: dict,
-    file_content: Optional[str] = None,
-) -> str:
-    """构建乐理出题模式的 user content。
-
-    根据 exam_format 参数选择河北式或山西式格式模板。
-
-    Args:
-        generation_params: 出题参数（题型、数量、难度、exam_format等）
-        file_content: 可选的参考资料文本
-
-    Returns:
-        格式化后的 user content
-    """
-    exam_format = generation_params.get("exam_format", "hebei")
-
-    if exam_format == "shanxi":
-        return _build_shanxi_user_content(generation_params, file_content)
-    else:
-        return _build_hebei_user_content(generation_params, file_content)

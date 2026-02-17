@@ -359,6 +359,69 @@
     .mh-stat-bar strong {
         color: var(--primary);
     }
+    /* 乐理题型胶囊选择 */
+    .mt-type-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .mt-type-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        font-size: 13px;
+        color: var(--text);
+        cursor: pointer;
+        transition: all 0.2s;
+        user-select: none;
+        background: white;
+    }
+    .mt-type-tag:hover {
+        border-color: var(--primary);
+        background: var(--primary-light);
+    }
+    .mt-type-tag.selected {
+        border-color: var(--primary);
+        background: var(--primary);
+        color: white;
+    }
+    .mt-type-tag .mt-tag-score {
+        font-size: 11px;
+        opacity: 0.7;
+    }
+    .mt-type-tag.selected .mt-tag-score {
+        opacity: 0.85;
+    }
+    .mt-stat-bar {
+        margin-top: 16px;
+        padding: 10px 16px;
+        background: var(--primary-light);
+        border-radius: 8px;
+        font-size: 14px;
+        color: var(--text-muted);
+        text-align: center;
+    }
+    .mt-stat-bar strong {
+        color: var(--primary);
+    }
+    .mt-select-all-btn {
+        font-size: 13px;
+        color: var(--primary);
+        background: none;
+        border: 1px solid var(--primary);
+        border-radius: 14px;
+        padding: 3px 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .mt-select-all-btn:hover,
+    .mt-select-all-btn.active {
+        background: var(--primary);
+        color: white;
+    }
     .mh-custom-upload summary {
         font-size: 13px;
         color: var(--text-muted);
@@ -573,48 +636,32 @@
                 </div>
             </div>
 
+            <!-- 题型胶囊选择 -->
             <div class="form-group">
-                <label>试卷格式</label>
-                <div class="difficulty-options" id="mt-format">
-                    <div class="diff-option selected" data-format="hebei">河北式（快速练习）</div>
-                    <div class="diff-option" data-format="shanxi">山西式（全面测试）</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <label style="margin-bottom:0;">选择题型</label>
+                    <button type="button" class="mt-select-all-btn" id="mt-select-all" onclick="toggleAllMtTypes()">全选</button>
+                </div>
+                <div class="mt-type-grid" id="mtTypeGrid"></div>
+                <div class="mt-stat-bar" id="mtStatBar">
+                    已选 <strong id="mtSelectedCount">0</strong> 种题型，预估总分 <strong id="mtSelectedScore">0</strong> 分
                 </div>
             </div>
 
-            <!-- 河北式：题型数量可调 -->
-            <div class="form-group" id="mt-hebei-types">
-                <label>题型与数量</label>
-                <div class="qtype-grid">
-                    <div class="qtype-item">
-                        <input type="checkbox" id="mt-single-choice" checked>
-                        <label for="mt-single-choice">单项选择题</label>
-                        <input type="number" id="mt-single-choice-n" value="5" min="1" max="20">
-                        <span style="font-size:13px;color:var(--text-muted)">题</span>
+            <!-- 选择题设置（仅选了"选择题"时显示） -->
+            <div class="form-group" id="mt-choice-settings" style="display:none;">
+                <label>选择题设置</label>
+                <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:14px;">单选题</span>
+                        <input type="number" id="mt-choice-single-n" value="5" min="1" max="30" style="width:60px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
+                        <span style="font-size:13px;color:var(--text-muted);">题</span>
                     </div>
-                    <div class="qtype-item">
-                        <input type="checkbox" id="mt-multi-choice" checked>
-                        <label for="mt-multi-choice">多项选择题</label>
-                        <input type="number" id="mt-multi-choice-n" value="5" min="1" max="20">
-                        <span style="font-size:13px;color:var(--text-muted)">题</span>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:14px;">多选题</span>
+                        <input type="number" id="mt-choice-multi-n" value="5" min="1" max="30" style="width:60px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
+                        <span style="font-size:13px;color:var(--text-muted);">题</span>
                     </div>
-                </div>
-                <p style="font-size:12px;color:var(--text-muted);margin-top:8px;">
-                    写作分析题（8分）为固定结构：音程/和弦构成与解决 + 旋律调性分析
-                </p>
-            </div>
-
-            <!-- 山西式：固定结构说明 -->
-            <div class="form-group" id="mt-shanxi-info" style="display:none;">
-                <label>固定试卷结构（80分）</label>
-                <div style="font-size:13px;color:var(--text-muted);line-height:1.8;padding:12px 16px;background:var(--primary-light);border-radius:8px;border:1px solid var(--border);">
-                    一、术语与音名标记（10分）<br>
-                    二、节奏组合（10分）<br>
-                    三、音程构成（10分）<br>
-                    四、和弦构成（10分）<br>
-                    五、音阶写作（10分）<br>
-                    六、音程调性判断（10分）<br>
-                    七、和弦调性判断（10分）<br>
-                    八、旋律调性分析（10分）
                 </div>
             </div>
 
@@ -877,8 +924,6 @@
 
     // 初始化难度选择器
     document.querySelectorAll('.difficulty-options').forEach(container => {
-        // 跳过试卷格式选择器（由专门逻辑处理）
-        if (container.id === 'mt-format') return;
         container.querySelectorAll('.diff-option').forEach(el => {
             el.addEventListener('click', () => {
                 container.querySelectorAll('.diff-option').forEach(e => e.classList.remove('selected'));
@@ -887,16 +932,69 @@
         });
     });
 
-    // 初始化乐理试卷格式选择器
-    document.querySelectorAll('#mt-format .diff-option').forEach(el => {
-        el.addEventListener('click', () => {
-            document.querySelectorAll('#mt-format .diff-option').forEach(e => e.classList.remove('selected'));
-            el.classList.add('selected');
-            const format = el.dataset.format;
-            document.getElementById('mt-hebei-types').style.display = format === 'hebei' ? '' : 'none';
-            document.getElementById('mt-shanxi-info').style.display = format === 'shanxi' ? '' : 'none';
+    // 初始化乐理题型胶囊选择
+    const MT_TYPES = [
+        { key: 'terms', name: '术语与记号', score: 5 },
+        { key: 'note_names', name: '音名标记', score: 5 },
+        { key: 'rhythm', name: '音值组合', score: 10 },
+        { key: 'intervals', name: '音程构成', score: 10 },
+        { key: 'chords', name: '和弦构成', score: 10 },
+        { key: 'scales', name: '音阶写作', score: 10 },
+        { key: 'interval_keys', name: '音程调性判断', score: 10 },
+        { key: 'chord_keys', name: '和弦调性判断', score: 10 },
+        { key: 'melody', name: '旋律调性分析', score: 10 },
+        { key: 'choice', name: '选择题', score: 0 },
+    ];
+
+    (function initMtTypes() {
+        const grid = document.getElementById('mtTypeGrid');
+        grid.innerHTML = MT_TYPES.map(t =>
+            `<span class="mt-type-tag" data-key="${t.key}" data-score="${t.score}" onclick="toggleMtTag(this)">${t.name}<span class="mt-tag-score">${t.score ? t.score + '分' : '自定义'}</span></span>`
+        ).join('');
+    })();
+
+    function toggleMtTag(el) {
+        el.classList.toggle('selected');
+        updateMtSelection();
+    }
+
+    function toggleAllMtTypes() {
+        const tags = document.querySelectorAll('.mt-type-tag');
+        const allSelected = Array.from(tags).every(t => t.classList.contains('selected'));
+        tags.forEach(t => { allSelected ? t.classList.remove('selected') : t.classList.add('selected'); });
+        document.getElementById('mt-select-all').classList.toggle('active', !allSelected);
+        updateMtSelection();
+    }
+
+    function getMtChoiceScore() {
+        const sn = parseInt(document.getElementById('mt-choice-single-n').value) || 0;
+        const mn = parseInt(document.getElementById('mt-choice-multi-n').value) || 0;
+        return sn * 0.6 + mn * 0.8;
+    }
+
+    function updateMtSelection() {
+        const selected = document.querySelectorAll('.mt-type-tag.selected');
+        let totalScore = 0;
+        let hasChoice = false;
+        selected.forEach(t => {
+            if (t.dataset.key === 'choice') {
+                hasChoice = true;
+                totalScore += getMtChoiceScore();
+            } else {
+                totalScore += parseFloat(t.dataset.score) || 0;
+            }
         });
-    });
+        document.getElementById('mtSelectedCount').textContent = selected.length;
+        document.getElementById('mtSelectedScore').textContent = totalScore % 1 === 0 ? totalScore : totalScore.toFixed(1);
+        document.getElementById('mt-choice-settings').style.display = hasChoice ? '' : 'none';
+        // 同步全选按钮
+        const all = document.querySelectorAll('.mt-type-tag');
+        document.getElementById('mt-select-all').classList.toggle('active', all.length === selected.length);
+    }
+
+    // 选择题数量变化时更新分数
+    document.getElementById('mt-choice-single-n').addEventListener('input', updateMtSelection);
+    document.getElementById('mt-choice-multi-n').addEventListener('input', updateMtSelection);
 
     // 文件拖拽（排版模式）
     const fmtArea = document.getElementById('fmtUploadArea');
@@ -1129,26 +1227,20 @@
     }
 
     function collectMtParams() {
-        const formatEl = document.querySelector('#mt-format .diff-option.selected');
-        const selectedFormat = formatEl ? formatEl.dataset.format : 'hebei';
-
-        const types = {};
-        if (selectedFormat === 'hebei') {
-            if (document.getElementById('mt-single-choice').checked)
-                types['单项选择题'] = document.getElementById('mt-single-choice-n').value;
-            if (document.getElementById('mt-multi-choice').checked)
-                types['多项选择题'] = document.getElementById('mt-multi-choice-n').value;
-        }
-        // 山西式不需要题型选择，结构固定
-
+        const selectedTypes = Array.from(document.querySelectorAll('.mt-type-tag.selected')).map(t => t.dataset.key);
         const diffEl = document.querySelector('#mt-diff .diff-option.selected');
-        return {
-            exam_format: selectedFormat,
-            question_types: types,
+        const params = {
+            selected_types: selectedTypes,
             difficulty: diffEl ? diffEl.dataset.diff : '中级',
             extra_requirements: document.getElementById('mt-extra').value.trim(),
             title: document.getElementById('mt-title').value.trim(),
         };
+        // 如果选了选择题，附带题数
+        if (selectedTypes.includes('choice')) {
+            params.choice_single_n = parseInt(document.getElementById('mt-choice-single-n').value) || 5;
+            params.choice_multi_n = parseInt(document.getElementById('mt-choice-multi-n').value) || 5;
+        }
+        return params;
     }
 
     function collectMhParams() {
@@ -1193,8 +1285,10 @@
             theme = modeThemes.music_theory;
             file = document.getElementById('mtFileInput').files[0];
             btn = document.getElementById('mtUploadBtn');
+            const mtParams = collectMtParams();
+            if (!mtParams.selected_types.length) { showAlert('请至少选择一种题型', 'error'); return; }
             if (file) form.append('file', file);
-            form.append('generation_params', JSON.stringify(collectMtParams()));
+            form.append('generation_params', JSON.stringify(mtParams));
         } else if (currentMode === 'music_history') {
             title = document.getElementById('mh-title').value.trim() || '音乐史选择题';
             school = document.getElementById('mh-school').value.trim();
@@ -1445,6 +1539,10 @@
         document.getElementById('genFileName').textContent = '';
         document.getElementById('mtFileInput').value = '';
         document.getElementById('mtFileName').textContent = '';
+        document.querySelectorAll('.mt-type-tag.selected').forEach(t => t.classList.remove('selected'));
+        document.getElementById('mt-select-all').classList.remove('active');
+        document.getElementById('mt-choice-settings').style.display = 'none';
+        updateMtSelection();
         document.getElementById('mhFileInput').value = '';
         document.getElementById('mhFileName').textContent = '';
         window._mhCsvBlob = null;
