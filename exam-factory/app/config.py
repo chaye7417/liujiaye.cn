@@ -39,7 +39,7 @@ DATABASE_URL = str(DATA_DIR / "exam_factory.db")
 
 # 限制
 MAX_FILE_SIZE_MB = 20
-MAX_DAILY_USES = 10
+MAX_DAILY_USES = 9999
 
 # LaTeX 相关
 LATEX_TEMPLATE_DIR = BASE_DIR / "latex_templates"
