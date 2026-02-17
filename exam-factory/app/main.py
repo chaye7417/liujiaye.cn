@@ -355,7 +355,7 @@ async def api_parse_stream(task_id: int, user: dict = Depends(get_current_user))
         try:
             if task_mode == "music_history":
                 # CSV 直接处理，不调用 AI
-                from app.csv_quiz import (
+                from app.modes.music_history import (
                     parse_csv_questions, select_questions, shuffle_options,
                     format_questions_markdown, format_questions_latex_csv,
                 )
