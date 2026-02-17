@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from app.music_theory_types import QUESTION_TYPE_PROMPTS, QUESTION_TYPE_SCORES
+from app.music_theory import QUESTION_TYPE_PROMPTS, QUESTION_TYPE_SCORES
 
 
 # =============================================================================
