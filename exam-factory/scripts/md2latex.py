@@ -18,6 +18,36 @@ from pathlib import Path
 from typing import Optional
 
 
+def fix_lilypond_code(code: str) -> str:
+    """修复 AI 生成的 LilyPond 代码中的常见格式问题。
+
+    AI 有时会把 \\omit Staff.BarLine 和音符粘在一起，
+    或者把多个音符写在同一行末尾，导致 LilyPond 解析失败。
+
+    Args:
+        code: 原始 LilyPond 代码
+
+    Returns:
+        修复后的 LilyPond 代码
+    """
+    # 修复 \omit Staff.XXX 后紧跟音符（无空格/换行）
+    # 例: \omit Staff.BarLined'1 → \omit Staff.BarLine\n  d'1
+    # 要求音符后必须跟八度标记 '/,，避免误拆 TimeSignature 等属性名
+    code = re.sub(
+        r"(\\omit\s+Staff\.\w+)([a-g](?:is|es)*[',])",
+        r'\1\n  \2',
+        code
+    )
+    # 修复 markup 闭括号 } 后紧跟音符（无换行）
+    # 例: ..."减七和弦" }f'1^\markup → ..."减七和弦" }\n  f'1^\markup
+    code = re.sub(
+        r'(\})\s*([a-g][eis]*[\',]*\d)',
+        r'\1\n  \2',
+        code
+    )
+    return code
+
+
 def parse_yaml_header(content: str) -> tuple[dict, str]:
     """
     解析 YAML 头部元数据。
@@ -144,6 +174,7 @@ def parse_single_question(content: str, points: float) -> dict:
         'essay_box': None,
         'essay_items': [],
         'lilypond_blocks': [],
+        'answer_lilypond_blocks': [],
     }
 
     lines = content.split('\n')
@@ -152,6 +183,7 @@ def parse_single_question(content: str, points: float) -> dict:
     essay_items = []
     in_lilypond = False
     lilypond_lines = []
+    after_answer = False  # 标记是否已经过了 > 答案: 行
 
     for line in lines:
         line_stripped = line.strip()
@@ -167,10 +199,11 @@ def parse_single_question(content: str, points: float) -> dict:
             in_lilypond = False
             code = '\n'.join(lilypond_lines).strip()
             if code:
-                question['lilypond_blocks'].append({
-                    'code': code,
-                    'staffsize': 20,
-                })
+                block = {'code': code, 'staffsize': 20}
+                if after_answer:
+                    question['answer_lilypond_blocks'].append(block)
+                else:
+                    question['lilypond_blocks'].append(block)
             continue
 
         # 收集 lilypond 代码（保持原始缩进，不做转义）
@@ -186,10 +219,12 @@ def parse_single_question(content: str, points: float) -> dict:
             continue
 
         # 解析答案 (> 答案: 内容)
-        answer_match = re.match(r'^>\s*答案[:：]\s*(.+)$', line_stripped)
+        answer_match = re.match(r'^>\s*答案[:：]\s*(.*)$', line_stripped)
         if answer_match:
+            after_answer = True
             answer_content = answer_match.group(1).strip()
-            question['answer'] = answer_content
+            if answer_content:
+                question['answer'] = answer_content
             # 如果是选择题，解析答案字母对应的数字
             if question['type'] == 'choice' and len(answer_content) == 1:
                 answer_letter = answer_content.upper()
@@ -455,7 +490,7 @@ def generate_question_latex(q: dict) -> list[str]:
     # LilyPond 乐谱代码块（在题干之后、选项之前输出）
     for block in q.get('lilypond_blocks', []):
         staffsize = block.get('staffsize', 20)
-        code = block['code']
+        code = fix_lilypond_code(block['code'])
         lines.append(r'  \begin{lilypond}[staffsize=%d]' % staffsize)
         lines.append(r'  \include "font-settings.ily"')
         lines.append(f'  {code}')
@@ -478,11 +513,25 @@ def generate_question_latex(q: dict) -> list[str]:
     if q['piano_staff'] > 0:
         lines.append(r'  \pianostaff{%d}' % q['piano_staff'])
 
-    # 答案
+    # 答案 LilyPond 谱例（仅答案卷显示）
+    if q.get('answer_lilypond_blocks'):
+        lines.append(r'  \ifthenelse{\boolean{showanswer}}{%')
+        lines.append(r'    \textbf{\textcolor{themecolor}{【答案】}}')
+        for block in q['answer_lilypond_blocks']:
+            staffsize = block.get('staffsize', 20)
+            code = fix_lilypond_code(block['code'])
+            lines.append(r'    \begin{lilypond}[staffsize=%d]' % staffsize)
+            lines.append(r'    \include "font-settings.ily"')
+            lines.append(f'    {code}')
+            lines.append(r'    \end{lilypond}')
+        lines.append(r'  }{}')
+
+    # 答案（文本）
     # 选择题：单选由 \choice 的第5个参数高亮，多选需额外输出 \answer
     if q['answer']:
         if q['type'] != 'choice':
             answer_escaped = escape_latex(q['answer'])
+            # 如果已有答案 LilyPond，文字答案作为补充
             lines.append(r'  \answer{%s}' % answer_escaped)
         elif q['answer_num'] == 0:
             # 多选题或无法解析的选择题答案

@@ -1,12 +1,5 @@
-% Gonville 字体设置
-\paper {
-  #(define fonts
-    (set-global-fonts
-     #:music "gonville"
-     #:brace "gonville"
-    ))
-}
-
+% LilyPond 字体与排版设置
+% 使用默认 emmentaler 字体（gonville 需要额外安装）
 \layout {
   \context {
     \Staff
