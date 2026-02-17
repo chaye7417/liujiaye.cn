@@ -102,13 +102,13 @@ def parse_questions(section_content: str) -> list[dict]:
     questions = []
 
     # 按 ## 标题分割题目
-    # 匹配格式: ## Q1 [5分] 或 ## 1. [5分] 或 ## [5分]
-    question_pattern = r'^##\s+(?:Q?\d*\.?\s*)?\[(\d+)分\]'
+    # 匹配格式: ## Q1 [5分] 或 ## 1. [5分] 或 ## [5分] 或 ## [0.6分]
+    question_pattern = r'^##\s+(?:Q?\d*\.?\s*)?\[(\d+(?:\.\d+)?)分\]'
     parts = re.split(question_pattern, section_content, flags=re.MULTILINE)
 
     # parts: ['前导', '分数1', '内容1', '分数2', '内容2', ...]
     for i in range(1, len(parts), 2):
-        points = int(parts[i])
+        points = float(parts[i])
         content = parts[i + 1] if i + 1 < len(parts) else ''
 
         question = parse_single_question(content.strip(), points)
@@ -117,7 +117,7 @@ def parse_questions(section_content: str) -> list[dict]:
     return questions
 
 
-def parse_single_question(content: str, points: int) -> dict:
+def parse_single_question(content: str, points: float) -> dict:
     """
     解析单个题目的内容。
 
@@ -125,7 +125,7 @@ def parse_single_question(content: str, points: int) -> dict:
 
     Args:
         content: 题目内容
-        points: 分值
+        points: 分值（支持整数和小数）
 
     Returns:
         {'points': 5, 'stem': '...', 'type': 'choice/short/essay',
@@ -429,7 +429,10 @@ def generate_question_latex(q: dict) -> list[str]:
     lines = []
 
     # 题目开始
-    lines.append(r'  \item \points{%d}' % q['points'])
+    pts = q['points']
+    # 整数分值用整数格式，小数分值保留小数
+    pts_str = str(int(pts)) if pts == int(pts) else f'{pts:g}'
+    lines.append(r'  \item \points{%s}' % pts_str)
 
     # 要求框（如果有）
     if q['essay_box']:

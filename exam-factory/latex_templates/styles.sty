@@ -72,27 +72,41 @@
 \newcommand{\postLilyPondExample}{\vspace{0.3em}}
 
 %=============================================================================
-% Scoring System
+% Scoring System (supports decimal points like 0.6分)
+% Uses integer arithmetic (points * 10) to avoid floating-point errors
 %=============================================================================
-\newcounter{exampoints}
-\setcounter{exampoints}{0}
+\newcount\exampoints@int
+\newcounter{examidcounter}
 
-\newcommand{\currentexamid}{}
-
-% Usage: \points{5} displays "(5分)" and adds to total
+% Usage: \points{5} or \points{0.6} displays "(X分)" and adds to total
 \newcommand{\points}[1]{%
-  \addtocounter{exampoints}{#1}%
+  \pgfmathtruncatemacro{\exampoints@add}{round(#1 * 10)}%
+  \global\advance\exampoints@int by \exampoints@add\relax%
   \textcolor{themecolor}{（#1分）}%
 }
 
-% Save current exam total points
+% Reset exam points to zero
+\newcommand{\resetexampoints}{\global\exampoints@int=0\relax}
+
+% Save current exam total points (uses integer division to format N.D)
+% Note: \numexpr rounds division, so we must correct for negative remainders
 \newcommand{\saveexampoints}{%
-  \immediate\write\@auxout{\string\newlabel{exampoints-\currentexamid}{{\theexampoints}{\thepage}}}%
+  \edef\exampoints@whole{\the\numexpr\exampoints@int/10\relax}%
+  \edef\exampoints@frac{\the\numexpr\exampoints@int-\exampoints@whole*10\relax}%
+  \ifnum\exampoints@frac<0
+    \edef\exampoints@whole{\the\numexpr\exampoints@whole-1\relax}%
+    \edef\exampoints@frac{\the\numexpr\exampoints@frac+10\relax}%
+  \fi
+  \ifnum\exampoints@frac=0
+    \immediate\write\@auxout{\string\newlabel{exampoints-\theexamidcounter}{{\exampoints@whole}{\thepage}}}%
+  \else
+    \immediate\write\@auxout{\string\newlabel{exampoints-\theexamidcounter}{{\exampoints@whole.\exampoints@frac}{\thepage}}}%
+  \fi
 }
 
 % Get exam total points
 \newcommand{\getexampoints}{%
-  \@ifundefined{r@exampoints-\currentexamid}{??}{\ref{exampoints-\currentexamid}}%
+  \@ifundefined{r@exampoints-\theexamidcounter}{??}{\ref{exampoints-\theexamidcounter}}%
 }
 
 %=============================================================================
@@ -140,9 +154,9 @@
 % Title and School Info
 %=============================================================================
 \newcommand{\myschool}{Exam Collection}
-\newcommand{\setschool}[1]{\renewcommand{\myschool}{#1}}
+\newcommand{\setschool}[1]{\gdef\myschool{#1}}
 \newcommand{\mytitle}{}
-\newcommand{\settitle}[1]{\renewcommand{\mytitle}{#1}}
+\newcommand{\settitle}[1]{\gdef\mytitle{#1}}
 \newcommand{\mytoday}{\number\year.\number\month.\number\day}
 
 %=============================================================================
@@ -459,12 +473,12 @@
 %=============================================================================
 % Usage: \testheader{Title}
 \newcommand{\testheader}[1]{%
-  \ifx\currentexamid\empty\else\saveexampoints\fi%
+  \ifnum\value{examidcounter}>0 \saveexampoints\fi%
   \clearpage%
+  \stepcounter{examidcounter}%
   \setcounter{section}{0}%
-  \setcounter{exampoints}{0}%
+  \resetexampoints%
   \settitle{#1}%
-  \renewcommand{\currentexamid}{#1}%
   \decoratedtitle{\mytitle}%
   \begin{flushright}%
     {\kaishu{命题教师：教研组}}\par
