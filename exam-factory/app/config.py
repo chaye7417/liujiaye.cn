@@ -68,7 +68,7 @@ MAX_FILE_SIZE_MB = 20
 MAX_DAILY_USES = 9999
 
 # 内置题库
-QUIZ_BANK_DIR = BASE_DIR / "quiz_bank"
+QUIZ_BANK_DIR = BASE_DIR / "app" / "modes" / "music_history" / "quiz_bank"
 
 # LaTeX 相关
 LATEX_TEMPLATE_DIR = BASE_DIR / "latex_templates"
