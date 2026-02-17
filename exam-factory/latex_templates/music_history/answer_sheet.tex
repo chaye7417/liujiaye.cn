@@ -1,0 +1,159 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 参考答案单独模板
+% 版本: 1.0
+% 说明: 仅显示答案，用于与题目分离的情况
+%       此模板读取题目模板生成的 .answers 文件
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[11pt,a4paper]{ctexart}
+
+% ==================== 宏包导入 ====================
+\usepackage{geometry}
+\geometry{top=2cm,bottom=2cm,right=1.8cm,left=1.8cm}
+\usepackage{float}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{ifthen}
+\usepackage{everypage}
+\usepackage{atbegshi}
+\usetikzlibrary{calc}
+
+% ==================== 自定义颜色 ====================
+\definecolor{mycolor}{HTML}{4e9b86}
+
+% ==================== 页眉与页脚设置 ====================
+\pagestyle{fancy} 
+\fancyhf{}
+\fancypagestyle{plain}{%
+	\fancyfoot[C]{\kaishu\mytitle\quad 参考答案\quad 第\thepage 页\quad 共\pageref{LastPage}页}
+}
+\fancyfoot[C]{\kaishu\mytitle\quad 参考答案\quad 第\thepage 页\quad 共\pageref{LastPage}页}
+\renewcommand{\headrulewidth}{0pt}
+
+% ==================== 水印设置 ====================
+\newcommand{\mywatermark}{内部资料}
+\newcommand{\mywatermarkcolor}{gray}
+\newcommand{\mywatermarkopacity}{0.1}
+\newboolean{showwatermark}
+\setboolean{showwatermark}{true}
+
+\newcommand{\AddWatermark}{%
+  \ifthenelse{\boolean{showwatermark}}{%
+    \begin{tikzpicture}[remember picture, overlay]
+      \foreach \i in {0,1,...,10} {
+        \foreach \j in {0,1,...,15} {
+          \node [rotate=45, text=\mywatermarkcolor, opacity=\mywatermarkopacity, font=\bfseries\Large] 
+          at ([xshift=\i*3cm, yshift=\j*2cm]current page.south west) {\mywatermark};
+        }
+      }
+    \end{tikzpicture}
+  }{}%
+}
+
+\AtBeginShipout{\AddWatermark}
+
+\newcommand{\updateWatermarkSettings}[3]{
+  \renewcommand{\mywatermark}{#1}
+  \renewcommand{\mywatermarkcolor}{#2}
+  \renewcommand{\mywatermarkopacity}{#3}
+  
+  \ifthenelse{\equal{#1}{}}{
+    \setboolean{showwatermark}{false}
+  }{
+    \setboolean{showwatermark}{true}
+  }
+}
+
+% ==================== 页面底纹设置 ====================
+\newboolean{showpagebg}
+\setboolean{showpagebg}{true}
+\newcommand{\mypagebgfile}{NWBUV-B006-Horz.pdf}
+
+\newcommand{\pagebg}{%
+  \ifthenelse{\boolean{showpagebg}}{%
+    \begin{tikzpicture}[remember picture,overlay]
+      \node[anchor=north,inner sep=0pt,outer sep=0pt] at (current page.north) {%
+        \includegraphics[width=\paperwidth,keepaspectratio]{\mypagebgfile}%
+      };
+    \end{tikzpicture}%
+  }{}%
+}
+
+\newcommand{\updatePageBgSettings}[2]{
+  \ifthenelse{\equal{#1}{true}}{
+    \setboolean{showpagebg}{true}
+  }{
+    \setboolean{showpagebg}{false}
+  }
+  \renewcommand{\mypagebgfile}{#2}
+}
+
+% ==================== 可配置变量 ====================
+\newcommand{\mytitle}{选择题试卷}
+\newcommand{\myauthor}{试卷生成器}
+\newcommand{\mydate}{\number\year.\number\month.\number\day}
+\newcommand{\myanswersfile}{选择题排版模板.answers}
+
+% 定义答案项目命令（与题目模板一致）
+\newcommand{\answeritem}[2]{%
+  #1. #2 \hspace{0.8em}
+  \ifnum#1=10\relax\\\fi
+  \ifnum#1=20\relax\\\fi
+  \ifnum#1=30\relax\\\fi
+  \ifnum#1=40\relax\\\fi
+  \ifnum#1=50\relax\\\fi
+  \ifnum#1=60\relax\\\fi
+  \ifnum#1=70\relax\\\fi
+  \ifnum#1=80\relax\\\fi
+  \ifnum#1=90\relax\\\fi
+  \ifnum#1=100\relax\\\fi
+}
+
+% ==================== 装饰标题命令 ====================
+\newcommand{\decoratedtitle}[1]{%
+  \thispagestyle{plain}%
+  \pagebg
+  \begin{center}
+    {\fontsize{22}{22}\selectfont\bfseries
+     \begin{tikzpicture}[baseline]
+       % 白色描边效果
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0,0.07) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0.07,0) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0,-0.07) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (-0.07,0) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0.05,0.05) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (-0.05,0.05) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0.05,-0.05) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (-0.05,-0.05) {#1};
+       % 主文本
+       \node[text=mycolor, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0,0) {#1};
+     \end{tikzpicture}
+     \par}
+  \end{center}
+  \vspace{1em}
+}
+
+% ==================== 文档内容 ====================
+\begin{document}
+	
+	\decoratedtitle{\mytitle\quad 参考答案}
+	\vspace{-2em}
+	\begin{flushright}
+		{\kaishu{命题人：\myauthor}}\par
+		{\mydate} 
+	\end{flushright}
+	
+	\vspace{2em}
+	
+	\section*{\textcolor{mycolor}{参考答案}}
+	
+	\begin{center}
+	\begin{tabular}{p{\textwidth}}
+	\input{\myanswersfile}
+	\end{tabular}
+	\end{center}
+	
+\end{document}

@@ -42,17 +42,29 @@ async def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
                 status TEXT DEFAULT 'pending',
+                mode TEXT DEFAULT 'format',
                 title TEXT,
                 school TEXT,
                 theme TEXT DEFAULT '4e9b86',
                 original_filename TEXT,
                 markdown_content TEXT,
+                generation_params TEXT,
                 pdf_path TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
         """)
+        # 迁移：为已有的 tasks 表添加新列（不存在则添加）
+        cursor = await db.execute("PRAGMA table_info(tasks)")
+        columns = {row[1] for row in await cursor.fetchall()}
+        if "mode" not in columns:
+            await db.execute("ALTER TABLE tasks ADD COLUMN mode TEXT DEFAULT 'format'")
+        if "generation_params" not in columns:
+            await db.execute("ALTER TABLE tasks ADD COLUMN generation_params TEXT")
+        if "model" not in columns:
+            await db.execute("ALTER TABLE tasks ADD COLUMN model TEXT")
+
         # 创建默认 guest 用户（临时测试用）
         await db.execute(
             "INSERT OR IGNORE INTO users (id, email) VALUES (1, 'guest@test.com')"

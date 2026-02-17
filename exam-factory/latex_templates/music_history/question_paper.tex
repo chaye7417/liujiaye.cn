@@ -1,0 +1,387 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 通用选择题排版模板
+% 版本: 2.0
+% 说明: 支持任意主题的选择题试卷生成
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[11pt,a4paper]{ctexart}
+
+% ==================== 宏包导入 ====================
+\usepackage{geometry}
+\geometry{top=2cm,bottom=2cm,right=1.8cm,left=1.8cm}
+\usepackage{float}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{pgf}
+\usepackage{exam-zh-choices} % 选项排版宏包
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{microtype} 
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{fontawesome5} % 用来输出辣椒符号
+\usepackage{enumitem} % 设置有序列表格式
+\usepackage{tikz}
+\usepackage{ifthen}
+\usepackage{csvsimple} % CSV处理包
+\usepackage{datatool}
+\usepackage{everypage} % 用于在每页添加水印
+\usepackage{atbegshi} % 帮助处理每页开始的命令
+\usetikzlibrary{calc}
+
+% ==================== 自定义颜色 ====================
+% 可以通过程序修改此处的颜色代码
+\definecolor{mycolor}{HTML}{4e9b86}
+
+% ==================== 页眉与页脚设置 ====================
+\pagestyle{fancy} 
+\fancyhf{} % 清空页眉页脚 
+\fancypagestyle{plain}{%
+	\fancyfoot[C]{\kaishu\mytitle\quad 第\thepage 页\quad 共\pageref{LastPage}页}
+}
+\fancyfoot[C]{\kaishu\mytitle\quad 第\thepage 页\quad 共\pageref{LastPage}页}
+\renewcommand{\headrulewidth}{0pt}
+
+% ==================== 水印设置 ====================
+\newcommand{\mywatermark}{内部资料}
+\newcommand{\mywatermarkcolor}{gray}
+\newcommand{\mywatermarkopacity}{0.1}
+\newboolean{showwatermark}
+\setboolean{showwatermark}{true}
+
+% 添加水印的命令
+\newcommand{\AddWatermark}{%
+  \ifthenelse{\boolean{showwatermark}}{%
+    \begin{tikzpicture}[remember picture, overlay]
+      \foreach \i in {0,1,...,10} {
+        \foreach \j in {0,1,...,15} {
+          \node [rotate=45, text=\mywatermarkcolor, opacity=\mywatermarkopacity, font=\bfseries\Large] 
+          at ([xshift=\i*3cm, yshift=\j*2cm]current page.south west) {\mywatermark};
+        }
+      }
+    \end{tikzpicture}
+  }{}%
+}
+
+% 确保每页都添加水印
+\AtBeginShipout{\AddWatermark}
+
+% 更新水印设置的命令
+\newcommand{\updateWatermarkSettings}[3]{
+  % #1: 水印内容
+  % #2: 水印颜色
+  % #3: 水印透明度
+  
+  \renewcommand{\mywatermark}{#1}
+  \renewcommand{\mywatermarkcolor}{#2}
+  \renewcommand{\mywatermarkopacity}{#3}
+  
+  \ifthenelse{\equal{#1}{}}{
+    \setboolean{showwatermark}{false}
+  }{
+    \setboolean{showwatermark}{true}
+  }
+}
+
+% ==================== 页面底纹设置 ====================
+\newboolean{showpagebg}
+\setboolean{showpagebg}{true}  % 默认显示底纹
+\newcommand{\mypagebgfile}{NWBUV-B006-Horz.pdf}
+
+% 页面背景命令
+\newcommand{\pagebg}{%
+  \ifthenelse{\boolean{showpagebg}}{%
+    \begin{tikzpicture}[remember picture,overlay]
+      \node[anchor=north,inner sep=0pt,outer sep=0pt] at (current page.north) {%
+        \includegraphics[width=\paperwidth,keepaspectratio]{\mypagebgfile}%
+      };
+    \end{tikzpicture}%
+  }{}%
+}
+
+% 更新底纹设置
+\newcommand{\updatePageBgSettings}[2]{
+  % #1: 是否显示底纹 (true/false)
+  % #2: 底纹文件名
+  \ifthenelse{\equal{#1}{true}}{
+    \setboolean{showpagebg}{true}
+  }{
+    \setboolean{showpagebg}{false}
+  }
+  \renewcommand{\mypagebgfile}{#2}
+}
+
+% ==================== 显示控制开关 ====================
+\newboolean{showjiexi}
+\newboolean{showdaan}       % 是否显示答案页面
+\newboolean{writeanswers}   % 是否写入答案文件（用于答案分离模式）
+\newboolean{showtigan}
+\newboolean{shownandu}
+\newboolean{showtiyuan}
+\newboolean{shuffleoptions}  % 是否随机打乱选项顺序
+\setboolean{showtiyuan}{true}  % 题源开关
+\setboolean{shownandu}{true}   % 难度开关
+\setboolean{showtigan}{true}   % 题干开关
+\setboolean{showdaan}{true}    % 答案页面显示开关
+\setboolean{writeanswers}{true} % 默认写入答案文件
+\setboolean{showjiexi}{false}  % 解析开关
+\setboolean{shuffleoptions}{true}  % 默认随机打乱选项
+
+% ==================== 答案记录系统 ====================
+\newcounter{totalQuestions}
+\setcounter{totalQuestions}{0}
+\newcounter{answerCounter}
+\setcounter{answerCounter}{0}
+
+\def\answerA{A}
+\def\answerB{B}
+\def\answerC{C}
+
+% 答案文件写入
+\newwrite\answerfile
+\immediate\openout\answerfile=\jobname.answers
+
+% 添加答案的命令（使用 writeanswers 控制，而非 showdaan）
+\newcommand{\addanswer}[1]{%
+  \ifthenelse{\boolean{writeanswers}}{%
+    \immediate\write\answerfile{\noexpand\answeritem{\arabic{enumi}}{#1}}%
+  }{}%
+}
+
+% 定义答案项目命令用于答案表格
+\newcommand{\answeritem}[2]{%
+  #1. #2 \hspace{0.8em}
+  \ifnum#1=10\relax\\\fi
+  \ifnum#1=20\relax\\\fi
+  \ifnum#1=30\relax\\\fi
+  \ifnum#1=40\relax\\\fi
+  \ifnum#1=50\relax\\\fi
+  \ifnum#1=60\relax\\\fi
+  \ifnum#1=70\relax\\\fi
+  \ifnum#1=80\relax\\\fi
+  \ifnum#1=90\relax\\\fi
+  \ifnum#1=100\relax\\\fi
+}
+
+\newcommand{\daan}[1]{}
+
+% ==================== 格式命令定义 ====================
+% 解析命令
+\newcommand{\jiexi}[1]{\ifthenelse{\boolean{showjiexi}}{\tikz[baseline]{\node[anchor=base,font=\bfseries\kaishu\color{white},draw=mycolor!90!white,fill=mycolor!90!white,rounded corners=0.8em,inner xsep=0.5em,ultra thick,minimum height=1.2ex](T)at(0,0){解析};}{\kaishu #1}}{}\par}
+
+% 题干命令
+\newcommand{\tigan}[1]{\ifthenelse{\boolean{showtigan}} {#1}{}\par}
+
+% 题源命令
+\newcommand{\tiyuan}[1]{\ifthenelse{\boolean{showtiyuan}\AND \boolean{showtigan}}{\textcolor{mycolor}{\textbf{\kaishu {(#1)}}}}{}}
+
+% 辣椒难度图标
+\newcommand{\lajiao}{\color[HTML]{f47a55}{\faPepperHot}}
+
+% 难度显示命令
+\newcommand{\nandu}[1]{\ifthenelse{\boolean{shownandu}\AND \boolean{showtigan}}{%
+		\ifcase#1% 
+		\or {\lajiao}% 
+		\or {\lajiao\lajiao}% 
+		\or {\lajiao\lajiao\lajiao}% 
+		\or {\lajiao\lajiao\lajiao\lajiao}% 
+		\or {\lajiao\lajiao\lajiao\lajiao\lajiao}% 
+		\fi% 
+	}{}}
+
+% 空集符号（兼容性）
+\newcommand{\kongji}{%
+	\mathord{\text{%
+			\tikz[baseline,line width=0.05ex,line join=round]
+			\draw (0,0.6ex) circle (0.35em)  (-0.35em,-0.25ex) -- (0.35em,1.35ex);}}}
+
+% ==================== 选项排版命令 ====================
+% 标准选项（不记录答案）
+\newcommand{\xuanxiang}[3]{\begin{choices}
+		\item #1
+		\item #2
+		\item #3
+\end{choices}}
+
+% 固定顺序选项（记录答案为 A）
+\newcommand{\xuanxiangguding}[3]{%
+  \begin{choices}
+    \item #1
+    \item #2
+    \item #3
+  \end{choices}
+  \addanswer{A}%
+}
+
+% 随机选项（自动打乱顺序并记录正确答案）
+\newcommand{\xuanxiangsuiji}[3]{%
+  \pgfmathsetmacro{\randcase}{int(1+3*rnd)}%
+  \ifcase\randcase
+  \or % 情况1: A-B-C (原始顺序)
+    \begin{choices}
+      \item #1
+      \item #2
+      \item #3
+    \end{choices}
+    \addanswer{A}%
+  \or % 情况2: B-C-A
+    \begin{choices}
+      \item #2
+      \item #3
+      \item #1
+    \end{choices}
+    \addanswer{C}%
+  \or % 情况3: C-A-B
+    \begin{choices}
+      \item #3
+      \item #1
+      \item #2
+    \end{choices}
+    \addanswer{B}%
+  \fi
+}
+
+% ==================== 题目编号样式 ====================
+\newcommand*\cir[1]{\tikz[baseline=(char.base)]{%
+		\node[circle,fill=mycolor,draw=mycolor,minimum size=0.5cm,align=center,inner sep=-1.0pt,font=\bfseries\sffamily\footnotesize\color{white}] (char){#1};}
+}
+
+% 题目环境
+\newenvironment{QsNum}{\begin{enumerate}[label=\protect\cir{\arabic*},itemindent=0em]\setlength{\columnsep}{4.5em}}
+	{\end{enumerate}}
+
+% ==================== 可配置变量（由程序自动修改）====================
+\newcommand{\mycsvfile}{temp_随机选择题.csv}
+\newcommand{\mytitle}{选择题试卷}
+\newcommand{\mytopic}{选择题}
+\newcommand{\myauthor}{试卷生成器}
+\newcommand{\mydate}{\number\year.\number\month.\number\day}
+\newcommand{\mydifficulty}{2}
+
+% 更新设置的命令
+\newcommand{\updateSettings}[6]{
+  % #1: 显示题源 (true/false)
+  % #2: 显示难度 (true/false)
+  % #3: 显示答案页面 (true/false)
+  % #4: 难度值 (1-5)
+  % #5: 随机打乱选项 (true/false)
+  % #6: 写入答案文件 (true/false) - 用于答案分离模式
+  
+  \ifthenelse{\equal{#1}{true}}{
+    \setboolean{showtiyuan}{true}
+  }{
+    \setboolean{showtiyuan}{false}
+  }
+  
+  \ifthenelse{\equal{#2}{true}}{
+    \setboolean{shownandu}{true}
+  }{
+    \setboolean{shownandu}{false}
+  }
+  
+  \ifthenelse{\equal{#3}{true}}{
+    \setboolean{showdaan}{true}
+  }{
+    \setboolean{showdaan}{false}
+  }
+  
+  \renewcommand{\mydifficulty}{#4}
+  
+  \ifthenelse{\equal{#5}{true}}{
+    \setboolean{shuffleoptions}{true}
+  }{
+    \setboolean{shuffleoptions}{false}
+  }
+  
+  \ifthenelse{\equal{#6}{true}}{
+    \setboolean{writeanswers}{true}
+  }{
+    \setboolean{writeanswers}{false}
+  }
+}
+
+% ==================== 加载CSV数据 ====================
+\DTLloaddb{questions}{\mycsvfile}
+
+% 读取题目的命令
+\newcommand{\readquestions}[2]{
+    \begin{QsNum}
+    \DTLforeach*[\DTLisgt{\tid}{#1}\and\DTLislt{\tid}{#2}]{questions}{%
+        \tid=题号,%
+        \tiwenti=问题,%
+        \optionA=选项A,%
+        \optionB=选项B,%
+        \optionC=选项C,%
+        \answer=正确答案%
+    }{%
+        \item \nandu{\mydifficulty}\tiyuan{\mytopic}
+        \tigan{\tiwenti}
+        \ifthenelse{\boolean{shuffleoptions}}{%
+          \xuanxiangsuiji{\optionA}{\optionB}{\optionC}%
+        }{%
+          \xuanxiangguding{\optionA}{\optionB}{\optionC}%
+        }
+    }
+    \end{QsNum}
+}
+
+% ==================== 装饰标题命令 ====================
+\newcommand{\decoratedtitle}[1]{%
+  \thispagestyle{plain}%
+  \pagebg
+  \begin{center}
+    {\fontsize{22}{22}\selectfont\bfseries
+     \begin{tikzpicture}[baseline]
+       % 白色描边效果
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0,0.07) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0.07,0) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0,-0.07) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (-0.07,0) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0.05,0.05) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (-0.05,0.05) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0.05,-0.05) {#1};
+       \node[text=white, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (-0.05,-0.05) {#1};
+       % 主文本
+       \node[text=mycolor, align=center, font=\fontsize{22}{22}\selectfont\bfseries] at (0,0) {#1};
+     \end{tikzpicture}
+     \par}
+  \end{center}
+  \vspace{1em}
+}
+
+% ==================== 文档内容 ====================
+\begin{document}
+	
+	\decoratedtitle{\mytitle}
+	\vspace{-2em}
+	\begin{flushright}
+		{\kaishu{命题人：\myauthor}}\par
+		{\mydate} 
+	\end{flushright}
+	
+  % 设置随机数种子（使用固定种子以便答案模板能重现相同顺序）
+  \pgfmathsetseed{12345}
+  
+  % 读取全部问题（从0到1000确保包括所有题目）
+  \readquestions{0}{1000}
+  
+  % 关闭答案文件
+  \immediate\closeout\answerfile
+  
+  % 如果答案开关为真，则显示答案部分
+  \ifthenelse{\boolean{showdaan}}{
+    \clearpage
+    \section*{\textcolor{mycolor}{参考答案}}
+    
+    % 读取并显示答案
+    \begin{center}
+    \begin{tabular}{p{\textwidth}}
+    \input{\jobname.answers}
+    \end{tabular}
+    \end{center}
+  }{}
+	
+\end{document}
+

@@ -59,10 +59,17 @@
 
 %=============================================================================
 % Music Symbols (Optional Module)
+% Use \providecommand to avoid conflict with LilyPond-generated macros
 %=============================================================================
-\newcommand{\flat}{$\flat$}       % Flat ♭ (usage: C\flat)
-\newcommand{\sharp}{$\sharp$}     % Sharp ♯ (usage: F\sharp)
-\newcommand{\natural}{$\natural$} % Natural ♮ (usage: B\natural)
+\providecommand{\flat}{$\flat$}       % Flat ♭ (usage: C\flat)
+\providecommand{\sharp}{$\sharp$}     % Sharp ♯ (usage: F\sharp)
+\providecommand{\natural}{$\natural$} % Natural ♮ (usage: B\natural)
+
+%=============================================================================
+% LilyPond Spacing Commands
+%=============================================================================
+\newcommand{\preLilyPondExample}{\vspace{0.3em}\nopagebreak[4]}
+\newcommand{\postLilyPondExample}{\vspace{0.3em}}
 
 %=============================================================================
 % Scoring System

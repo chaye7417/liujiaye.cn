@@ -1,17 +1,32 @@
-"""AI 服务模块 - 调用 LLM API 将文件内容转换为标准试卷 Markdown。"""
+"""AI 服务模块 - 调用 LLM API，支持三种模式：排版、通用出题、乐理出题。"""
 
 import asyncio
 import json
 import logging
 import re
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 import httpx
-from app.config import AI_API_BASE, AI_API_KEY, AI_MODEL, AI_PROVIDER
+from app.config import AI_MODELS, DEFAULT_MODEL
+from app.prompts import (
+    FORMAT_PROMPT,
+    GENERATE_PROMPT,
+    MUSIC_THEORY_PROMPT,
+    build_format_user_content,
+    build_generate_user_content,
+    build_music_theory_user_content,
+)
 
 logger = logging.getLogger(__name__)
 
 MAX_INPUT_CHARS = 15000
+
+# mode → system prompt 映射
+_MODE_PROMPTS = {
+    "format": FORMAT_PROMPT,
+    "generate": GENERATE_PROMPT,
+    "music_theory": MUSIC_THEORY_PROMPT,
+}
 
 
 def _clean_markdown(text: str) -> str:
@@ -24,112 +39,118 @@ def _clean_markdown(text: str) -> str:
 # 导出给 main.py 使用
 clean_markdown = _clean_markdown
 
-SYSTEM_PROMPT = """你是一个试卷格式化专家。用户会给你一份试卷的原始文本内容，你需要将其转换为标准的 Markdown 格式。
 
-## 输出格式要求
+def _build_user_content(
+    mode: str,
+    file_content: Optional[str],
+    generation_params: Optional[dict],
+) -> str:
+    """根据 mode 构建 user content。
 
-必须严格按照以下格式输出，不要添加任何额外说明：
+    Args:
+        mode: 模式（format / generate / music_theory）
+        file_content: 文件文本内容
+        generation_params: 出题参数
 
-```
----
-title: 试卷标题（从内容中提取）
----
-
-# 第一大题的题型名称（如：选择题）
-
-## [分数分]
-题目内容？
-- A. 选项A
-- B. 选项B
-- C. 选项C
-- D. 选项D
-> 答案: B
-
-# 第二大题的题型名称（如：简答题）
-
-## [分数分]
-题目内容？
-> 行数: 3
-> 答案: 答案内容
-
-# 第三大题的题型名称（如：综合题）
-
-## [分数分]
-> 要求框: 任务标题
-> - 要求 1
-> - 要求 2
-
-题目内容？
-> 行数: 15
-> 答案: 参考答案
-```
-
-## 规则
-
-1. **题目格式**：每题用 `## [n分]` 开头，n 是分值
-2. **选择题**：必须有 A/B/C/D 四个选项，格式 `- A. 内容`
-3. **简答题**：用 `> 行数: n` 指定答题行数（根据题目难度估算：简单题 2-3 行，中等 4-6 行，复杂 8-15 行）
-4. **综合大题**：可以用 `> 要求框: 标题` 加要求列表（仅用于最后的大题）
-5. **答案**：每题必须有 `> 答案: 内容`
-6. **分值**：如果原文有分值就用原文的，没有的话根据题型合理分配
-7. **题型分组**：相同题型的题放在同一个 `#` 标题下
-8. **不要编造**：忠实还原原始内容，不要添加或修改题目
-9. **标题**：从试卷内容中提取标题放到 YAML 头部的 title 字段
-
-## 音乐类试题特殊格式
-
-如果遇到需要五线谱答题的题目：
-- 普通五线谱：`> 五线谱: n`（n 为谱表行数）
-- 钢琴大谱表：`> 钢琴谱: n`（n 为谱表组数）
-"""
+    Returns:
+        构建好的 user content 字符串
+    """
+    if mode == "generate":
+        return build_generate_user_content(
+            file_content or "",
+            generation_params or {},
+        )
+    elif mode == "music_theory":
+        return build_music_theory_user_content(
+            generation_params or {},
+            file_content,
+        )
+    else:
+        return build_format_user_content(file_content or "")
 
 
-async def stream_ai_chunks(file_content: str) -> AsyncGenerator[str, None]:
+def _get_model_config(model_key: Optional[str] = None) -> dict:
+    """获取指定模型的配置。
+
+    Args:
+        model_key: 模型 key，为 None 时使用默认模型
+
+    Returns:
+        模型配置字典
+    """
+    key = model_key or DEFAULT_MODEL
+    if key not in AI_MODELS:
+        key = DEFAULT_MODEL
+    return AI_MODELS[key]
+
+
+async def stream_ai_chunks(
+    file_content: Optional[str] = None,
+    mode: str = "format",
+    generation_params: Optional[dict] = None,
+    model_key: Optional[str] = None,
+) -> AsyncGenerator[str, None]:
     """异步生成器，逐片段 yield AI 返回的文本。
 
     Args:
-        file_content: 提取的试卷文本
+        file_content: 提取的试卷文本（排版/通用出题必填，乐理可选）
+        mode: 模式（format / generate / music_theory）
+        generation_params: 出题参数（通用出题/乐理模式使用）
+        model_key: AI 模型 key（对应 AI_MODELS 中的 key）
 
     Yields:
         AI 生成的文本片段
     """
-    if len(file_content) > MAX_INPUT_CHARS:
+    if file_content and len(file_content) > MAX_INPUT_CHARS:
         logger.warning("文本过长 (%d)，截断至 %d", len(file_content), MAX_INPUT_CHARS)
         file_content = file_content[:MAX_INPUT_CHARS] + "\n\n[... 内容过长已截断 ...]"
 
-    user_content = f"请将以下试卷内容转换为标准 Markdown 格式：\n\n{file_content}"
+    cfg = _get_model_config(model_key)
+    provider = cfg["provider"]
+    api_base = cfg["api_base"]
+    api_key = cfg["api_key"]
+    model = cfg["model"]
 
-    if AI_PROVIDER == "openai":
-        url = f"{AI_API_BASE}/v1/chat/completions"
+    system_prompt = _MODE_PROMPTS.get(mode, FORMAT_PROMPT)
+    user_content = _build_user_content(mode, file_content, generation_params)
+
+    # 出题模式需要更多 token（DeepSeek 上限 8192）
+    max_tokens = 8192 if mode in ("generate", "music_theory") else 8000
+
+    if provider == "openai":
+        url = f"{api_base}/v1/chat/completions"
         headers = {
-            "Authorization": f"Bearer {AI_API_KEY}",
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
         body = {
-            "model": AI_MODEL,
-            "max_tokens": 8000,
+            "model": model,
+            "max_tokens": max_tokens,
             "stream": True,
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content},
             ],
         }
     else:
-        url = f"{AI_API_BASE}/v1/messages"
+        url = f"{api_base}/v1/messages"
         headers = {
-            "x-api-key": AI_API_KEY,
+            "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
             "Content-Type": "application/json",
         }
         body = {
-            "model": AI_MODEL,
-            "max_tokens": 8000,
+            "model": model,
+            "max_tokens": max_tokens,
             "stream": True,
-            "system": SYSTEM_PROMPT,
+            "system": system_prompt,
             "messages": [{"role": "user", "content": user_content}],
         }
 
-    logger.info("AI [%s] 流式请求，模型: %s，长度: %d", AI_PROVIDER, AI_MODEL, len(file_content))
+    logger.info(
+        "AI [%s] 流式请求，模式: %s，模型: %s，内容长度: %d",
+        provider, mode, model, len(user_content),
+    )
 
     async with httpx.AsyncClient(timeout=httpx.Timeout(300.0, connect=30.0)) as client:
         async with client.stream("POST", url, headers=headers, json=body) as response:
@@ -172,14 +193,102 @@ async def stream_ai_chunks(file_content: str) -> AsyncGenerator[str, None]:
                             yield content
 
 
-async def parse_to_markdown(file_content: str) -> str:
-    """非流式版本，收集所有片段返回完整 Markdown。"""
+async def extract_exam_info(text: str, model_key: Optional[str] = None) -> dict:
+    """从试卷文本中快速提取标题和学校名称。
+
+    Args:
+        text: 试卷原始文本
+        model_key: AI 模型 key（默认使用第一个可用模型）
+
+    Returns:
+        {"title": "...", "school": "..."}
+    """
+    cfg = _get_model_config(model_key)
+    provider = cfg["provider"]
+    api_base = cfg["api_base"]
+    api_key = cfg["api_key"]
+    model = cfg["model"]
+
+    prompt = (
+        "从以下试卷文本中提取信息，只返回JSON，不要返回其他任何内容：\n"
+        '{"title": "试卷标题", "school": "学校名称"}\n'
+        "如果无法确定，对应字段留空字符串。\n\n"
+        + text[:800]
+    )
+
+    if provider == "openai":
+        url = f"{api_base}/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        body = {
+            "model": model,
+            "max_tokens": 100,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+    else:
+        url = f"{api_base}/v1/messages"
+        headers = {
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        }
+        body = {
+            "model": model,
+            "max_tokens": 100,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(15.0)) as client:
+            response = await client.post(url, headers=headers, json=body)
+            if response.status_code != 200:
+                return {"title": "", "school": ""}
+
+            data = response.json()
+            if provider == "openai":
+                content = data["choices"][0]["message"]["content"]
+            else:
+                content = data["content"][0]["text"]
+
+            # 提取 JSON
+            match = re.search(r'\{.*\}', content, re.DOTALL)
+            if match:
+                result = json.loads(match.group())
+                return {
+                    "title": result.get("title", ""),
+                    "school": result.get("school", ""),
+                }
+    except Exception as e:
+        logger.warning("提取试卷信息失败: %s", e)
+
+    return {"title": "", "school": ""}
+
+
+async def parse_to_markdown(
+    file_content: str,
+    mode: str = "format",
+    generation_params: Optional[dict] = None,
+    model_key: Optional[str] = None,
+) -> str:
+    """非流式版本，收集所有片段返回完整 Markdown。
+
+    Args:
+        file_content: 文件文本内容
+        mode: 模式
+        generation_params: 出题参数
+        model_key: AI 模型 key
+
+    Returns:
+        完整的 Markdown 文本
+    """
     chunks: list[str] = []
     max_retries = 2
     for attempt in range(max_retries + 1):
         try:
             chunks = []
-            async for chunk in stream_ai_chunks(file_content):
+            async for chunk in stream_ai_chunks(file_content, mode, generation_params, model_key):
                 chunks.append(chunk)
             result = "".join(chunks)
             if not result.strip():

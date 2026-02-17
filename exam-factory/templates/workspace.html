@@ -3,6 +3,106 @@
 
 {% block head %}
 <style>
+    /* 模式切换 Tab */
+    .mode-tabs {
+        display: flex;
+        gap: 0;
+        margin-bottom: 24px;
+        border-bottom: 2px solid var(--border);
+    }
+    .mode-tab {
+        padding: 12px 24px;
+        font-size: 15px;
+        font-weight: 500;
+        color: var(--text-muted);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        transition: all 0.2s;
+        background: none;
+        border-top: none;
+        border-left: none;
+        border-right: none;
+    }
+    .mode-tab:hover {
+        color: var(--primary);
+    }
+    .mode-tab.active {
+        color: var(--primary);
+        border-bottom-color: var(--primary);
+    }
+    .mode-tab .tab-icon {
+        margin-right: 6px;
+    }
+    /* 模式表单切换 */
+    .mode-form { display: none; }
+    .mode-form.active { display: block; }
+    /* 题型网格 */
+    .qtype-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-top: 8px;
+    }
+    .qtype-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        transition: all 0.2s;
+    }
+    .qtype-item:has(input[type="checkbox"]:checked) {
+        border-color: var(--primary);
+        background: var(--primary-light);
+    }
+    .qtype-item label {
+        flex: 1;
+        font-size: 14px;
+        cursor: pointer;
+        margin: 0;
+    }
+    .qtype-item input[type="checkbox"] {
+        accent-color: var(--primary);
+        width: 18px;
+        height: 18px;
+    }
+    .qtype-item input[type="number"] {
+        width: 60px;
+        padding: 4px 8px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font-size: 14px;
+        text-align: center;
+    }
+    .qtype-item input[type="number"]:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+    /* 难度选择 */
+    .difficulty-options {
+        display: flex;
+        gap: 12px;
+        margin-top: 8px;
+    }
+    .diff-option {
+        padding: 8px 20px;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+        background: white;
+    }
+    .diff-option:hover {
+        border-color: var(--primary);
+    }
+    .diff-option.selected {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
     /* AI 流式输出区域 */
     .stream-box {
         background: #1e1e1e;
@@ -121,6 +221,152 @@
         background: var(--success);
         animation: none;
     }
+    /* 上传区域（小）— 用于出题模式可选上传 */
+    .upload-area-small {
+        border: 2px dashed var(--border);
+        border-radius: var(--radius);
+        padding: 24px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .upload-area-small:hover {
+        border-color: var(--primary);
+        background: var(--primary-light);
+    }
+    .upload-area-small .hint {
+        font-size: 13px;
+        color: var(--text-muted);
+        margin-top: 4px;
+    }
+    .upload-area-small .filename {
+        font-size: 14px;
+        color: var(--primary);
+        font-weight: 500;
+        margin-top: 6px;
+    }
+    /* 补充要求文本框 */
+    .extra-textarea {
+        min-height: 80px !important;
+    }
+    /* 模型选择 */
+    .model-selector {
+        margin-bottom: 20px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--border);
+    }
+    .model-selector label {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+        display: block;
+    }
+    .model-selector select {
+        width: 220px;
+        padding: 8px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 14px;
+        background: white;
+        cursor: pointer;
+        transition: border-color 0.2s;
+    }
+    .model-selector select:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+    .model-selector.hidden {
+        display: none;
+    }
+    /* 音乐史题库选择 */
+    .mh-cat-section {
+        margin-bottom: 20px;
+    }
+    .mh-cat-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+    .mh-cat-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text);
+    }
+    .mh-select-all-btn {
+        font-size: 13px;
+        color: var(--primary);
+        background: none;
+        border: 1px solid var(--primary);
+        border-radius: 14px;
+        padding: 3px 14px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .mh-select-all-btn:hover {
+        background: var(--primary);
+        color: white;
+    }
+    .mh-select-all-btn.active {
+        background: var(--primary);
+        color: white;
+    }
+    .mh-topic-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .mh-topic-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 14px;
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        font-size: 13px;
+        color: var(--text);
+        cursor: pointer;
+        transition: all 0.2s;
+        user-select: none;
+        background: white;
+    }
+    .mh-topic-tag:hover {
+        border-color: var(--primary);
+        background: var(--primary-light);
+    }
+    .mh-topic-tag.selected {
+        border-color: var(--primary);
+        background: var(--primary);
+        color: white;
+    }
+    .mh-topic-tag .mh-tag-count {
+        font-size: 11px;
+        opacity: 0.7;
+    }
+    .mh-topic-tag.selected .mh-tag-count {
+        opacity: 0.85;
+    }
+    .mh-stat-bar {
+        margin-top: 16px;
+        padding: 10px 16px;
+        background: var(--primary-light);
+        border-radius: 8px;
+        font-size: 14px;
+        color: var(--text-muted);
+        text-align: center;
+    }
+    .mh-stat-bar strong {
+        color: var(--primary);
+    }
+    .mh-custom-upload summary {
+        font-size: 13px;
+        color: var(--text-muted);
+        cursor: pointer;
+    }
+    .mh-custom-upload summary:hover {
+        color: var(--primary);
+    }
 </style>
 {% endblock %}
 
@@ -137,11 +383,11 @@
     <!-- 步骤指示器 -->
     <div class="steps">
         <div class="step active" id="step1">
-            <span class="num">1</span> 上传文件
+            <span class="num">1</span> 设置参数
         </div>
         <div class="step-line"></div>
         <div class="step" id="step2">
-            <span class="num">2</span> AI 解析
+            <span class="num">2</span> AI 生成
         </div>
         <div class="step-line"></div>
         <div class="step" id="step3">
@@ -155,54 +401,352 @@
 
     <div id="alert" class="alert"></div>
 
-    <!-- 第 1 步：上传 -->
+    <!-- 第 1 步：配置 -->
     <div id="panel1" class="card">
-        <h2>上传试卷文件</h2>
+        <!-- 模式 Tab -->
+        <div class="mode-tabs">
+            <button class="mode-tab active" onclick="switchMode('format')" id="tab-format">
+                <span class="tab-icon">&#128196;</span>排版模式
+            </button>
+            <button class="mode-tab" onclick="switchMode('generate')" id="tab-generate">
+                <span class="tab-icon">&#9999;&#65039;</span>通用出题
+            </button>
+            <button class="mode-tab" onclick="switchMode('music_theory')" id="tab-music_theory">
+                <span class="tab-icon">&#127925;</span>乐理出题
+            </button>
+            <button class="mode-tab" onclick="switchMode('music_history')" id="tab-music_history">
+                <span class="tab-icon">&#128214;</span>音乐史出题
+            </button>
+        </div>
 
-        <div class="form-row">
+        <!-- 模型选择（多模型时显示） -->
+        <div class="model-selector hidden" id="modelSelector">
+            <label for="modelSelect">AI 模型</label>
+            <select id="modelSelect"></select>
+        </div>
+
+        <!-- ========== 排版模式表单 ========== -->
+        <div id="form-format" class="mode-form active">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="fmt-title">试卷标题（选择文件后自动识别）</label>
+                    <input type="text" id="fmt-title" placeholder="如：2024年期末考试 - 高等数学">
+                </div>
+                <div class="form-group">
+                    <label for="fmt-school">学校名称（可选）</label>
+                    <input type="text" id="fmt-school" placeholder="如：中央音乐学院">
+                </div>
+            </div>
+
             <div class="form-group">
-                <label for="title">试卷标题 *</label>
-                <input type="text" id="title" placeholder="如：2024年期末考试 - 高等数学">
+                <label>主题色</label>
+                <div class="color-options" id="fmt-colors">
+                    <div class="color-option selected" data-color="4e9b86" style="background:#4e9b86" title="青绿色"></div>
+                    <div class="color-option" data-color="1971c2" style="background:#1971c2" title="蓝色"></div>
+                    <div class="color-option" data-color="c92a2a" style="background:#c92a2a" title="红色"></div>
+                    <div class="color-option" data-color="2f9e44" style="background:#2f9e44" title="绿色"></div>
+                    <div class="color-option" data-color="7048e8" style="background:#7048e8" title="紫色"></div>
+                </div>
             </div>
+
             <div class="form-group">
-                <label for="school">学校名称（可选）</label>
-                <input type="text" id="school" placeholder="如：中央音乐学院">
+                <label>上传文件 *</label>
+                <div class="upload-area" id="fmtUploadArea" onclick="document.getElementById('fmtFileInput').click()">
+                    <div class="icon">&#128194;</div>
+                    <div class="text">点击或拖拽文件到此处</div>
+                    <div class="hint">支持 .docx .pdf .txt .md，最大 20MB</div>
+                    <div class="filename" id="fmtFileName"></div>
+                </div>
+                <input type="file" id="fmtFileInput" accept=".docx,.pdf,.txt,.md" style="display:none" onchange="fmtFileSelected(this)">
             </div>
+
+            <button class="btn btn-primary btn-block" id="fmtUploadBtn" onclick="uploadFile()">
+                上传并解析
+            </button>
         </div>
 
-        <div class="form-group">
-            <label>主题色</label>
-            <div class="color-options">
-                <div class="color-option selected" data-color="4e9b86" style="background:#4e9b86" title="青绿色"></div>
-                <div class="color-option" data-color="1971c2" style="background:#1971c2" title="蓝色"></div>
-                <div class="color-option" data-color="c92a2a" style="background:#c92a2a" title="红色"></div>
-                <div class="color-option" data-color="2f9e44" style="background:#2f9e44" title="绿色"></div>
-                <div class="color-option" data-color="7048e8" style="background:#7048e8" title="紫色"></div>
+        <!-- ========== 通用出题表单 ========== -->
+        <div id="form-generate" class="mode-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="gen-title">试卷标题</label>
+                    <input type="text" id="gen-title" placeholder="如：数据结构 期末模拟">
+                </div>
+                <div class="form-group">
+                    <label for="gen-school">学校名称（可选）</label>
+                    <input type="text" id="gen-school" placeholder="如：中央音乐学院">
+                </div>
             </div>
+
+            <div class="form-group">
+                <label>主题色</label>
+                <div class="color-options" id="gen-colors">
+                    <div class="color-option selected" data-color="4e9b86" style="background:#4e9b86" title="青绿色"></div>
+                    <div class="color-option" data-color="1971c2" style="background:#1971c2" title="蓝色"></div>
+                    <div class="color-option" data-color="c92a2a" style="background:#c92a2a" title="红色"></div>
+                    <div class="color-option" data-color="2f9e44" style="background:#2f9e44" title="绿色"></div>
+                    <div class="color-option" data-color="7048e8" style="background:#7048e8" title="紫色"></div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>题型与数量（勾选后填写数量）</label>
+                <div class="qtype-grid">
+                    <div class="qtype-item">
+                        <input type="checkbox" id="gen-choice" checked>
+                        <label for="gen-choice">选择题</label>
+                        <input type="number" id="gen-choice-n" value="10" min="0" max="50">
+                        <span style="font-size:13px;color:var(--text-muted)">题</span>
+                    </div>
+                    <div class="qtype-item">
+                        <input type="checkbox" id="gen-fill">
+                        <label for="gen-fill">填空题</label>
+                        <input type="number" id="gen-fill-n" value="5" min="0" max="50">
+                        <span style="font-size:13px;color:var(--text-muted)">题</span>
+                    </div>
+                    <div class="qtype-item">
+                        <input type="checkbox" id="gen-short">
+                        <label for="gen-short">简答题</label>
+                        <input type="number" id="gen-short-n" value="3" min="0" max="20">
+                        <span style="font-size:13px;color:var(--text-muted)">题</span>
+                    </div>
+                    <div class="qtype-item">
+                        <input type="checkbox" id="gen-essay">
+                        <label for="gen-essay">论述题</label>
+                        <input type="number" id="gen-essay-n" value="1" min="0" max="10">
+                        <span style="font-size:13px;color:var(--text-muted)">题</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>难度</label>
+                <div class="difficulty-options" id="gen-diff">
+                    <div class="diff-option" data-diff="简单">简单</div>
+                    <div class="diff-option selected" data-diff="中等">中等</div>
+                    <div class="diff-option" data-diff="困难">困难</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="gen-extra">补充要求（可选）</label>
+                <textarea id="gen-extra" class="extra-textarea" placeholder="如：重点考查第 3-5 章内容，选择题偏向概念理解..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>上传参考材料 *</label>
+                <div class="upload-area" id="genUploadArea" onclick="document.getElementById('genFileInput').click()">
+                    <div class="icon">&#128194;</div>
+                    <div class="text">点击或拖拽文件到此处</div>
+                    <div class="hint">上传教材/讲义/笔记等参考资料，AI 将基于此出题</div>
+                    <div class="filename" id="genFileName"></div>
+                </div>
+                <input type="file" id="genFileInput" accept=".docx,.pdf,.txt,.md" style="display:none" onchange="genFileSelected(this)">
+            </div>
+
+            <button class="btn btn-primary btn-block" id="genUploadBtn" onclick="uploadFile()">
+                开始出题
+            </button>
         </div>
 
-        <div class="form-group">
-            <label>上传文件 *</label>
-            <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
-                <div class="icon">&#128194;</div>
-                <div class="text">点击或拖拽文件到此处</div>
-                <div class="hint">支持 .docx .pdf .txt .md，最大 20MB</div>
-                <div class="filename" id="fileName"></div>
+        <!-- ========== 乐理出题表单 ========== -->
+        <div id="form-music_theory" class="mode-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="mt-title">试卷标题</label>
+                    <input type="text" id="mt-title" placeholder="如：乐理模拟试题">
+                </div>
+                <div class="form-group">
+                    <label for="mt-school">学校名称（可选）</label>
+                    <input type="text" id="mt-school" placeholder="如：中央音乐学院">
+                </div>
             </div>
-            <input type="file" id="fileInput" accept=".docx,.pdf,.txt,.md" style="display:none" onchange="fileSelected(this)">
+
+            <div class="form-group">
+                <label>主题色</label>
+                <div class="color-options" id="mt-colors">
+                    <div class="color-option selected" data-color="4e9b86" style="background:#4e9b86" title="青绿色"></div>
+                    <div class="color-option" data-color="1971c2" style="background:#1971c2" title="蓝色"></div>
+                    <div class="color-option" data-color="c92a2a" style="background:#c92a2a" title="红色"></div>
+                    <div class="color-option" data-color="2f9e44" style="background:#2f9e44" title="绿色"></div>
+                    <div class="color-option" data-color="7048e8" style="background:#7048e8" title="紫色"></div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>试卷格式</label>
+                <div class="difficulty-options" id="mt-format">
+                    <div class="diff-option selected" data-format="hebei">河北式（快速练习）</div>
+                    <div class="diff-option" data-format="shanxi">山西式（全面测试）</div>
+                </div>
+            </div>
+
+            <!-- 河北式：题型数量可调 -->
+            <div class="form-group" id="mt-hebei-types">
+                <label>题型与数量</label>
+                <div class="qtype-grid">
+                    <div class="qtype-item">
+                        <input type="checkbox" id="mt-single-choice" checked>
+                        <label for="mt-single-choice">单项选择题</label>
+                        <input type="number" id="mt-single-choice-n" value="5" min="1" max="20">
+                        <span style="font-size:13px;color:var(--text-muted)">题</span>
+                    </div>
+                    <div class="qtype-item">
+                        <input type="checkbox" id="mt-multi-choice" checked>
+                        <label for="mt-multi-choice">多项选择题</label>
+                        <input type="number" id="mt-multi-choice-n" value="5" min="1" max="20">
+                        <span style="font-size:13px;color:var(--text-muted)">题</span>
+                    </div>
+                </div>
+                <p style="font-size:12px;color:var(--text-muted);margin-top:8px;">
+                    写作分析题（8分）为固定结构：音程/和弦构成与解决 + 旋律调性分析
+                </p>
+            </div>
+
+            <!-- 山西式：固定结构说明 -->
+            <div class="form-group" id="mt-shanxi-info" style="display:none;">
+                <label>固定试卷结构（80分）</label>
+                <div style="font-size:13px;color:var(--text-muted);line-height:1.8;padding:12px 16px;background:var(--primary-light);border-radius:8px;border:1px solid var(--border);">
+                    一、术语与音名标记（10分）<br>
+                    二、节奏组合（10分）<br>
+                    三、音程构成（10分）<br>
+                    四、和弦构成（10分）<br>
+                    五、音阶写作（10分）<br>
+                    六、音程调性判断（10分）<br>
+                    七、和弦调性判断（10分）<br>
+                    八、旋律调性分析（10分）
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>难度</label>
+                <div class="difficulty-options" id="mt-diff">
+                    <div class="diff-option" data-diff="初级">初级</div>
+                    <div class="diff-option selected" data-diff="中级">中级</div>
+                    <div class="diff-option" data-diff="高级">高级</div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="mt-extra">补充要求（可选）</label>
+                <textarea id="mt-extra" class="extra-textarea" placeholder="如：多出五声调式相关题目，选择题中包含谱例..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>上传参考材料（可选，不上传则 AI 自由出题）</label>
+                <div class="upload-area-small" id="mtUploadArea" onclick="document.getElementById('mtFileInput').click()">
+                    <div class="text" style="font-size:14px;color:var(--text-muted)">&#128194; 点击上传参考材料</div>
+                    <div class="hint">可选：上传教材/讲义辅助出题</div>
+                    <div class="filename" id="mtFileName"></div>
+                </div>
+                <input type="file" id="mtFileInput" accept=".docx,.pdf,.txt,.md" style="display:none" onchange="mtFileSelected(this)">
+            </div>
+
+            <button class="btn btn-primary btn-block" id="mtUploadBtn" onclick="uploadFile()">
+                开始出题
+            </button>
         </div>
 
-        <button class="btn btn-primary btn-block" id="uploadBtn" onclick="uploadFile()">
-            上传并解析
-        </button>
+        <!-- ========== 音乐史出题表单 ========== -->
+        <div id="form-music_history" class="mode-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="mh-title">试卷标题</label>
+                    <input type="text" id="mh-title" placeholder="如：西方音乐史选择题">
+                </div>
+                <div class="form-group">
+                    <label for="mh-school">学校名称（可选）</label>
+                    <input type="text" id="mh-school" placeholder="如：中央音乐学院">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>主题色</label>
+                <div class="color-options" id="mh-colors">
+                    <div class="color-option selected" data-color="4e9b86" style="background:#4e9b86" title="青绿色"></div>
+                    <div class="color-option" data-color="1971c2" style="background:#1971c2" title="蓝色"></div>
+                    <div class="color-option" data-color="c92a2a" style="background:#c92a2a" title="红色"></div>
+                    <div class="color-option" data-color="2f9e44" style="background:#2f9e44" title="绿色"></div>
+                    <div class="color-option" data-color="7048e8" style="background:#7048e8" title="紫色"></div>
+                </div>
+            </div>
+
+            <!-- 内置题库选择 -->
+            <div class="form-group">
+                <div id="mhQuizBankLoading" style="color:var(--text-muted);font-size:14px;padding:24px;text-align:center;">加载题库中...</div>
+                <div id="mhQuizBank" style="display:none;">
+                    <!-- 中国音乐史 -->
+                    <div class="mh-cat-section">
+                        <div class="mh-cat-header">
+                            <span class="mh-cat-title">中国音乐史</span>
+                            <button type="button" class="mh-select-all-btn" id="mh-select-all-chinese" onclick="toggleAllTopics('chinese')">全选</button>
+                        </div>
+                        <div class="mh-topic-grid" id="mhTopicsChinese"></div>
+                    </div>
+                    <!-- 西方音乐史 -->
+                    <div class="mh-cat-section">
+                        <div class="mh-cat-header">
+                            <span class="mh-cat-title">西方音乐史</span>
+                            <button type="button" class="mh-select-all-btn" id="mh-select-all-western" onclick="toggleAllTopics('western')">全选</button>
+                        </div>
+                        <div class="mh-topic-grid" id="mhTopicsWestern"></div>
+                    </div>
+                    <!-- 统计栏 -->
+                    <div class="mh-stat-bar" id="mhSelectedInfo">
+                        <span>已选 <strong id="mhSelectedCount">0</strong> 个专题，共 <strong id="mhSelectedTotal">0</strong> 题</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 自定义上传（折叠） -->
+            <div class="form-group">
+                <details class="mh-custom-upload">
+                    <summary>自定义上传 CSV</summary>
+                    <div style="margin-top:10px;">
+                        <div class="upload-area-small" id="mhUploadArea" onclick="document.getElementById('mhFileInput').click()">
+                            <div class="text" style="font-size:14px;color:var(--text-muted);">点击上传自定义 CSV 文件（多选）</div>
+                            <div class="filename" id="mhFileName"></div>
+                        </div>
+                        <input type="file" id="mhFileInput" multiple accept=".csv" style="display:none" onchange="mhFileSelected(this)">
+                    </div>
+                </details>
+            </div>
+
+            <div class="form-group">
+                <label for="mh-count">选题数量</label>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <input type="number" id="mh-count" value="50" min="0" max="500" style="width:100px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
+                    <span style="font-size:14px;color:var(--text-muted);">题（0 = 全部题目）</span>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="mh-shuffle" checked style="accent-color:var(--primary);width:18px;height:18px;">
+                    随机打乱选项顺序
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label for="mh-points">每题分值</label>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <input type="number" id="mh-points" value="2" min="1" max="10" style="width:80px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
+                    <span style="font-size:14px;color:var(--text-muted);">分</span>
+                </div>
+            </div>
+
+            <button class="btn btn-primary btn-block" id="mhUploadBtn" onclick="uploadFile()">
+                生成试卷
+            </button>
+        </div>
     </div>
 
     <!-- 第 2 步：AI 流式解析 -->
     <div id="panel2" class="card parse-panel">
-        <h2>AI 正在解析试卷</h2>
+        <h2 id="panel2Title">AI 正在生成试卷</h2>
         <div class="parse-status" id="parseStatus">
             <div class="dot"></div>
-            <span id="parseStatusText">AI 正在分析试卷内容...</span>
+            <span id="parseStatusText">AI 正在分析内容...</span>
         </div>
         <div class="stream-box" id="streamBox"><span class="cursor"></span></div>
         <div class="progress-wrap">
@@ -220,7 +764,7 @@
     <div id="panel3" class="card" style="display:none">
         <h2>编辑试卷内容</h2>
         <p style="color:var(--text-muted); font-size:14px; margin-bottom:16px;">
-            AI 已识别出以下内容，你可以直接编辑修改，确认无误后生成 PDF。
+            AI 已生成以下内容，你可以直接编辑修改，确认无误后生成 PDF。
         </p>
 
         <div class="form-group">
@@ -228,7 +772,7 @@
         </div>
 
         <div class="btn-group">
-            <button class="btn btn-secondary" onclick="goBack()">重新上传</button>
+            <button class="btn btn-secondary" onclick="goBack()">重新开始</button>
             <button class="btn btn-primary" style="flex:1" id="generateBtn" onclick="generatePDF()">
                 生成试卷 PDF
             </button>
@@ -284,9 +828,13 @@
 {% block scripts %}
 <script>
     let currentTaskId = null;
-    let selectedTheme = '4e9b86';
+    let currentMode = 'format';
 
-    // 检查登录状态
+    // 每个模式各自的主题色
+    const modeThemes = { format: '4e9b86', generate: '4e9b86', music_theory: '4e9b86', music_history: '4e9b86' };
+
+    // ============ 初始化 ============
+
     (async () => {
         try {
             const res = await fetch('/api/me');
@@ -295,7 +843,169 @@
                 document.getElementById('userEmail').textContent = data.email;
             }
         } catch (e) {}
+        // 加载可用模型列表
+        try {
+            const res = await fetch('/api/models');
+            if (res.ok) {
+                const models = await res.json();
+                const select = document.getElementById('modelSelect');
+                const selector = document.getElementById('modelSelector');
+                models.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m.key;
+                    opt.textContent = m.label;
+                    select.appendChild(opt);
+                });
+                // 多于 1 个模型时显示选择器
+                if (models.length > 1) {
+                    selector.classList.remove('hidden');
+                }
+            }
+        } catch (e) {}
     })();
+
+    // 初始化所有颜色选择器
+    document.querySelectorAll('.color-options').forEach(container => {
+        container.querySelectorAll('.color-option').forEach(el => {
+            el.addEventListener('click', () => {
+                container.querySelectorAll('.color-option').forEach(e => e.classList.remove('selected'));
+                el.classList.add('selected');
+                modeThemes[currentMode] = el.dataset.color;
+            });
+        });
+    });
+
+    // 初始化难度选择器
+    document.querySelectorAll('.difficulty-options').forEach(container => {
+        // 跳过试卷格式选择器（由专门逻辑处理）
+        if (container.id === 'mt-format') return;
+        container.querySelectorAll('.diff-option').forEach(el => {
+            el.addEventListener('click', () => {
+                container.querySelectorAll('.diff-option').forEach(e => e.classList.remove('selected'));
+                el.classList.add('selected');
+            });
+        });
+    });
+
+    // 初始化乐理试卷格式选择器
+    document.querySelectorAll('#mt-format .diff-option').forEach(el => {
+        el.addEventListener('click', () => {
+            document.querySelectorAll('#mt-format .diff-option').forEach(e => e.classList.remove('selected'));
+            el.classList.add('selected');
+            const format = el.dataset.format;
+            document.getElementById('mt-hebei-types').style.display = format === 'hebei' ? '' : 'none';
+            document.getElementById('mt-shanxi-info').style.display = format === 'shanxi' ? '' : 'none';
+        });
+    });
+
+    // 文件拖拽（排版模式）
+    const fmtArea = document.getElementById('fmtUploadArea');
+    fmtArea.addEventListener('dragover', (e) => { e.preventDefault(); fmtArea.classList.add('dragover'); });
+    fmtArea.addEventListener('dragleave', () => fmtArea.classList.remove('dragover'));
+    fmtArea.addEventListener('drop', (e) => {
+        e.preventDefault(); fmtArea.classList.remove('dragover');
+        if (e.dataTransfer.files[0]) {
+            document.getElementById('fmtFileInput').files = e.dataTransfer.files;
+            fmtFileSelected(document.getElementById('fmtFileInput'));
+        }
+    });
+
+    // 文件拖拽（通用出题）
+    const genArea = document.getElementById('genUploadArea');
+    genArea.addEventListener('dragover', (e) => { e.preventDefault(); genArea.classList.add('dragover'); });
+    genArea.addEventListener('dragleave', () => genArea.classList.remove('dragover'));
+    genArea.addEventListener('drop', (e) => {
+        e.preventDefault(); genArea.classList.remove('dragover');
+        if (e.dataTransfer.files[0]) {
+            document.getElementById('genFileInput').files = e.dataTransfer.files;
+            genFileSelected(document.getElementById('genFileInput'));
+        }
+    });
+
+    // 加载内置题库列表
+    let quizBankData = null;
+    (async () => {
+        try {
+            const res = await fetch('/api/quiz-bank');
+            if (res.ok) {
+                quizBankData = await res.json();
+                renderQuizBank(quizBankData);
+            }
+        } catch (e) {
+            document.getElementById('mhQuizBankLoading').textContent = '题库加载失败';
+        }
+    })();
+
+    function renderQuizBank(data) {
+        document.getElementById('mhQuizBankLoading').style.display = 'none';
+        document.getElementById('mhQuizBank').style.display = 'block';
+
+        const containers = { chinese: 'mhTopicsChinese', western: 'mhTopicsWestern' };
+        for (const [cat, containerId] of Object.entries(containers)) {
+            const container = document.getElementById(containerId);
+            const items = data[cat] || [];
+            container.innerHTML = items.map(item =>
+                `<span class="mh-topic-tag" data-cat="${cat}" data-file="${item.file}" data-count="${item.count}" onclick="toggleTag(this)">${item.name}<span class="mh-tag-count">${item.count}</span></span>`
+            ).join('');
+        }
+    }
+
+    function toggleTag(el) {
+        el.classList.toggle('selected');
+        updateTopicSelection();
+    }
+
+    function toggleAllTopics(cat) {
+        const tags = document.querySelectorAll(`.mh-topic-tag[data-cat="${cat}"]`);
+        const allSelected = Array.from(tags).every(t => t.classList.contains('selected'));
+        tags.forEach(t => { allSelected ? t.classList.remove('selected') : t.classList.add('selected'); });
+        // 更新按钮样式
+        const btn = document.getElementById(`mh-select-all-${cat}`);
+        if (btn) btn.classList.toggle('active', !allSelected);
+        updateTopicSelection();
+    }
+
+    function updateTopicSelection() {
+        const selected = document.querySelectorAll('.mh-topic-tag.selected');
+        let totalCount = 0;
+        selected.forEach(t => totalCount += parseInt(t.dataset.count) || 0);
+        document.getElementById('mhSelectedCount').textContent = selected.length;
+        document.getElementById('mhSelectedTotal').textContent = totalCount;
+
+        // 同步全选按钮样式
+        ['chinese', 'western'].forEach(cat => {
+            const all = document.querySelectorAll(`.mh-topic-tag[data-cat="${cat}"]`);
+            const sel = document.querySelectorAll(`.mh-topic-tag[data-cat="${cat}"].selected`);
+            const btn = document.getElementById(`mh-select-all-${cat}`);
+            if (btn) btn.classList.toggle('active', all.length > 0 && all.length === sel.length);
+        });
+    }
+
+    function getSelectedTopics() {
+        return Array.from(document.querySelectorAll('.mh-topic-tag.selected')).map(t => t.dataset.file);
+    }
+
+    // ============ 模式切换 ============
+
+    function switchMode(mode) {
+        currentMode = mode;
+        // 切换 Tab 样式
+        document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('tab-' + mode).classList.add('active');
+        // 切换表单
+        document.querySelectorAll('.mode-form').forEach(f => f.classList.remove('active'));
+        document.getElementById('form-' + mode).classList.add('active');
+        // 音乐史模式不需要 AI 模型选择器
+        const selector = document.getElementById('modelSelector');
+        if (mode === 'music_history') {
+            selector.classList.add('hidden');
+        } else if (document.getElementById('modelSelect').options.length > 1) {
+            selector.classList.remove('hidden');
+        }
+        hideAlert();
+    }
+
+    // ============ 通用函数 ============
 
     function showAlert(msg, type) {
         const el = document.getElementById('alert');
@@ -306,39 +1016,6 @@
 
     function hideAlert() {
         document.getElementById('alert').className = 'alert';
-    }
-
-    // 主题色选择
-    document.querySelectorAll('.color-option').forEach(el => {
-        el.addEventListener('click', () => {
-            document.querySelectorAll('.color-option').forEach(e => e.classList.remove('selected'));
-            el.classList.add('selected');
-            selectedTheme = el.dataset.color;
-        });
-    });
-
-    // 文件拖拽
-    const uploadArea = document.getElementById('uploadArea');
-    uploadArea.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        uploadArea.classList.add('dragover');
-    });
-    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
-    uploadArea.addEventListener('drop', (e) => {
-        e.preventDefault();
-        uploadArea.classList.remove('dragover');
-        const file = e.dataTransfer.files[0];
-        if (file) {
-            document.getElementById('fileInput').files = e.dataTransfer.files;
-            fileSelected(document.getElementById('fileInput'));
-        }
-    });
-
-    function fileSelected(input) {
-        const file = input.files[0];
-        if (file) {
-            document.getElementById('fileName').textContent = file.name;
-        }
     }
 
     function setStep(n) {
@@ -361,25 +1038,188 @@
         target.classList.add('show');
     }
 
-    // ============ 第 1 步：上传文件 ============
+    // ============ 文件选择回调 ============
+
+    async function fmtFileSelected(input) {
+        const file = input.files[0];
+        if (!file) return;
+        document.getElementById('fmtFileName').textContent = file.name;
+
+        const titleInput = document.getElementById('fmt-title');
+        const schoolInput = document.getElementById('fmt-school');
+        if (titleInput.value.trim() && schoolInput.value.trim()) return;
+
+        titleInput.placeholder = 'AI 正在分析文件...';
+        schoolInput.placeholder = 'AI 正在分析文件...';
+        try {
+            const form = new FormData();
+            form.append('file', file);
+            const res = await fetch('/api/extract-info', { method: 'POST', body: form });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.title && !titleInput.value.trim()) titleInput.value = data.title;
+                if (data.school && !schoolInput.value.trim()) schoolInput.value = data.school;
+            }
+        } catch (e) {}
+        finally {
+            titleInput.placeholder = '如：2024年期末考试 - 高等数学';
+            schoolInput.placeholder = '如：中央音乐学院';
+        }
+    }
+
+    function genFileSelected(input) {
+        if (input.files[0]) document.getElementById('genFileName').textContent = input.files[0].name;
+    }
+
+    function mtFileSelected(input) {
+        if (input.files[0]) document.getElementById('mtFileName').textContent = input.files[0].name;
+    }
+
+    async function mhFileSelected(input) {
+        const files = Array.from(input.files);
+        if (!files.length) return;
+
+        document.getElementById('mhFileName').textContent =
+            files.length === 1 ? files[0].name : `已选择 ${files.length} 个文件`;
+
+        // 读取所有 CSV 并合并
+        const allContent = [];
+        let headerLine = '';
+        for (const f of files) {
+            const text = await f.text();
+            const lines = text.trim().split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                // 检测表头行
+                if (line.includes('问题') && line.includes('选项')) {
+                    if (!headerLine) {
+                        headerLine = line;
+                        allContent.push(headerLine);
+                    }
+                    continue;
+                }
+                allContent.push(line);
+            }
+        }
+
+        window._mhCsvBlob = new Blob([allContent.join('\n')], {type: 'text/csv'});
+    }
+
+    // ============ 收集出题参数 ============
+
+    function collectGenParams() {
+        const types = {};
+        if (document.getElementById('gen-choice').checked)
+            types['选择题'] = document.getElementById('gen-choice-n').value;
+        if (document.getElementById('gen-fill').checked)
+            types['填空题'] = document.getElementById('gen-fill-n').value;
+        if (document.getElementById('gen-short').checked)
+            types['简答题'] = document.getElementById('gen-short-n').value;
+        if (document.getElementById('gen-essay').checked)
+            types['论述题'] = document.getElementById('gen-essay-n').value;
+
+        const diffEl = document.querySelector('#gen-diff .diff-option.selected');
+        return {
+            question_types: types,
+            difficulty: diffEl ? diffEl.dataset.diff : '中等',
+            extra_requirements: document.getElementById('gen-extra').value.trim(),
+            title: document.getElementById('gen-title').value.trim(),
+        };
+    }
+
+    function collectMtParams() {
+        const formatEl = document.querySelector('#mt-format .diff-option.selected');
+        const selectedFormat = formatEl ? formatEl.dataset.format : 'hebei';
+
+        const types = {};
+        if (selectedFormat === 'hebei') {
+            if (document.getElementById('mt-single-choice').checked)
+                types['单项选择题'] = document.getElementById('mt-single-choice-n').value;
+            if (document.getElementById('mt-multi-choice').checked)
+                types['多项选择题'] = document.getElementById('mt-multi-choice-n').value;
+        }
+        // 山西式不需要题型选择，结构固定
+
+        const diffEl = document.querySelector('#mt-diff .diff-option.selected');
+        return {
+            exam_format: selectedFormat,
+            question_types: types,
+            difficulty: diffEl ? diffEl.dataset.diff : '中级',
+            extra_requirements: document.getElementById('mt-extra').value.trim(),
+            title: document.getElementById('mt-title').value.trim(),
+        };
+    }
+
+    function collectMhParams() {
+        return {
+            question_count: parseInt(document.getElementById('mh-count').value) || 0,
+            shuffle: document.getElementById('mh-shuffle').checked,
+            points_per_question: parseInt(document.getElementById('mh-points').value) || 2,
+            title: document.getElementById('mh-title').value.trim() || '音乐史选择题',
+        };
+    }
+
+    // ============ 第 1 步：上传/提交 ============
 
     async function uploadFile() {
-        const title = document.getElementById('title').value.trim();
-        const file = document.getElementById('fileInput').files[0];
-
-        if (!title) { showAlert('请输入试卷标题', 'error'); return; }
-        if (!file) { showAlert('请选择文件', 'error'); return; }
-
         hideAlert();
-        const btn = document.getElementById('uploadBtn');
-        btn.disabled = true;
-        btn.textContent = '上传中...';
 
         const form = new FormData();
-        form.append('file', file);
+        form.append('mode', currentMode);
+
+        let title, school, theme, file, btn;
+
+        if (currentMode === 'format') {
+            title = document.getElementById('fmt-title').value.trim() || '未命名试卷';
+            school = document.getElementById('fmt-school').value.trim();
+            theme = modeThemes.format;
+            file = document.getElementById('fmtFileInput').files[0];
+            btn = document.getElementById('fmtUploadBtn');
+            if (!file) { showAlert('请选择文件', 'error'); return; }
+            form.append('file', file);
+        } else if (currentMode === 'generate') {
+            title = document.getElementById('gen-title').value.trim() || '未命名试卷';
+            school = document.getElementById('gen-school').value.trim();
+            theme = modeThemes.generate;
+            file = document.getElementById('genFileInput').files[0];
+            btn = document.getElementById('genUploadBtn');
+            if (!file) { showAlert('请上传参考材料', 'error'); return; }
+            form.append('file', file);
+            form.append('generation_params', JSON.stringify(collectGenParams()));
+        } else if (currentMode === 'music_theory') {
+            title = document.getElementById('mt-title').value.trim() || '乐理试卷';
+            school = document.getElementById('mt-school').value.trim();
+            theme = modeThemes.music_theory;
+            file = document.getElementById('mtFileInput').files[0];
+            btn = document.getElementById('mtUploadBtn');
+            if (file) form.append('file', file);
+            form.append('generation_params', JSON.stringify(collectMtParams()));
+        } else if (currentMode === 'music_history') {
+            title = document.getElementById('mh-title').value.trim() || '音乐史选择题';
+            school = document.getElementById('mh-school').value.trim();
+            theme = modeThemes.music_history;
+            btn = document.getElementById('mhUploadBtn');
+            const mhParams = collectMhParams();
+            if (window._mhCsvBlob) {
+                // 自定义上传模式
+                form.append('file', window._mhCsvBlob, 'combined.csv');
+            } else {
+                // 内置题库模式
+                const topics = getSelectedTopics();
+                if (!topics.length) { showAlert('请至少选择一个专题', 'error'); return; }
+                mhParams.selected_topics = topics;
+            }
+            form.append('generation_params', JSON.stringify(mhParams));
+        }
+
         form.append('title', title);
-        form.append('school', document.getElementById('school').value.trim());
-        form.append('theme', selectedTheme);
+        form.append('school', school);
+        form.append('theme', theme);
+        form.append('model', document.getElementById('modelSelect').value || '');
+
+        btn.disabled = true;
+        btn.textContent = currentMode === 'format' ? '上传中...' : '提交中...';
 
         try {
             const res = await fetch('/api/upload', { method: 'POST', body: form });
@@ -389,14 +1229,14 @@
                 currentTaskId = data.task_id;
                 startAIParse();
             } else {
-                showAlert(data.detail || '上传失败', 'error');
+                showAlert(data.detail || '提交失败', 'error');
                 btn.disabled = false;
-                btn.textContent = '上传并解析';
+                btn.textContent = currentMode === 'format' ? '上传并解析' : '开始出题';
             }
         } catch (e) {
             showAlert('网络错误，请重试', 'error');
             btn.disabled = false;
-            btn.textContent = '上传并解析';
+            btn.textContent = currentMode === 'format' ? '上传并解析' : '开始出题';
         }
     }
 
@@ -405,6 +1245,14 @@
     async function startAIParse() {
         setStep(2);
         showPanel('panel2');
+
+        const titleMap = {
+            format: 'AI 正在解析试卷',
+            generate: 'AI 正在出题',
+            music_theory: 'AI 正在生成乐理试题',
+            music_history: '正在生成音乐史试卷',
+        };
+        document.getElementById('panel2Title').textContent = titleMap[currentMode] || 'AI 正在生成';
 
         const streamBox = document.getElementById('streamBox');
         const parseProgress = document.getElementById('parseProgress');
@@ -418,7 +1266,7 @@
         parsePct.textContent = '0%';
         parseMsg.textContent = '正在连接 AI...';
         parseStatus.classList.remove('done');
-        parseStatusText.textContent = 'AI 正在分析试卷内容...';
+        parseStatusText.textContent = currentMode === 'format' ? 'AI 正在分析试卷内容...' : 'AI 正在生成题目...';
 
         let collected = '';
         let charCount = 0;
@@ -427,7 +1275,7 @@
             const res = await fetch(`/api/tasks/${currentTaskId}/parse`);
             if (!res.ok) {
                 const err = await res.json();
-                throw new Error(err.detail || 'AI 解析请求失败');
+                throw new Error(err.detail || 'AI 请求失败');
             }
 
             const reader = res.body.getReader();
@@ -444,39 +1292,38 @@
 
                 for (const line of lines) {
                     if (!line.startsWith('data: ')) continue;
-                    const jsonStr = line.slice(6);
                     let event;
-                    try {
-                        event = JSON.parse(jsonStr);
-                    } catch (e) { continue; }
+                    try { event = JSON.parse(line.slice(6)); } catch (e) { continue; }
 
                     if (event.type === 'chunk') {
                         collected += event.text;
                         charCount += event.text.length;
-                        // 更新流式显示
                         const cursor = streamBox.querySelector('.cursor');
                         const textNode = document.createTextNode(event.text);
                         streamBox.insertBefore(textNode, cursor);
                         streamBox.scrollTop = streamBox.scrollHeight;
-                        // 模拟进度（基于字符数估算，假设总共约 3000 字）
                         const pct = Math.min(95, Math.round(charCount / 30));
                         parseProgress.style.width = pct + '%';
                         parsePct.textContent = pct + '%';
                         parseMsg.textContent = `已接收 ${charCount} 字符...`;
                     } else if (event.type === 'done') {
-                        // 解析完成
                         parseProgress.style.width = '100%';
                         parsePct.textContent = '100%';
-                        parseMsg.textContent = '解析完成';
+                        parseMsg.textContent = '生成完成';
                         parseStatus.classList.add('done');
-                        parseStatusText.textContent = 'AI 解析完成';
-                        streamBox.querySelector('.cursor').remove();
+                        parseStatusText.textContent = 'AI 生成完成';
+                        const cursorEl = streamBox.querySelector('.cursor');
+                        if (cursorEl) cursorEl.remove();
 
-                        // 短暂停留后跳转到编辑
                         setTimeout(() => {
                             document.getElementById('markdownEditor').value = event.markdown;
-                            showPanel('panel3');
-                            setStep(3);
+                            if (currentMode === 'music_history') {
+                                // 音乐史模式跳过编辑，直接生成 PDF
+                                generatePDF();
+                            } else {
+                                showPanel('panel3');
+                                setStep(3);
+                            }
                         }, 800);
                     } else if (event.type === 'error') {
                         throw new Error(event.message);
@@ -484,11 +1331,10 @@
                 }
             }
         } catch (e) {
-            showAlert('AI 解析失败: ' + e.message, 'error');
+            showAlert('AI 生成失败: ' + e.message, 'error');
             showPanel('panel1');
             setStep(1);
-            document.getElementById('uploadBtn').disabled = false;
-            document.getElementById('uploadBtn').textContent = '上传并解析';
+            resetButtons();
         }
     }
 
@@ -543,11 +1389,8 @@
 
                 for (const line of lines) {
                     if (!line.startsWith('data: ')) continue;
-                    const jsonStr = line.slice(6);
                     let event;
-                    try {
-                        event = JSON.parse(jsonStr);
-                    } catch (e) { continue; }
+                    try { event = JSON.parse(line.slice(6)); } catch (e) { continue; }
 
                     if (event.type === 'progress') {
                         pdfProgress.style.width = event.pct + '%';
@@ -564,9 +1407,7 @@
                         document.getElementById('examLink').href = event.exam_url;
                         document.getElementById('answerLink').href = event.answer_url;
 
-                        setTimeout(() => {
-                            showPanel('panel4');
-                        }, 500);
+                        setTimeout(() => { showPanel('panel4'); }, 500);
                     } else if (event.type === 'error') {
                         throw new Error(event.message);
                     }
@@ -581,14 +1422,38 @@
 
     // ============ 导航 ============
 
+    function resetButtons() {
+        document.getElementById('fmtUploadBtn').disabled = false;
+        document.getElementById('fmtUploadBtn').textContent = '上传并解析';
+        document.getElementById('genUploadBtn').disabled = false;
+        document.getElementById('genUploadBtn').textContent = '开始出题';
+        document.getElementById('mtUploadBtn').disabled = false;
+        document.getElementById('mtUploadBtn').textContent = '开始出题';
+        document.getElementById('mhUploadBtn').disabled = false;
+        document.getElementById('mhUploadBtn').textContent = '生成试卷';
+    }
+
     function goBack() {
         currentTaskId = null;
         hideAlert();
         showPanel('panel1');
-        document.getElementById('uploadBtn').disabled = false;
-        document.getElementById('uploadBtn').textContent = '上传并解析';
-        document.getElementById('fileInput').value = '';
-        document.getElementById('fileName').textContent = '';
+        resetButtons();
+        // 清除文件选择
+        document.getElementById('fmtFileInput').value = '';
+        document.getElementById('fmtFileName').textContent = '';
+        document.getElementById('genFileInput').value = '';
+        document.getElementById('genFileName').textContent = '';
+        document.getElementById('mtFileInput').value = '';
+        document.getElementById('mtFileName').textContent = '';
+        document.getElementById('mhFileInput').value = '';
+        document.getElementById('mhFileName').textContent = '';
+        window._mhCsvBlob = null;
+        document.querySelectorAll('.mh-topic-tag.selected').forEach(t => t.classList.remove('selected'));
+        ['chinese', 'western'].forEach(cat => {
+            const btn = document.getElementById(`mh-select-all-${cat}`);
+            if (btn) btn.classList.remove('active');
+        });
+        updateTopicSelection();
         setStep(1);
     }
 

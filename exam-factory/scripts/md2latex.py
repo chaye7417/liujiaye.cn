@@ -121,12 +121,15 @@ def parse_single_question(content: str, points: int) -> dict:
     """
     解析单个题目的内容。
 
+    支持 ```lilypond``` 代码块，会保存为原始 LilyPond 代码（不做 LaTeX 转义）。
+
     Args:
         content: 题目内容
         points: 分值
 
     Returns:
-        {'points': 5, 'stem': '...', 'type': 'choice/short/essay', ...}
+        {'points': 5, 'stem': '...', 'type': 'choice/short/essay',
+         'lilypond_blocks': [{'code': '...', 'staffsize': 20}, ...], ...}
     """
     question = {
         'points': points,
@@ -139,16 +142,41 @@ def parse_single_question(content: str, points: int) -> dict:
         'staff_lines': 0,
         'piano_staff': 0,
         'essay_box': None,
-        'essay_items': []
+        'essay_items': [],
+        'lilypond_blocks': [],
     }
 
     lines = content.split('\n')
     stem_lines = []
     in_essay_box = False
     essay_items = []
+    in_lilypond = False
+    lilypond_lines = []
 
     for line in lines:
         line_stripped = line.strip()
+
+        # 检测 lilypond 代码块开始
+        if re.match(r'^```lilypond', line_stripped):
+            in_lilypond = True
+            lilypond_lines = []
+            continue
+
+        # 检测 lilypond 代码块结束
+        if in_lilypond and line_stripped == '```':
+            in_lilypond = False
+            code = '\n'.join(lilypond_lines).strip()
+            if code:
+                question['lilypond_blocks'].append({
+                    'code': code,
+                    'staffsize': 20,
+                })
+            continue
+
+        # 收集 lilypond 代码（保持原始缩进，不做转义）
+        if in_lilypond:
+            lilypond_lines.append(line.rstrip())
+            continue
 
         # 解析选择题选项 (- A. 内容)
         option_match = re.match(r'^-\s*([A-D])\.\s*(.+)$', line_stripped)
@@ -390,6 +418,8 @@ def generate_question_latex(q: dict) -> list[str]:
     """
     生成单个题目的 LaTeX 代码。
 
+    支持 LilyPond 乐谱代码块，自动注入 font-settings.ily。
+
     Args:
         q: 题目字典
 
@@ -419,6 +449,15 @@ def generate_question_latex(q: dict) -> list[str]:
             if extra_line.strip():
                 lines.append(r'  %s' % extra_line)
 
+    # LilyPond 乐谱代码块（在题干之后、选项之前输出）
+    for block in q.get('lilypond_blocks', []):
+        staffsize = block.get('staffsize', 20)
+        code = block['code']
+        lines.append(r'  \begin{lilypond}[staffsize=%d]' % staffsize)
+        lines.append(r'  \include "font-settings.ily"')
+        lines.append(f'  {code}')
+        lines.append(r'  \end{lilypond}')
+
     # 选择题选项
     if q['type'] == 'choice' and len(q['options']) == 4:
         options = [escape_latex(opt) for opt in q['options']]
@@ -437,9 +476,15 @@ def generate_question_latex(q: dict) -> list[str]:
         lines.append(r'  \pianostaff{%d}' % q['piano_staff'])
 
     # 答案
-    if q['answer'] and q['type'] != 'choice':
-        answer_escaped = escape_latex(q['answer'])
-        lines.append(r'  \answer{%s}' % answer_escaped)
+    # 选择题：单选由 \choice 的第5个参数高亮，多选需额外输出 \answer
+    if q['answer']:
+        if q['type'] != 'choice':
+            answer_escaped = escape_latex(q['answer'])
+            lines.append(r'  \answer{%s}' % answer_escaped)
+        elif q['answer_num'] == 0:
+            # 多选题或无法解析的选择题答案
+            answer_escaped = escape_latex(q['answer'])
+            lines.append(r'  \answer{%s}' % answer_escaped)
 
     lines.append('')
 

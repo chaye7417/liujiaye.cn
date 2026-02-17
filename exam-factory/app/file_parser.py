@@ -77,7 +77,7 @@ def parse_file(file_path: Path) -> str:
         return parse_docx(file_path)
     elif suffix == ".pdf":
         return parse_pdf(file_path)
-    elif suffix in (".txt", ".md"):
+    elif suffix in (".txt", ".md", ".csv"):
         return file_path.read_text(encoding="utf-8")
     else:
         raise ValueError(f"不支持的文件格式: {suffix}")
