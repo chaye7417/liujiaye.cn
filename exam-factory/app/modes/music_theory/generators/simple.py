@@ -181,36 +181,48 @@ def _flatten_clef_groups(
 
 
 def _build_blank_staff(
-    count: int,
+    chunk: list[tuple[dict, Note]],
     note_offset: int = 0,
 ) -> list[str]:
-    """生成空白五线谱 LilyPond 块（有小节线和编号，无谱号无音符）。
+    """生成空白五线谱 LilyPond 块（带谱号、编号、音名标注）。
 
-    用于反向题：学生在打印的五线谱上书写音符。
+    用于反向题：谱号显示在谱上，编号在上方，音名在下方，
+    学生在对应位置写出音符。
 
     Args:
-        count: 空白小节数
+        chunk: [(clef_cfg, Note), ...] 每个位置的谱号和目标音符
         note_offset: 编号起始偏移
 
     Returns:
         LilyPond 代码行列表（含 ```lilypond 围栏）
     """
-    if count == 0:
+    if not chunk:
         return []
 
     lines: list[str] = [
         "```lilypond",
-        '\\new Staff \\with { \\remove "Clef_engraver" } {',
+        "{",
         "  \\omit Staff.TimeSignature",
         "  \\omit Score.BarNumber",
     ]
+    current_clef: str | None = None
 
-    for idx in range(count):
+    for idx, (clef_cfg, note) in enumerate(chunk):
         note_num = note_offset + idx + 1
+
+        # 谱号切换
+        if clef_cfg["lily"] != current_clef:
+            lines.append(f"  \\clef {clef_cfg['lily']}")
+            current_clef = clef_cfg["lily"]
+
+        # 空白小节：编号在上，音名在下
+        label = f"{note.to_pitch_name()}，{note.to_pitch_label()}"
         lines.append(
             f'  s1^\\markup {{ \\small "({note_num})" }}'
+            f'_\\markup {{ \\small "{label}" }}'
         )
-        if idx < count - 1:
+
+        if idx < len(chunk) - 1:
             lines.append("  \\noBreak")
 
     lines.extend(["}", "```", ""])
@@ -360,35 +372,8 @@ def _build_reverse_notes(
     for chunk_idx, chunk in enumerate(chunks):
         offset = chunk_idx * _NOTES_PER_LINE
 
-        # 题目文本：按谱号分组列出音名
-        question_lines: list[str] = []
-        current_clef: str | None = None
-        current_cfg: dict | None = None
-        current_items: list[str] = []
-
-        for i, (clef_cfg, note) in enumerate(chunk):
-            note_num = offset + i + 1
-            if clef_cfg["lily"] != current_clef:
-                if current_items and current_cfg:
-                    question_lines.append(
-                        f"{current_cfg['name']}：{'　'.join(current_items)}"
-                    )
-                current_clef = clef_cfg["lily"]
-                current_cfg = clef_cfg
-                current_items = []
-            current_items.append(f"({note_num}) {note.to_pitch_name()}，{note.to_pitch_label()}")
-
-        if current_items and current_cfg:
-            question_lines.append(
-                f"{current_cfg['name']}：{'　'.join(current_items)}"
-            )
-
-        # 每行谱号末尾加 LaTeX 强制换行，防止多谱号文字挤在一段
-        for idx in range(len(question_lines) - 1):
-            question_lines[idx] += r"\\"
-
-        # 空白五线谱（有小节线+编号，无谱号）
-        blank_lily = _build_blank_staff(len(chunk), note_offset=offset)
+        # 空白五线谱（带谱号、编号在上、音名在下）
+        blank_lily = _build_blank_staff(chunk, note_offset=offset)
 
         # 答案五线谱（带谱号和音符）
         answer_lily = _build_lily_block(chunk, note_offset=offset)
@@ -397,8 +382,6 @@ def _build_reverse_notes(
             parts = [
                 "## [5分]",
                 "在五线谱上写出指定音：",
-                "",
-                *question_lines,
                 "> 仅试题:",
                 *blank_lily,
                 "> 答案:",
@@ -407,7 +390,6 @@ def _build_reverse_notes(
         else:
             parts = [
                 "## [续]",
-                *question_lines,
                 "> 仅试题:",
                 *blank_lily,
                 "> 答案:",
