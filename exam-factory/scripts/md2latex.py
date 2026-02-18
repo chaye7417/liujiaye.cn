@@ -503,10 +503,12 @@ def generate_question_latex(q: dict) -> list[str]:
         code, extracted_ss = fix_lilypond_code(block['code'])
         if extracted_ss is not None:
             staffsize = extracted_ss
+        lines.append(r'  \begin{center}')
         lines.append(r'  \begin{lilypond}[staffsize=%d]' % staffsize)
         lines.append(r'  \include "font-settings.ily"')
         lines.append(f'  {code}')
         lines.append(r'  \end{lilypond}')
+        lines.append(r'  \end{center}')
 
     # 选择题选项
     if q['type'] == 'choice' and len(q['options']) == 4:
@@ -534,10 +536,12 @@ def generate_question_latex(q: dict) -> list[str]:
             code, extracted_ss = fix_lilypond_code(block['code'])
             if extracted_ss is not None:
                 staffsize = extracted_ss
+            lines.append(r'    \begin{center}')
             lines.append(r'    \begin{lilypond}[staffsize=%d]' % staffsize)
             lines.append(r'    \include "font-settings.ily"')
             lines.append(f'    {code}')
             lines.append(r'    \end{lilypond}')
+            lines.append(r'    \end{center}')
         lines.append(r'  }{}')
 
     # 答案（文本）

@@ -202,6 +202,7 @@ def _build_lily_block(
         "```lilypond",
         "{",
         "  \\omit Staff.TimeSignature",
+        "  \\omit Score.BarNumber",
     ]
     current_clef: str | None = None
 
