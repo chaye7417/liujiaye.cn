@@ -527,17 +527,19 @@ def generate_question_latex(q: dict) -> list[str]:
         lines.append(r'  \end{lilypond}')
 
     # 仅试题谱例（答案模式隐藏）
+    # 使用 \ifshowanswer...\fi 而非 \ifthenelse，
+    # 因为 lilypond-book 替换会引入额外花括号，干扰 \ifthenelse 参数扫描
     for block in q.get('question_only_lilypond_blocks', []):
         staffsize = block.get('staffsize', 20)
         code, extracted_ss = fix_lilypond_code(block['code'])
         if extracted_ss is not None:
             staffsize = extracted_ss
-        lines.append(r'  \ifthenelse{\boolean{showanswer}}{}{%')
+        lines.append(r'  \ifshowanswer\else')
         lines.append(r'  \begin{lilypond}[staffsize=%d,]' % staffsize)
         lines.append(r'  \include "font-settings.ily"')
         lines.append(f'  {code}')
         lines.append(r'  \end{lilypond}')
-        lines.append(r'  }')
+        lines.append(r'  \fi')
 
     # 选择题选项
     if q['type'] == 'choice' and len(q['options']) == 4:
@@ -557,8 +559,10 @@ def generate_question_latex(q: dict) -> list[str]:
         lines.append(r'  \pianostaff{%d}' % q['piano_staff'])
 
     # 答案 LilyPond 谱例（仅答案卷显示）
+    # 使用 \ifshowanswer...\fi 而非 \ifthenelse，
+    # 因为 lilypond-book 替换会引入额外花括号，干扰 \ifthenelse 参数扫描
     if q.get('answer_lilypond_blocks'):
-        lines.append(r'  \ifthenelse{\boolean{showanswer}}{%')
+        lines.append(r'  \ifshowanswer')
         if pts >= 0:
             lines.append(r'    \textbf{\textcolor{themecolor}{【答案】}}')
         for block in q['answer_lilypond_blocks']:
@@ -570,7 +574,7 @@ def generate_question_latex(q: dict) -> list[str]:
             lines.append(r'    \include "font-settings.ily"')
             lines.append(f'    {code}')
             lines.append(r'    \end{lilypond}')
-        lines.append(r'  }{}')
+        lines.append(r'  \fi')
 
     # 答案（文本）
     # 选择题：单选由 \choice 的第5个参数高亮，多选需额外输出 \answer
