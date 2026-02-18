@@ -336,8 +336,8 @@ def _build_reverse_notes(
 ) -> str:
     """生成反向题：给音名，在五线谱上写出音符。
 
-    按谱号分组，每 _NOTES_PER_LINE 个音符拆为一组，
-    每组生成题目文本 + 空白五线谱，方便学生书写。
+    先展平所有音符，再统一按 _NOTES_PER_LINE 拆组，
+    每组生成题目文本 + 空白五线谱（带编号和小节线）。
 
     Args:
         n: 题目数量
@@ -346,54 +346,67 @@ def _build_reverse_notes(
     """
     configs = clef_configs or _CLEF_CONFIGS
     clef_groups = _pick_notes(n, used, clef_configs=configs)
+    flat = _flatten_clef_groups(clef_groups)
+
+    # 统一按 _NOTES_PER_LINE 拆分（和正向一样）
+    chunks = [
+        flat[i:i + _NOTES_PER_LINE]
+        for i in range(0, len(flat), _NOTES_PER_LINE)
+    ]
 
     sections: list[str] = []
-    note_global_idx = 0
-    is_first = True
+    for chunk_idx, chunk in enumerate(chunks):
+        offset = chunk_idx * _NOTES_PER_LINE
 
-    for clef_cfg, notes in clef_groups:
-        # 每个谱号内按 _NOTES_PER_LINE 拆分
-        for chunk_start in range(0, len(notes), _NOTES_PER_LINE):
-            chunk_notes = notes[chunk_start:chunk_start + _NOTES_PER_LINE]
+        # 题目文本：按谱号分组列出音名
+        question_lines: list[str] = []
+        current_clef: str | None = None
+        current_cfg: dict | None = None
+        current_items: list[str] = []
 
-            # 题目文本：列出音名
-            items: list[str] = []
-            flat_chunk: list[tuple[dict, Note]] = []
-            for note in chunk_notes:
-                note_global_idx += 1
-                items.append(f"({note_global_idx}) {note.to_pitch_label()}")
-                flat_chunk.append((clef_cfg, note))
+        for i, (clef_cfg, note) in enumerate(chunk):
+            note_num = offset + i + 1
+            if clef_cfg["lily"] != current_clef:
+                if current_items and current_cfg:
+                    question_lines.append(
+                        f"{current_cfg['name']}：{'　'.join(current_items)}"
+                    )
+                current_clef = clef_cfg["lily"]
+                current_cfg = clef_cfg
+                current_items = []
+            current_items.append(f"({note_num}) {note.to_pitch_label()}")
 
-            question_line = f"{clef_cfg['name']}：{'　'.join(items)}"
+        if current_items and current_cfg:
+            question_lines.append(
+                f"{current_cfg['name']}：{'　'.join(current_items)}"
+            )
 
-            # 空白五线谱（有小节线+编号，无谱号）供学生书写
-            offset = note_global_idx - len(chunk_notes)
-            blank_lily = _build_blank_staff(len(chunk_notes), note_offset=offset)
+        # 空白五线谱（有小节线+编号，无谱号）
+        blank_lily = _build_blank_staff(len(chunk), note_offset=offset)
 
-            # 答案五线谱（带谱号和音符）
-            answer_lily = _build_lily_block(flat_chunk, note_offset=offset)
+        # 答案五线谱（带谱号和音符）
+        answer_lily = _build_lily_block(chunk, note_offset=offset)
 
-            if is_first:
-                parts = [
-                    "## [5分]",
-                    "在五线谱上写出指定音：",
-                    "",
-                    question_line,
-                    *blank_lily,
-                    "> 答案:",
-                    *answer_lily,
-                ]
-                is_first = False
-            else:
-                parts = [
-                    "## [续]",
-                    question_line,
-                    *blank_lily,
-                    "> 答案:",
-                    *answer_lily,
-                ]
+        if chunk_idx == 0:
+            parts = [
+                "## [5分]",
+                "在五线谱上写出指定音：",
+                "",
+                *question_lines,
+                *blank_lily,
+                "> 答案:",
+                *answer_lily,
+            ]
+        else:
+            parts = [
+                "## [续]",
+                *question_lines,
+                *blank_lily,
+                "> 答案:",
+                *answer_lily,
+            ]
 
-            sections.append("\n".join(parts))
+        sections.append("\n".join(parts))
 
     return "\n\n".join(sections)
 
