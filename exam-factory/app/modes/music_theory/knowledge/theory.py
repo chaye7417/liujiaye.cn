@@ -25,6 +25,7 @@ from .data import (
 _ACC_TO_LILY = {-2: "eses", -1: "es", 0: "", 1: "is", 2: "isis"}
 _ACC_TO_CHINESE = {-2: "bb", -1: "b", 0: "", 1: "#", 2: "×"}
 _ACC_TO_LATEX = {-2: r"\accflat\accflat ", -1: r"\accflat ", 0: "", 1: r"\accsharp ", 2: "×"}
+_ACC_TO_UNICODE = {-2: "♭♭", -1: "♭", 0: "", 1: "♯", 2: "×"}
 
 # Unicode 上下标数字（替代 \textsuperscript/\textsubscript，避免字体上下文被破坏）
 _SUPERSCRIPTS = {1: "¹", 2: "²", 3: "³"}
@@ -99,11 +100,14 @@ class Note:
         letter = self.letter.lower() if "小" in scale_desc else self.letter
         return f"{acc[self.accidental]}{letter}{scale_desc}"
 
-    def to_pitch_name(self) -> str:
+    def to_pitch_name(self, latex: bool = True) -> str:
         r"""转中国音组标记。
 
-        变化记号用 LaTeX 命令（\sharp \flat），
         上下标用 Unicode 字符（¹²³ / ₁₂），避免 \textsuperscript 破坏字体上下文。
+
+        Args:
+            latex: True 用 LaTeX 命令（\accsharp \accflat），
+                   False 用 Unicode 符号（♯ ♭），适合 LilyPond markup。
 
         体系：
             octave 0 → 大字二组  C₂
@@ -114,7 +118,8 @@ class Note:
             octave 5 → 小字二组  c²
             octave 6 → 小字三组  c³
         """
-        acc = _ACC_TO_LATEX[self.accidental]
+        acc_map = _ACC_TO_LATEX if latex else _ACC_TO_UNICODE
+        acc = acc_map[self.accidental]
         if self.octave >= 3:
             letter = self.letter.lower()
             group = self.octave - 3
@@ -134,10 +139,15 @@ class Note:
         """返回中国音组名称，如 '小字一组'。"""
         return _PITCH_GROUPS.get(self.octave, "")
 
-    def to_pitch_label(self) -> str:
-        r"""返回中文音组标记，如 '小字一组\sharp c'。"""
+    def to_pitch_label(self, latex: bool = True) -> str:
+        r"""返回中文音组标记，如 '小字一组\sharp c'。
+
+        Args:
+            latex: True 用 LaTeX 命令，False 用 Unicode 符号。
+        """
         group = _PITCH_GROUPS.get(self.octave, "")
-        acc = _ACC_TO_LATEX[self.accidental]
+        acc_map = _ACC_TO_LATEX if latex else _ACC_TO_UNICODE
+        acc = acc_map[self.accidental]
         letter = self.letter.lower() if self.octave >= 3 else self.letter
         return f"{group}{acc}{letter}"
 

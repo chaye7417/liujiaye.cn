@@ -215,8 +215,8 @@ def _build_blank_staff(
             lines.append(f"  \\clef {clef_cfg['lily']}")
             current_clef = clef_cfg["lily"]
 
-        # 空白小节：编号在上，音名在下
-        label = f"{note.to_pitch_name()}，{note.to_pitch_label()}"
+        # 空白小节：编号在上，音名在下（用 Unicode 符号，非 LaTeX 命令）
+        label = f"{note.to_pitch_name(latex=False)}，{note.to_pitch_label(latex=False)}"
         lines.append(
             f'  s1^\\markup {{ \\small "({note_num})" }}'
             f'_\\markup {{ \\small "{label}" }}'
