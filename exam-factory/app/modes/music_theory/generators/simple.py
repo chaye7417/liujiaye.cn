@@ -232,6 +232,7 @@ def _build_blank_staff(
 def _build_lily_block(
     flat_notes: list[tuple[dict, Note]],
     note_offset: int = 0,
+    show_labels: bool = False,
 ) -> list[str]:
     """生成单个 LilyPond 块，多谱号内联切换，每音一小节。
 
@@ -240,6 +241,7 @@ def _build_lily_block(
     Args:
         flat_notes: [(clef_cfg, Note), ...] 展平的音符列表
         note_offset: 编号起始偏移（用于反向题接续编号）
+        show_labels: 是否在音符下方显示音名标注
 
     Returns:
         LilyPond 代码行列表（含 ```lilypond 围栏）
@@ -264,11 +266,18 @@ def _build_lily_block(
             lines.append(f"  \\clef {clef_cfg['lily']}")
             current_clef = clef_cfg["lily"]
 
-        # 音符（全音符 = 一小节）
-        lines.append(
+        # 音符（全音符 = 一小节）+ 编号在上
+        note_line = (
             f'  {note.to_lilypond()}1'
             f'^\\markup {{ \\small "({note_num})" }}'
         )
+
+        # 可选：音名标注在下
+        if show_labels:
+            label = f"{note.to_pitch_name(latex=False)}，{note.to_pitch_label(latex=False)}"
+            note_line += f'_\\markup {{ \\small "{label}" }}'
+
+        lines.append(note_line)
 
         # 换行控制：不在最后一个音符后加
         if idx < total - 1:
@@ -312,27 +321,32 @@ def _build_forward_notes(
     sections: list[str] = []
     for chunk_idx, chunk in enumerate(chunks):
         offset = chunk_idx * _NOTES_PER_LINE
-        lily = _build_lily_block(chunk, note_offset=offset)
 
-        chunk_answers = [
-            f"({offset + i + 1}) {note.to_pitch_name()}，{note.to_pitch_label()}"
-            for i, (_, note) in enumerate(chunk)
-        ]
+        # 试题谱：只有音符 + 编号
+        lily_question = _build_lily_block(chunk, note_offset=offset)
+        # 答案谱：音符 + 编号 + 音名标注在下方
+        lily_answer = _build_lily_block(
+            chunk, note_offset=offset, show_labels=True,
+        )
 
         if chunk_idx == 0:
             parts = [
                 "## [5分]",
                 "写出下列各音的音名（用音组标记法）：",
-                *lily,
+                "> 仅试题:",
+                *lily_question,
                 "> 行数: 1",
-                "> 答案: " + " ".join(chunk_answers),
+                "> 答案:",
+                *lily_answer,
             ]
         else:
             parts = [
                 "## [续]",
-                *lily,
+                "> 仅试题:",
+                *lily_question,
                 "> 行数: 1",
-                "> 答案: " + " ".join(chunk_answers),
+                "> 答案:",
+                *lily_answer,
             ]
 
         sections.append("\n".join(parts))
