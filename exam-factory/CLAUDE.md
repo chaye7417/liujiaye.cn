@@ -129,12 +129,10 @@ JWT_SECRET=随机字符串
 
 ```bash
 # 一键部署（本地改完代码后执行）
-./deploy.sh "描述改了什么"
-
-# 手动部署
-git add -A && git commit -m "xxx" && git push
-ssh ubuntu@81.70.28.90 "cd /home/ubuntu/exam-factory && git pull && sudo systemctl restart exam-factory"
+cd exam-factory && ./deploy.sh "描述改了什么"
 ```
+
+deploy.sh 流程：提交到 liujiaye.cn 仓库 → rsync 同步到服务器 → 安装依赖 → 重启服务
 
 ## 服务器运维
 
@@ -155,7 +153,6 @@ ssh ubuntu@81.70.28.90 "cat /etc/nginx/sites-available/exam-factory"
 ## 已知问题 / TODO
 
 - 邮箱验证未启用（`get_current_user` 临时返回 guest 用户）
-- 没有 HTTPS（需要域名 + Let's Encrypt）
 - AI 输入文本超过 15000 字符会被截断
 - 每日使用限制 10 次（`MAX_DAILY_USES`）
 
