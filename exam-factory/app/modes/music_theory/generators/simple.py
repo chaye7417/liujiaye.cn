@@ -7,58 +7,51 @@ from ..knowledge.theory import Note
 
 
 # ---------------------------------------------------------------------------
-# 谱号配置：谱号名称、LilyPond 指令、适用音符池
+# 谱号配置：按八度范围自动生成音符池（7 自然音 + 7 常用变化音 = 14 音/八度）
 # ---------------------------------------------------------------------------
+_COMMON_ACCIDENTALS: list[tuple[str, int]] = [
+    ("C", 1), ("D", -1), ("E", -1), ("F", 1),
+    ("G", 1), ("A", -1), ("B", -1),
+]
+
+
+def _make_clef_pool(octave_range: list[int]) -> list[Note]:
+    """按八度范围生成音符池。
+
+    每个八度包含 7 个自然音 + 7 个常用变化音（#C bD bE #F #G bA bB）。
+
+    Args:
+        octave_range: 八度列表，如 [3, 4, 5]
+    """
+    notes: list[Note] = []
+    for octave in octave_range:
+        for letter in LETTERS:
+            notes.append(Note(letter, 0, octave))
+        for letter, acc in _COMMON_ACCIDENTALS:
+            notes.append(Note(letter, acc, octave))
+    return notes
+
+
 _CLEF_CONFIGS: list[dict] = [
-    {
+    {   # 高音谱号：G3–G5（3 个八度，42 音）
         "name": "高音谱号",
         "lily": "treble",
-        "notes": [
-            Note("C", 0, 4), Note("D", 0, 4), Note("E", 0, 4),
-            Note("F", 0, 4), Note("G", 0, 4), Note("A", 0, 4), Note("B", 0, 4),
-            Note("C", 1, 4), Note("D", -1, 4), Note("E", -1, 4),
-            Note("F", 1, 4), Note("A", -1, 4), Note("B", -1, 4),
-            Note("G", 0, 3), Note("A", 0, 3), Note("B", 0, 3),
-            Note("C", 0, 5), Note("D", 0, 5), Note("E", 0, 5),
-            Note("F", 0, 5), Note("G", 0, 5),
-            Note("F", 1, 5), Note("B", -1, 3),
-        ],
+        "notes": _make_clef_pool([3, 4, 5]),
     },
-    {
+    {   # 低音谱号：C2–B3（2 个八度，28 音）
         "name": "低音谱号",
         "lily": "bass",
-        "notes": [
-            Note("C", 0, 3), Note("D", 0, 3), Note("E", 0, 3),
-            Note("F", 0, 3), Note("G", 0, 3), Note("A", 0, 2), Note("B", 0, 2),
-            Note("C", 1, 3), Note("E", -1, 3), Note("F", 1, 3),
-            Note("A", -1, 2), Note("B", -1, 2), Note("D", -1, 3),
-            Note("G", 0, 2), Note("F", 0, 2), Note("C", 0, 2),
-            Note("D", 0, 2), Note("E", 0, 2),
-        ],
+        "notes": _make_clef_pool([2, 3]),
     },
-    {
+    {   # 中音谱号：C3–A4（2 个八度，28 音）
         "name": "中音谱号",
         "lily": "alto",
-        "notes": [
-            Note("C", 0, 3), Note("D", 0, 3), Note("E", 0, 3),
-            Note("F", 0, 3), Note("G", 0, 3), Note("A", 0, 3), Note("B", 0, 3),
-            Note("C", 0, 4), Note("D", 0, 4), Note("E", 0, 4),
-            Note("F", 0, 4), Note("G", 0, 4), Note("A", 0, 4),
-            Note("F", 1, 3), Note("B", -1, 3), Note("C", 1, 4),
-            Note("E", -1, 4), Note("A", -1, 3),
-        ],
+        "notes": _make_clef_pool([3, 4]),
     },
-    {
+    {   # 次中音谱号：B2–E4（3 个八度，42 音）
         "name": "次中音谱号",
         "lily": "tenor",
-        "notes": [
-            Note("B", 0, 2), Note("C", 0, 3), Note("D", 0, 3),
-            Note("E", 0, 3), Note("F", 0, 3), Note("G", 0, 3),
-            Note("A", 0, 3), Note("B", 0, 3),
-            Note("C", 0, 4), Note("D", 0, 4), Note("E", 0, 4),
-            Note("F", 1, 3), Note("B", -1, 2), Note("E", -1, 3),
-            Note("A", -1, 3),
-        ],
+        "notes": _make_clef_pool([2, 3, 4]),
     },
 ]
 
@@ -312,6 +305,9 @@ def _build_forward_notes(
     clef_groups = _pick_notes(n, used, clef_configs=configs)
     flat = _flatten_clef_groups(clef_groups)
 
+    # 打乱顺序，让谱号均匀分布到每个 chunk（而非前几组全是同一谱号）
+    random.shuffle(flat)
+
     # 按 _NOTES_PER_LINE 拆分为多组
     chunks = [
         flat[i:i + _NOTES_PER_LINE]
@@ -375,6 +371,9 @@ def _build_reverse_notes(
     configs = clef_configs or _CLEF_CONFIGS
     clef_groups = _pick_notes(n, used, clef_configs=configs)
     flat = _flatten_clef_groups(clef_groups)
+
+    # 打乱顺序，让谱号均匀分布到每个 chunk
+    random.shuffle(flat)
 
     # 统一按 _NOTES_PER_LINE 拆分（和正向一样）
     chunks = [
