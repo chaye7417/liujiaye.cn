@@ -65,6 +65,11 @@
 \providecommand{\sharp}{$\sharp$}     % Sharp ♯ (usage: F\sharp)
 \providecommand{\natural}{$\natural$} % Natural ♮ (usage: B\natural)
 
+% CJK-safe accidental commands — \mbox isolates math font switch,
+% preventing subsequent Chinese characters from garbling
+\newcommand{\accsharp}{\mbox{\ensuremath{\sharp}}}
+\newcommand{\accflat}{\mbox{\ensuremath{\flat}}}
+
 %=============================================================================
 % LilyPond Spacing Commands
 %=============================================================================

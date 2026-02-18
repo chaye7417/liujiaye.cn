@@ -24,7 +24,7 @@ from .data import (
 # ---------------------------------------------------------------------------
 _ACC_TO_LILY = {-2: "eses", -1: "es", 0: "", 1: "is", 2: "isis"}
 _ACC_TO_CHINESE = {-2: "bb", -1: "b", 0: "", 1: "#", 2: "×"}
-_ACC_TO_LATEX = {-2: r"\flat\flat ", -1: r"\flat ", 0: "", 1: r"\sharp ", 2: "×"}
+_ACC_TO_LATEX = {-2: r"\accflat\accflat ", -1: r"\accflat ", 0: "", 1: r"\accsharp ", 2: "×"}
 
 # Unicode 上下标数字（替代 \textsuperscript/\textsubscript，避免字体上下文被破坏）
 _SUPERSCRIPTS = {1: "¹", 2: "²", 3: "³"}
