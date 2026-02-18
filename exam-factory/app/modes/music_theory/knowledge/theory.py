@@ -26,6 +26,11 @@ _ACC_TO_LILY = {-2: "eses", -1: "es", 0: "", 1: "is", 2: "isis"}
 _ACC_TO_CHINESE = {-2: "bb", -1: "b", 0: "", 1: "#", 2: "×"}
 _ACC_TO_LATEX = {-2: r"\flat\flat ", -1: r"\flat ", 0: "", 1: r"\sharp ", 2: "×"}
 
+_PITCH_GROUPS = {
+    0: "大字二组", 1: "大字一组", 2: "大字组",
+    3: "小字组", 4: "小字一组", 5: "小字二组", 6: "小字三组",
+}
+
 
 # ---------------------------------------------------------------------------
 # Note 类
@@ -117,6 +122,17 @@ class Note:
             if group == 0:
                 return f"{acc}{letter}"
             return f"{acc}{letter}\\textsubscript{{{group}}}"
+
+    def pitch_group_name(self) -> str:
+        """返回中国音组名称，如 '小字一组'。"""
+        return _PITCH_GROUPS.get(self.octave, "")
+
+    def to_pitch_label(self) -> str:
+        r"""返回中文音组标记（无上下标），如 '小字一组\sharp c'。"""
+        group = _PITCH_GROUPS.get(self.octave, "")
+        acc = _ACC_TO_LATEX[self.accidental]
+        letter = self.letter.lower() if self.octave >= 3 else self.letter
+        return f"{group}{acc}{letter}"
 
     def matches(self, other: Note) -> bool:
         """忽略八度比较音名和升降号。"""

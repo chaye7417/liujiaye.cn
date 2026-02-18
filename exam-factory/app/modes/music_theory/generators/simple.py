@@ -94,52 +94,57 @@ def generate_terms(section_num: str, n: int = 5, **kwargs) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 音名标记
+# 音名标记 — 辅助函数
 # ---------------------------------------------------------------------------
-def generate_note_names(section_num: str, n: int = 0, **kwargs) -> str:
-    """生成音名标记题的完整 Markdown（含多种谱号 LilyPond 谱例）。
-
-    随机选择 2-4 种谱号，每种谱号出若干音，总题数随机 5-10。
-    答案使用中国音组标记体系（大字组/小字组 + 上下标）。
+def _pick_notes(
+    n: int,
+    used: set[tuple[str, int, int]],
+    max_clefs: int = 4,
+) -> list[tuple[dict, list[Note]]]:
+    """为多种谱号随机选音。
 
     Args:
-        section_num: 大题编号
-        n: 题目数量（0 表示随机 5-10）
-    """
-    if n <= 0:
-        n = random.randint(5, 10)
+        n: 总题数
+        used: 已使用音符集合（会被修改）
+        max_clefs: 最多使用几种谱号
 
-    # 随机选 2-4 种谱号
-    num_clefs = random.randint(2, min(4, len(_CLEF_CONFIGS)))
+    Returns:
+        [(clef_cfg, [Note, ...]), ...]
+    """
+    num_clefs = random.randint(1, min(max_clefs, len(_CLEF_CONFIGS)))
     chosen_clefs = random.sample(_CLEF_CONFIGS, num_clefs)
 
-    # 给每种谱号分配题数
-    base_per_clef = n // num_clefs
+    base = n // num_clefs
     remainder = n % num_clefs
-    clef_counts = [base_per_clef] * num_clefs
+    counts = [base] * num_clefs
     for i in range(remainder):
-        clef_counts[i] += 1
-    random.shuffle(clef_counts)
+        counts[i] += 1
+    random.shuffle(counts)
 
-    # 为每种谱号选音
-    clef_groups: list[tuple[dict, list[Note]]] = []
-    used: set[tuple[str, int, int]] = set()
-
-    for clef_cfg, count in zip(chosen_clefs, clef_counts):
+    groups: list[tuple[dict, list[Note]]] = []
+    for clef_cfg, count in zip(chosen_clefs, counts):
         pool = clef_cfg["notes"]
-        selected_notes: list[Note] = []
+        selected: list[Note] = []
         for _ in range(count):
             for _attempt in range(50):
                 note = random.choice(pool)
                 key = (note.letter, note.accidental, note.octave)
                 if key not in used:
                     used.add(key)
-                    selected_notes.append(note)
+                    selected.append(note)
                     break
-        if selected_notes:
-            clef_groups.append((clef_cfg, selected_notes))
+        if selected:
+            groups.append((clef_cfg, selected))
+    return groups
 
-    # 生成 LilyPond 谱例（每种谱号一行）
+
+# ---------------------------------------------------------------------------
+# 音名标记 — 正向（看谱写音名）
+# ---------------------------------------------------------------------------
+def _build_forward_notes(n: int, used: set[tuple[str, int, int]]) -> str:
+    """生成正向题：给五线谱音符，写出音名。"""
+    clef_groups = _pick_notes(n, used, max_clefs=4)
+
     lily_parts: list[str] = []
     all_notes: list[Note] = []
     note_idx = 0
@@ -161,17 +166,107 @@ def generate_note_names(section_num: str, n: int = 0, **kwargs) -> str:
             all_notes.append(note)
         lily_parts.extend(["}", "```", ""])
 
-    # 答案（中国音组标记）
     answer_items = [
-        f"({i+1}) {note.to_pitch_name()}" for i, note in enumerate(all_notes)
+        f"({i+1}) {note.to_pitch_name()}，{note.to_pitch_label()}"
+        for i, note in enumerate(all_notes)
     ]
 
-    md_parts = [
-        f"# 音名标记\n",
+    actual_n = len(all_notes)
+    parts = [
         "## [5分]",
         "写出下列各音的音名（用音组标记法）：",
         *lily_parts,
-        f"> 行数: {n}",
+        f"> 行数: {actual_n}",
         "> 答案: " + " ".join(answer_items),
     ]
-    return "\n".join(md_parts)
+    return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# 音名标记 — 反向（看音名写谱）
+# ---------------------------------------------------------------------------
+def _build_reverse_notes(n: int, used: set[tuple[str, int, int]]) -> str:
+    """生成反向题：给音名，在五线谱上写出音符。"""
+    clef_groups = _pick_notes(n, used, max_clefs=3)
+
+    question_lines: list[str] = []
+    blank_lily: list[str] = []
+    answer_lily: list[str] = []
+    note_idx = 0
+
+    for clef_cfg, notes in clef_groups:
+        # 题目：列出音名
+        items: list[str] = []
+        start_idx = note_idx
+        for note in notes:
+            note_idx += 1
+            items.append(f"({note_idx}) {note.to_pitch_label()}")
+        question_lines.append(f"{clef_cfg['name']}：{'　'.join(items)}")
+
+        # 空白五线谱（带谱号，spacer rests 占位）
+        spacers = " ".join(["s1"] * len(notes))
+        blank_lily.extend([
+            "```lilypond",
+            "{",
+            f"  \\clef {clef_cfg['lily']}",
+            "  \\omit Staff.TimeSignature",
+            "  \\omit Staff.BarLine",
+            f"  {spacers}",
+            "}",
+            "```",
+            "",
+        ])
+
+        # 答案五线谱
+        answer_lily.extend([
+            "```lilypond",
+            "{",
+            f"  \\clef {clef_cfg['lily']}",
+            "  \\omit Staff.TimeSignature",
+            "  \\omit Staff.BarLine",
+        ])
+        for j, note in enumerate(notes):
+            answer_lily.append(
+                f'  {note.to_lilypond()}1'
+                f'^\\markup {{ \\small "({start_idx + j + 1})" }}'
+            )
+        answer_lily.extend(["}", "```", ""])
+
+    parts = [
+        "## [5分]",
+        "在下列谱号的五线谱上写出指定音：",
+        "",
+        *question_lines,
+        "",
+        *blank_lily,
+        "> 答案:",
+        *answer_lily,
+    ]
+    return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# 音名标记 — 主入口
+# ---------------------------------------------------------------------------
+def generate_note_names(section_num: str, n: int = 0, **kwargs) -> str:
+    """生成音名标记题（正向 + 反向）。
+
+    正向：给五线谱音符，写出音名（含中文音组说明）。
+    反向：给音名，在五线谱上写出音符。
+
+    Args:
+        section_num: 大题编号
+        n: 总题数（0 表示随机 6-12）
+    """
+    if n <= 0:
+        n = random.randint(6, 12)
+
+    n_forward = max(3, (n + 1) // 2)
+    n_reverse = max(2, n - n_forward)
+
+    used: set[tuple[str, int, int]] = set()
+
+    forward_md = _build_forward_notes(n_forward, used)
+    reverse_md = _build_reverse_notes(n_reverse, used)
+
+    return "\n".join(["# 音名标记\n", forward_md, "", reverse_md])
