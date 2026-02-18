@@ -393,6 +393,7 @@ def _build_reverse_notes(
                 "在五线谱上写出指定音：",
                 "",
                 *question_lines,
+                "> 仅试题:",
                 *blank_lily,
                 "> 答案:",
                 *answer_lily,
@@ -401,6 +402,7 @@ def _build_reverse_notes(
             parts = [
                 "## [续]",
                 *question_lines,
+                "> 仅试题:",
                 *blank_lily,
                 "> 答案:",
                 *answer_lily,

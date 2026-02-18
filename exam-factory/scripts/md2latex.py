@@ -190,6 +190,7 @@ def parse_single_question(content: str, points: float) -> dict:
         'essay_box': None,
         'essay_items': [],
         'lilypond_blocks': [],
+        'question_only_lilypond_blocks': [],
         'answer_lilypond_blocks': [],
     }
 
@@ -200,6 +201,7 @@ def parse_single_question(content: str, points: float) -> dict:
     in_lilypond = False
     lilypond_lines = []
     after_answer = False  # 标记是否已经过了 > 答案: 行
+    question_only = False  # 标记是否在 > 仅试题: 区域
 
     for line in lines:
         line_stripped = line.strip()
@@ -218,6 +220,9 @@ def parse_single_question(content: str, points: float) -> dict:
                 block = {'code': code, 'staffsize': 20}
                 if after_answer:
                     question['answer_lilypond_blocks'].append(block)
+                elif question_only:
+                    question['question_only_lilypond_blocks'].append(block)
+                    question_only = False
                 else:
                     question['lilypond_blocks'].append(block)
             continue
@@ -232,6 +237,11 @@ def parse_single_question(content: str, points: float) -> dict:
         if option_match:
             question['type'] = 'choice'
             question['options'].append(option_match.group(2))
+            continue
+
+        # 解析仅试题标记 (> 仅试题:)
+        if re.match(r'^>\s*仅试题[:：]', line_stripped):
+            question_only = True
             continue
 
         # 解析答案 (> 答案: 内容)
@@ -515,6 +525,19 @@ def generate_question_latex(q: dict) -> list[str]:
         lines.append(r'  \include "font-settings.ily"')
         lines.append(f'  {code}')
         lines.append(r'  \end{lilypond}')
+
+    # 仅试题谱例（答案模式隐藏）
+    for block in q.get('question_only_lilypond_blocks', []):
+        staffsize = block.get('staffsize', 20)
+        code, extracted_ss = fix_lilypond_code(block['code'])
+        if extracted_ss is not None:
+            staffsize = extracted_ss
+        lines.append(r'  \ifthenelse{\boolean{showanswer}}{}{%')
+        lines.append(r'  \begin{lilypond}[staffsize=%d,]' % staffsize)
+        lines.append(r'  \include "font-settings.ily"')
+        lines.append(f'  {code}')
+        lines.append(r'  \end{lilypond}')
+        lines.append(r'  }')
 
     # 选择题选项
     if q['type'] == 'choice' and len(q['options']) == 4:
