@@ -178,6 +178,43 @@ def _flatten_clef_groups(
     return flat
 
 
+def _build_blank_staff(
+    count: int,
+    note_offset: int = 0,
+) -> list[str]:
+    """生成空白五线谱 LilyPond 块（有小节线和编号，无谱号无音符）。
+
+    用于反向题：学生在打印的五线谱上书写音符。
+
+    Args:
+        count: 空白小节数
+        note_offset: 编号起始偏移
+
+    Returns:
+        LilyPond 代码行列表（含 ```lilypond 围栏）
+    """
+    if count == 0:
+        return []
+
+    lines: list[str] = [
+        "```lilypond",
+        '\\new Staff \\with { \\remove "Clef_engraver" } {',
+        "  \\omit Staff.TimeSignature",
+        "  \\omit Score.BarNumber",
+    ]
+
+    for idx in range(count):
+        note_num = note_offset + idx + 1
+        lines.append(
+            f'  s1^\\markup {{ \\small "({note_num})" }}'
+        )
+        if idx < count - 1:
+            lines.append("  \\noBreak")
+
+    lines.extend(["}", "```", ""])
+    return lines
+
+
 def _build_lily_block(
     flat_notes: list[tuple[dict, Note]],
     note_offset: int = 0,
@@ -329,8 +366,11 @@ def _build_reverse_notes(
 
             question_line = f"{clef_cfg['name']}：{'　'.join(items)}"
 
-            # 答案五线谱
+            # 空白五线谱（有小节线+编号，无谱号）供学生书写
             offset = note_global_idx - len(chunk_notes)
+            blank_lily = _build_blank_staff(len(chunk_notes), note_offset=offset)
+
+            # 答案五线谱（带谱号和音符）
             answer_lily = _build_lily_block(flat_chunk, note_offset=offset)
 
             if is_first:
@@ -339,8 +379,7 @@ def _build_reverse_notes(
                     "在五线谱上写出指定音：",
                     "",
                     question_line,
-                    "",
-                    "> 五线谱: 1",
+                    *blank_lily,
                     "> 答案:",
                     *answer_lily,
                 ]
@@ -349,8 +388,7 @@ def _build_reverse_notes(
                 parts = [
                     "## [续]",
                     question_line,
-                    "",
-                    "> 五线谱: 1",
+                    *blank_lily,
                     "> 答案:",
                     *answer_lily,
                 ]
