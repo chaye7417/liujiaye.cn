@@ -144,11 +144,23 @@ def generate_intervals(
     lily_lines.append("}")
     lily_lines.append("```")
 
-    # 答案
-    answers = [
-        f"({i+1}) {root.to_lilypond()}-{target.to_lilypond()}"
-        for i, (root, _, target) in enumerate(questions)
+    # 答案（LilyPond 谱例：每个音程用尖括号表示）
+    answer_lily = [
+        "```lilypond",
+        "{",
+        "  \\clef treble",
+        "  \\omit Staff.TimeSignature",
+        "  \\omit Staff.BarLine",
     ]
+    for i, (root, interval, target) in enumerate(questions):
+        answer_lily.append(
+            f'  <{root.to_lilypond()} {target.to_lilypond()}>1'
+            f'^\\markup {{ \\small "({i+1})" }}'
+        )
+        if i == half - 1 and n > 5:
+            answer_lily.append('  \\bar "" \\break')
+    answer_lily.append("}")
+    answer_lily.append("```")
 
     md_parts = [
         f"# 音程构成\n",
@@ -156,7 +168,8 @@ def generate_intervals(
         "以下列音为根音构成指定音程：",
         *lily_lines,
         "> 五线谱: 2",
-        "> 答案: " + " ".join(answers),
+        "> 答案:",
+        *answer_lily,
     ]
     return "\n".join(md_parts)
 
@@ -232,11 +245,23 @@ def generate_chords(
     lily_lines.append("}")
     lily_lines.append("```")
 
-    # 答案
-    answers = []
+    # 答案（LilyPond 谱例：每个和弦用尖括号）
+    answer_lily = [
+        "```lilypond",
+        "{",
+        "  \\clef treble",
+        "  \\omit Staff.TimeSignature",
+        "  \\omit Staff.BarLine",
+    ]
     for i, (_, _, _, chord_notes) in enumerate(questions):
-        notes_str = "-".join(n.to_lilypond() for n in chord_notes)
-        answers.append(f"({i+1}) {notes_str}")
+        notes_str = " ".join(nt.to_lilypond() for nt in chord_notes)
+        answer_lily.append(
+            f'  <{notes_str}>1^\\markup {{ \\small "({i+1})" }}'
+        )
+        if i % 2 == 1 and i < len(questions) - 1:
+            answer_lily.append('  \\bar "" \\break')
+    answer_lily.append("}")
+    answer_lily.append("```")
 
     rows = (n + 1) // 2
     md_parts = [
@@ -245,7 +270,8 @@ def generate_chords(
         "以下列音为指定音构成和弦：",
         *lily_lines,
         f"> 五线谱: {rows}",
-        "> 答案: " + " ".join(answers),
+        "> 答案:",
+        *answer_lily,
     ]
     return "\n".join(md_parts)
 
@@ -321,22 +347,33 @@ def generate_scales(
         else:
             question_text = f"写出{display}音阶（上行）"
 
-        # 答案：LilyPond 音符序列
-        notes_lily = " ".join(note.to_lilypond() for note in scale_notes)
+        # 答案：LilyPond 谱例
+        all_notes = list(scale_notes)
 
         if is_melodic:
             # 旋律小调下行 = 自然小调
             down_scale = build_scale(tonic, "自然小调")
             down_notes = list(reversed(down_scale))
             # 去掉第一个音（与上行最后一个音重复）
-            down_lily = " ".join(note.to_lilypond() for note in down_notes[1:])
-            notes_lily = notes_lily + " " + down_lily
+            all_notes.extend(down_notes[1:])
+
+        notes_lily = " ".join(note.to_lilypond() + "4" for note in all_notes)
+        answer_lily = "\n".join([
+            "```lilypond",
+            "{",
+            "  \\clef treble",
+            "  \\omit Staff.TimeSignature",
+            f"  {notes_lily}",
+            "}",
+            "```",
+        ])
 
         md_parts.extend([
             f"## [{score_each}分]",
             question_text,
             "> 五线谱: 1",
-            f"> 答案: {notes_lily}",
+            "> 答案:",
+            answer_lily,
             "",
         ])
 
