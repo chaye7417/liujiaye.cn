@@ -190,7 +190,6 @@ def _build_reverse_notes(n: int, used: set[tuple[str, int, int]]) -> str:
     clef_groups = _pick_notes(n, used, max_clefs=3)
 
     question_lines: list[str] = []
-    blank_lily: list[str] = []
     answer_lily: list[str] = []
     note_idx = 0
 
@@ -202,20 +201,6 @@ def _build_reverse_notes(n: int, used: set[tuple[str, int, int]]) -> str:
             note_idx += 1
             items.append(f"({note_idx}) {note.to_pitch_label()}")
         question_lines.append(f"{clef_cfg['name']}：{'　'.join(items)}")
-
-        # 空白五线谱（带谱号，spacer rests 占位）
-        spacers = " ".join(["s1"] * len(notes))
-        blank_lily.extend([
-            "```lilypond",
-            "{",
-            f"  \\clef {clef_cfg['lily']}",
-            "  \\omit Staff.TimeSignature",
-            "  \\omit Staff.BarLine",
-            f"  {spacers}",
-            "}",
-            "```",
-            "",
-        ])
 
         # 答案五线谱
         answer_lily.extend([
@@ -232,13 +217,14 @@ def _build_reverse_notes(n: int, used: set[tuple[str, int, int]]) -> str:
             )
         answer_lily.extend(["}", "```", ""])
 
+    num_staves = len(clef_groups)
     parts = [
         "## [5分]",
-        "在下列谱号的五线谱上写出指定音：",
+        "在五线谱上写出指定音：",
         "",
         *question_lines,
         "",
-        *blank_lily,
+        f"> 五线谱: {num_staves}",
         "> 答案:",
         *answer_lily,
     ]
