@@ -163,6 +163,74 @@ def _pick_notes(
 
 
 # ---------------------------------------------------------------------------
+# 音名标记 — LilyPond 谱例生成（共用）
+# ---------------------------------------------------------------------------
+_NOTES_PER_LINE = 5
+
+
+def _flatten_clef_groups(
+    clef_groups: list[tuple[dict, list[Note]]],
+) -> list[tuple[dict, Note]]:
+    """将 [(clef_cfg, [Note, ...]), ...] 展平为 [(clef_cfg, Note), ...]。"""
+    flat: list[tuple[dict, Note]] = []
+    for clef_cfg, notes in clef_groups:
+        for note in notes:
+            flat.append((clef_cfg, note))
+    return flat
+
+
+def _build_lily_block(
+    flat_notes: list[tuple[dict, Note]],
+    note_offset: int = 0,
+) -> list[str]:
+    """生成单个 LilyPond 块，多谱号内联切换，每音一小节。
+
+    每行最多 _NOTES_PER_LINE 个音符，用 \\noBreak / \\break 控制换行。
+
+    Args:
+        flat_notes: [(clef_cfg, Note), ...] 展平的音符列表
+        note_offset: 编号起始偏移（用于反向题接续编号）
+
+    Returns:
+        LilyPond 代码行列表（含 ```lilypond 围栏）
+    """
+    total = len(flat_notes)
+    if total == 0:
+        return []
+
+    lines: list[str] = [
+        "```lilypond",
+        "{",
+        "  \\omit Staff.TimeSignature",
+    ]
+    current_clef: str | None = None
+
+    for idx, (clef_cfg, note) in enumerate(flat_notes):
+        note_num = note_offset + idx + 1
+
+        # 谱号切换
+        if clef_cfg["lily"] != current_clef:
+            lines.append(f"  \\clef {clef_cfg['lily']}")
+            current_clef = clef_cfg["lily"]
+
+        # 音符（全音符 = 一小节）
+        lines.append(
+            f'  {note.to_lilypond()}1'
+            f'^\\markup {{ \\small "({note_num})" }}'
+        )
+
+        # 换行控制：不在最后一个音符后加
+        if idx < total - 1:
+            if note_num % _NOTES_PER_LINE == 0:
+                lines.append("  \\break")
+            else:
+                lines.append("  \\noBreak")
+
+    lines.extend(["}", "```", ""])
+    return lines
+
+
+# ---------------------------------------------------------------------------
 # 音名标记 — 正向（看谱写音名）
 # ---------------------------------------------------------------------------
 def _build_forward_notes(
@@ -179,27 +247,10 @@ def _build_forward_notes(
     """
     configs = clef_configs or _CLEF_CONFIGS
     clef_groups = _pick_notes(n, used, clef_configs=configs)
+    flat = _flatten_clef_groups(clef_groups)
 
-    lily_parts: list[str] = []
-    all_notes: list[Note] = []
-    note_idx = 0
-
-    for clef_cfg, notes in clef_groups:
-        lily_parts.extend([
-            "```lilypond",
-            "{",
-            f"  \\clef {clef_cfg['lily']}",
-            "  \\omit Staff.TimeSignature",
-            "  \\omit Staff.BarLine",
-        ])
-        for note in notes:
-            note_idx += 1
-            lily_parts.append(
-                f'  {note.to_lilypond()}1'
-                f'^\\markup {{ \\small "({note_idx})" }}'
-            )
-            all_notes.append(note)
-        lily_parts.extend(["}", "```", ""])
+    lily_parts = _build_lily_block(flat)
+    all_notes = [note for _, note in flat]
 
     answer_items = [
         f"({i+1}) {note.to_pitch_name()}，{note.to_pitch_label()}"
@@ -234,34 +285,20 @@ def _build_reverse_notes(
     """
     configs = clef_configs or _CLEF_CONFIGS
     clef_groups = _pick_notes(n, used, clef_configs=configs)
+    flat = _flatten_clef_groups(clef_groups)
 
+    # 题目文本：按谱号分组列出音名
     question_lines: list[str] = []
-    answer_lily: list[str] = []
     note_idx = 0
-
     for clef_cfg, notes in clef_groups:
-        # 题目：列出音名
         items: list[str] = []
-        start_idx = note_idx
         for note in notes:
             note_idx += 1
             items.append(f"({note_idx}) {note.to_pitch_label()}")
         question_lines.append(f"{clef_cfg['name']}：{'　'.join(items)}")
 
-        # 答案五线谱
-        answer_lily.extend([
-            "```lilypond",
-            "{",
-            f"  \\clef {clef_cfg['lily']}",
-            "  \\omit Staff.TimeSignature",
-            "  \\omit Staff.BarLine",
-        ])
-        for j, note in enumerate(notes):
-            answer_lily.append(
-                f'  {note.to_lilypond()}1'
-                f'^\\markup {{ \\small "({start_idx + j + 1})" }}'
-            )
-        answer_lily.extend(["}", "```", ""])
+    # 答案五线谱：合并为一个块
+    answer_lily = _build_lily_block(flat)
 
     num_staves = len(clef_groups)
     parts = [
