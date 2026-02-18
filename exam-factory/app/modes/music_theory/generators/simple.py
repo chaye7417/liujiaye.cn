@@ -117,16 +117,17 @@ def _filter_clefs(clef_keys: list[str] | None) -> list[dict]:
 
 def _pick_notes(
     n: int,
-    used: set[tuple[str, int, int]],
+    used: set[tuple[str, str, int, int]],
     clef_configs: list[dict] | None = None,
 ) -> list[tuple[dict, list[Note]]]:
     """为多种谱号随机选音。
 
     所有可用谱号都会出现（题数不够时按题数上限）。
+    去重 key 包含谱号，同一个音在不同谱号上算不同题目。
 
     Args:
         n: 总题数
-        used: 已使用音符集合（会被修改）
+        used: 已使用音符集合 (clef_lily, letter, accidental, octave)
         clef_configs: 可用的谱号配置列表（None 用全部）
 
     Returns:
@@ -147,11 +148,12 @@ def _pick_notes(
     groups: list[tuple[dict, list[Note]]] = []
     for clef_cfg, count in zip(chosen_clefs, counts):
         pool = clef_cfg["notes"]
+        clef_lily = clef_cfg["lily"]
         selected: list[Note] = []
         for _ in range(count):
             for _attempt in range(50):
                 note = random.choice(pool)
-                key = (note.letter, note.accidental, note.octave)
+                key = (clef_lily, note.letter, note.accidental, note.octave)
                 if key not in used:
                     used.add(key)
                     selected.append(note)
@@ -443,7 +445,7 @@ def generate_note_names(section_num: str, n: int = 0, **kwargs) -> str:
     # 筛选可用谱号
     clef_configs = _filter_clefs(clef_keys)
 
-    used: set[tuple[str, int, int]] = set()
+    used: set[tuple[str, str, int, int]] = set()
     sections: list[str] = ["# 音名标记\n"]
 
     if n_forward > 0:
