@@ -139,9 +139,17 @@ def parse_questions(section_content: str) -> list[dict]:
     """
     questions = []
 
+    # 将 ## [续] 续接标记转换为特殊分值 -1（不生成新题号）
+    section_content = re.sub(
+        r'^##\s+\[续\]',
+        '## [-1分]',
+        section_content,
+        flags=re.MULTILINE,
+    )
+
     # 按 ## 标题分割题目
-    # 匹配格式: ## Q1 [5分] 或 ## 1. [5分] 或 ## [5分] 或 ## [0.6分]
-    question_pattern = r'^##\s+(?:Q?\d*\.?\s*)?\[(\d+(?:\.\d+)?)分\]'
+    # 匹配格式: ## Q1 [5分] 或 ## 1. [5分] 或 ## [5分] 或 ## [0.6分] 或 ## [-1分](续接)
+    question_pattern = r'^##\s+(?:Q?\d*\.?\s*)?\[(-?\d+(?:\.\d+)?)分\]'
     parts = re.split(question_pattern, section_content, flags=re.MULTILINE)
 
     # parts: ['前导', '分数1', '内容1', '分数2', '内容2', ...]
@@ -473,11 +481,11 @@ def generate_question_latex(q: dict) -> list[str]:
     """
     lines = []
 
-    # 题目开始
+    # 题目开始（续接题 pts < 0 不生成 \item，内容追加到上一题）
     pts = q['points']
-    # 整数分值用整数格式，小数分值保留小数
-    pts_str = str(int(pts)) if pts == int(pts) else f'{pts:g}'
-    lines.append(r'  \item \points{%s}' % pts_str)
+    if pts >= 0:
+        pts_str = str(int(pts)) if pts == int(pts) else f'{pts:g}'
+        lines.append(r'  \item \points{%s}' % pts_str)
 
     # 要求框（如果有）
     if q['essay_box']:
@@ -507,7 +515,6 @@ def generate_question_latex(q: dict) -> list[str]:
         lines.append(r'  \include "font-settings.ily"')
         lines.append(f'  {code}')
         lines.append(r'  \end{lilypond}')
-        lines.append(r'  \vspace{2em}')
 
     # 选择题选项
     if q['type'] == 'choice' and len(q['options']) == 4:

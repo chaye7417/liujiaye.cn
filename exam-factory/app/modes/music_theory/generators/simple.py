@@ -241,6 +241,9 @@ def _build_forward_notes(
 ) -> str:
     """生成正向题：给五线谱音符，写出音名。
 
+    每 _NOTES_PER_LINE 个音符拆为一组，
+    每组生成独立五线谱 + 书写行，方便学生作答。
+
     Args:
         n: 题目数量
         used: 已使用音符集合
@@ -250,23 +253,41 @@ def _build_forward_notes(
     clef_groups = _pick_notes(n, used, clef_configs=configs)
     flat = _flatten_clef_groups(clef_groups)
 
-    lily_parts = _build_lily_block(flat)
-    all_notes = [note for _, note in flat]
-
-    answer_items = [
-        f"({i+1}) {note.to_pitch_name()}，{note.to_pitch_label()}"
-        for i, note in enumerate(all_notes)
+    # 按 _NOTES_PER_LINE 拆分为多组
+    chunks = [
+        flat[i:i + _NOTES_PER_LINE]
+        for i in range(0, len(flat), _NOTES_PER_LINE)
     ]
 
-    actual_n = len(all_notes)
-    parts = [
-        "## [5分]",
-        "写出下列各音的音名（用音组标记法）：",
-        *lily_parts,
-        f"> 行数: {actual_n}",
-        "> 答案: " + " ".join(answer_items),
-    ]
-    return "\n".join(parts)
+    sections: list[str] = []
+    for chunk_idx, chunk in enumerate(chunks):
+        offset = chunk_idx * _NOTES_PER_LINE
+        lily = _build_lily_block(chunk, note_offset=offset)
+
+        chunk_answers = [
+            f"({offset + i + 1}) {note.to_pitch_name()}，{note.to_pitch_label()}"
+            for i, (_, note) in enumerate(chunk)
+        ]
+
+        if chunk_idx == 0:
+            parts = [
+                "## [5分]",
+                "写出下列各音的音名（用音组标记法）：",
+                *lily,
+                f"> 行数: {len(chunk)}",
+                "> 答案: " + " ".join(chunk_answers),
+            ]
+        else:
+            parts = [
+                "## [续]",
+                *lily,
+                f"> 行数: {len(chunk)}",
+                "> 答案: " + " ".join(chunk_answers),
+            ]
+
+        sections.append("\n".join(parts))
+
+    return "\n\n".join(sections)
 
 
 # ---------------------------------------------------------------------------
@@ -279,6 +300,9 @@ def _build_reverse_notes(
 ) -> str:
     """生成反向题：给音名，在五线谱上写出音符。
 
+    按谱号分组，每 _NOTES_PER_LINE 个音符拆为一组，
+    每组生成题目文本 + 空白五线谱，方便学生书写。
+
     Args:
         n: 题目数量
         used: 已使用音符集合
@@ -286,33 +310,55 @@ def _build_reverse_notes(
     """
     configs = clef_configs or _CLEF_CONFIGS
     clef_groups = _pick_notes(n, used, clef_configs=configs)
-    flat = _flatten_clef_groups(clef_groups)
 
-    # 题目文本：按谱号分组列出音名
-    question_lines: list[str] = []
-    note_idx = 0
+    sections: list[str] = []
+    note_global_idx = 0
+    is_first = True
+
     for clef_cfg, notes in clef_groups:
-        items: list[str] = []
-        for note in notes:
-            note_idx += 1
-            items.append(f"({note_idx}) {note.to_pitch_label()}")
-        question_lines.append(f"{clef_cfg['name']}：{'　'.join(items)}")
+        # 每个谱号内按 _NOTES_PER_LINE 拆分
+        for chunk_start in range(0, len(notes), _NOTES_PER_LINE):
+            chunk_notes = notes[chunk_start:chunk_start + _NOTES_PER_LINE]
 
-    # 答案五线谱：合并为一个块
-    answer_lily = _build_lily_block(flat)
+            # 题目文本：列出音名
+            items: list[str] = []
+            flat_chunk: list[tuple[dict, Note]] = []
+            for note in chunk_notes:
+                note_global_idx += 1
+                items.append(f"({note_global_idx}) {note.to_pitch_label()}")
+                flat_chunk.append((clef_cfg, note))
 
-    num_staves = len(clef_groups)
-    parts = [
-        "## [5分]",
-        "在五线谱上写出指定音：",
-        "",
-        *question_lines,
-        "",
-        f"> 五线谱: {num_staves}",
-        "> 答案:",
-        *answer_lily,
-    ]
-    return "\n".join(parts)
+            question_line = f"{clef_cfg['name']}：{'　'.join(items)}"
+
+            # 答案五线谱
+            offset = note_global_idx - len(chunk_notes)
+            answer_lily = _build_lily_block(flat_chunk, note_offset=offset)
+
+            if is_first:
+                parts = [
+                    "## [5分]",
+                    "在五线谱上写出指定音：",
+                    "",
+                    question_line,
+                    "",
+                    "> 五线谱: 1",
+                    "> 答案:",
+                    *answer_lily,
+                ]
+                is_first = False
+            else:
+                parts = [
+                    "## [续]",
+                    question_line,
+                    "",
+                    "> 五线谱: 1",
+                    "> 答案:",
+                    *answer_lily,
+                ]
+
+            sections.append("\n".join(parts))
+
+    return "\n\n".join(sections)
 
 
 # ---------------------------------------------------------------------------
