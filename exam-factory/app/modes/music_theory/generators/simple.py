@@ -226,24 +226,14 @@ def _build_blank_staff(
         "  \\omit Score.BarNumber",
     ]
     current_clef: str | None = None
-    current_ottava: int = 0
 
     for idx, (clef_cfg, note) in enumerate(chunk):
         note_num = note_offset + idx + 1
-        needed_ottava = _get_ottava(clef_cfg, note)
 
-        # 谱号切换前先取消八度线
+        # 谱号切换
         if clef_cfg["lily"] != current_clef:
-            if current_ottava != 0:
-                lines.append("  \\ottava #0")
-                current_ottava = 0
             lines.append(f"  \\clef {clef_cfg['lily']}")
             current_clef = clef_cfg["lily"]
-
-        # 设置八度线
-        if needed_ottava != current_ottava:
-            lines.append(f"  \\ottava #{needed_ottava}")
-            current_ottava = needed_ottava
 
         # 空白小节：编号在上，音名在下（用 Unicode 符号，非 LaTeX 命令）
         label = f"{note.to_pitch_name(latex=False)}，{note.to_pitch_label(latex=False)}"
@@ -254,10 +244,6 @@ def _build_blank_staff(
 
         if idx < len(chunk) - 1:
             lines.append("  \\noBreak")
-
-    # 结束前取消八度线
-    if current_ottava != 0:
-        lines.append("  \\ottava #0")
 
     lines.extend(["}", "```", ""])
     return lines
