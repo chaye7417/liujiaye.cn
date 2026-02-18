@@ -14,11 +14,16 @@ _COMMON_ACCIDENTALS: list[tuple[str, int]] = [
     ("G", 1), ("A", -1), ("B", -1),
 ]
 
+_DOUBLE_ACCIDENTALS: list[tuple[str, int]] = [
+    ("C", 2), ("D", 2), ("F", 2), ("G", 2),       # ×C ×D ×F ×G
+    ("D", -2), ("E", -2), ("A", -2), ("B", -2),    # bbD bbE bbA bbB
+]
+
 
 def _make_clef_pool(octave_range: list[int]) -> list[Note]:
     """按八度范围生成音符池。
 
-    每个八度包含 7 个自然音 + 7 个常用变化音（#C bD bE #F #G bA bB）= 14 音。
+    每个八度包含 7 自然音 + 7 单变化音 + 8 重升降音 = 22 音。
 
     Args:
         octave_range: 八度列表，如 [3, 4, 5]
@@ -28,6 +33,8 @@ def _make_clef_pool(octave_range: list[int]) -> list[Note]:
         for letter in LETTERS:
             notes.append(Note(letter, 0, octave))
         for letter, acc in _COMMON_ACCIDENTALS:
+            notes.append(Note(letter, acc, octave))
+        for letter, acc in _DOUBLE_ACCIDENTALS:
             notes.append(Note(letter, acc, octave))
     return notes
 
