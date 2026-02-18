@@ -663,20 +663,12 @@
                         <span style="font-size:13px;color:var(--text-muted);">题</span>
                     </div>
                 </div>
-                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                     <span style="font-size:14px;">谱号：</span>
-                    <label style="display:flex;align-items:center;gap:4px;font-size:14px;cursor:pointer;">
-                        <input type="checkbox" class="mt-nn-clef" value="treble" checked> 高音
-                    </label>
-                    <label style="display:flex;align-items:center;gap:4px;font-size:14px;cursor:pointer;">
-                        <input type="checkbox" class="mt-nn-clef" value="bass" checked> 低音
-                    </label>
-                    <label style="display:flex;align-items:center;gap:4px;font-size:14px;cursor:pointer;">
-                        <input type="checkbox" class="mt-nn-clef" value="alto"> 中音
-                    </label>
-                    <label style="display:flex;align-items:center;gap:4px;font-size:14px;cursor:pointer;">
-                        <input type="checkbox" class="mt-nn-clef" value="tenor"> 次中音
-                    </label>
+                    <span class="mt-type-tag mt-nn-clef selected" data-clef="treble" onclick="toggleNnClef(this)">高音</span>
+                    <span class="mt-type-tag mt-nn-clef selected" data-clef="bass" onclick="toggleNnClef(this)">低音</span>
+                    <span class="mt-type-tag mt-nn-clef" data-clef="alto" onclick="toggleNnClef(this)">中音</span>
+                    <span class="mt-type-tag mt-nn-clef" data-clef="tenor" onclick="toggleNnClef(this)">次中音</span>
                 </div>
             </div>
 
@@ -1067,6 +1059,13 @@
     document.getElementById('mt-nn-forward').addEventListener('input', updateMtSelection);
     document.getElementById('mt-nn-reverse').addEventListener('input', updateMtSelection);
 
+    function toggleNnClef(el) {
+        el.classList.toggle('selected');
+        // 至少保留一个谱号
+        const selected = document.querySelectorAll('.mt-nn-clef.selected');
+        if (selected.length === 0) el.classList.add('selected');
+    }
+
     // 文件拖拽（排版模式）
     const fmtArea = document.getElementById('fmtUploadArea');
     fmtArea.addEventListener('dragover', (e) => { e.preventDefault(); fmtArea.classList.add('dragover'); });
@@ -1311,7 +1310,7 @@
         if (selectedTypes.includes('note_names')) {
             params.note_names_forward_n = parseInt(document.getElementById('mt-nn-forward').value) || 5;
             params.note_names_reverse_n = parseInt(document.getElementById('mt-nn-reverse').value) || 5;
-            params.note_names_clefs = Array.from(document.querySelectorAll('.mt-nn-clef:checked')).map(c => c.value);
+            params.note_names_clefs = Array.from(document.querySelectorAll('.mt-nn-clef.selected')).map(c => c.dataset.clef);
             if (!params.note_names_clefs.length) params.note_names_clefs = ['treble'];
         }
         // 如果选了选择题，附带题数
