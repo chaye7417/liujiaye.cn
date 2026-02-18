@@ -273,14 +273,14 @@ def _build_forward_notes(
                 "## [5分]",
                 "写出下列各音的音名（用音组标记法）：",
                 *lily,
-                f"> 行数: {len(chunk)}",
+                "> 行数: 1",
                 "> 答案: " + " ".join(chunk_answers),
             ]
         else:
             parts = [
                 "## [续]",
                 *lily,
-                f"> 行数: {len(chunk)}",
+                "> 行数: 1",
                 "> 答案: " + " ".join(chunk_answers),
             ]
 

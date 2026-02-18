@@ -85,6 +85,7 @@ def _generate_font_settings_ily(music_font: str = DEFAULT_MUSIC_FONT) -> str:
         f'% LilyPond 字体设置 - {cfg["label"] if "label" in cfg else music_font}',
         "\\paper {",
         "  indent = 0",
+        "  ragged-right = ##f",
         "  system-system-spacing = #'((basic-distance . 24) (padding . 6))",
         "  #(define fonts",
         "    (set-global-fonts",
