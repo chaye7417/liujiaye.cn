@@ -89,6 +89,7 @@ async def stream_ai_chunks(
     mode: str = "format",
     generation_params: Optional[dict] = None,
     model_key: Optional[str] = None,
+    override_user_content: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     """异步生成器，逐片段 yield AI 返回的文本。
 
@@ -97,6 +98,7 @@ async def stream_ai_chunks(
         mode: 模式（format / generate / music_theory）
         generation_params: 出题参数（通用出题/乐理模式使用）
         model_key: AI 模型 key（对应 AI_MODELS 中的 key）
+        override_user_content: 直接传入的 user content（跳过内部构建）
 
     Yields:
         AI 生成的文本片段
@@ -112,7 +114,7 @@ async def stream_ai_chunks(
     model = cfg["model"]
 
     system_prompt = _MODE_PROMPTS.get(mode, FORMAT_PROMPT)
-    user_content = _build_user_content(mode, file_content, generation_params)
+    user_content = override_user_content or _build_user_content(mode, file_content, generation_params)
 
     # 出题模式需要更多 token（DeepSeek 上限 8192）
     max_tokens = 8192 if mode in ("generate", "music_theory") else 8000

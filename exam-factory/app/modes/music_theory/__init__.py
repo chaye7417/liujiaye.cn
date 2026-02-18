@@ -4,6 +4,7 @@
 """
 
 import importlib
+import json
 import pkgutil
 from pathlib import Path
 from typing import Optional
@@ -419,6 +420,8 @@ def build_user_content(
         return f"__PRECOMPUTED__\n{header}{computed_md}"
 
     # ---- 混合模式 / 纯 AI ----
+    # 构建仅包含 AI 题型的 prompt（不注入预计算内容，避免 AI 篡改）
+    from .generators import CHINESE_NUMS as _CN
     section_parts: list[str] = []
     total_score = 0.0
     section_num = 0
@@ -427,14 +430,16 @@ def build_user_content(
         section_num += 1
 
         if key in COMPUTABLE_GENERATORS:
-            # 已由程序生成，跳过 AI prompt（但仍计算分值）
             total_score += QUESTION_TYPE_SCORES.get(key, 0)
             continue
 
+        cn_num = _CN[section_num - 1] if section_num <= 10 else str(section_num)
         prompt_text = QUESTION_TYPE_PROMPTS.get(key)
         if not prompt_text:
             continue
-        section_parts.append(f"\n**第{section_num}部分（需要你生成）：**\n{prompt_text}")
+        section_parts.append(
+            f"\n**第{cn_num}部分（大题编号用「{cn_num}」）：**\n{prompt_text}"
+        )
 
         if key == "choice":
             single_n = int(generation_params.get("choice_single_n", 5))
@@ -449,44 +454,46 @@ def build_user_content(
             total_score += QUESTION_TYPE_SCORES.get(key, 0)
 
     ai_type_count = len(needs_ai)
-    parts = [
-        f"请出一套乐理试卷中以下 {ai_type_count} 种题型的部分。",
+    ai_prompt_parts = [
+        f"请只生成以下 {ai_type_count} 种题型，不要生成其他题型。",
         "\n## 需要你生成的题型\n",
         *section_parts,
-        f"\n**总分：{total_score:.1f}分**",
         f"\n**难度：**{difficulty}",
     ]
 
     if title:
-        parts.append(f"\n**试卷标题：**{title}")
+        ai_prompt_parts.append(f"\n**试卷标题：**{title}")
 
     if extra_requirements:
-        parts.append(f"\n**补充要求：**{extra_requirements}")
+        ai_prompt_parts.append(f"\n**补充要求：**{extra_requirements}")
 
     if file_content:
-        parts.append(f"\n## 参考资料\n\n{file_content}")
+        ai_prompt_parts.append(f"\n## 参考资料\n\n{file_content}")
 
-    # 注入已生成的程序化题目
-    if computed_md:
-        parts.append(
-            "\n## 以下题目已由程序预生成（直接使用，不要修改）\n\n"
-            "请将你生成的题型与以下内容合并输出为完整试卷。"
-            "预生成部分的编号和内容保持不变，你只需补充上方列出的题型。\n\n"
-            + computed_md
-        )
-
-    parts.append(
+    ai_prompt_parts.append(
         "\n## 重要提醒\n"
+        "- 只生成上面列出的题型，其他题型已由程序生成，不需要你管\n"
+        "- 大题编号必须使用上面指定的编号（如「三」「五」），不要从「一」开始\n"
         "- 涉及谱例的题目必须使用 ```lilypond``` 代码块\n"
         "- LilyPond 代码必须语法正确\n"
         "- 不要在 LilyPond 代码中写 \\include 或 \\version\n"
         "- 答案必须准确\n"
-        "- 严格按照试卷结构出题，题型顺序与上方一致\n"
-        "- 音程/和弦构成题必须用LilyPond谱例给出题目音\n"
         "- 旋律调性分析题必须用LilyPond谱例给出旋律\n"
         "- 节奏组合题必须用LilyPond谱例，禁止使用Unicode音符符号\n"
-        "- 调性判断题的答案必须列出所有可能的调式\n"
-        "- **预生成的题目必须原样保留，不要修改其内容或编号**"
     )
 
-    return "\n".join(parts)
+    ai_prompt = "\n".join(ai_prompt_parts)
+
+    # 混合模式：返回 __MIXED__ 前缀 + JSON，由 main.py 分别处理
+    if computed_md:
+        header = ""
+        if title:
+            header = f"---\ntitle: {title}\n---\n\n"
+        payload = json.dumps({
+            "computed_md": header + computed_md,
+            "ai_prompt": ai_prompt,
+        }, ensure_ascii=False)
+        return f"__MIXED__\n{payload}"
+
+    # 纯 AI 模式（无可计算题型）
+    return ai_prompt

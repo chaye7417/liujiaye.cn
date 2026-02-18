@@ -406,8 +406,26 @@ async def api_parse_stream(task_id: int, user: dict = Depends(get_current_user))
                     # 全可计算题型，不调用 AI，秒出结果
                     full_md = user_content[len("__PRECOMPUTED__\n"):]
                     yield _sse({"type": "chunk", "text": full_md})
+                elif user_content.startswith("__MIXED__"):
+                    # 混合模式：先输出预计算部分，再 AI 生成剩余
+                    payload = json.loads(user_content[len("__MIXED__\n"):])
+                    computed_md = payload["computed_md"]
+                    ai_prompt = payload["ai_prompt"]
+
+                    # 立即输出预计算部分
+                    collected.append(computed_md + "\n\n")
+                    yield _sse({"type": "chunk", "text": computed_md + "\n\n"})
+
+                    # AI 只生成剩余题型
+                    async for chunk in stream_ai_chunks(
+                        text, task_mode, gen_params, task_model,
+                        override_user_content=ai_prompt,
+                    ):
+                        collected.append(chunk)
+                        yield _sse({"type": "chunk", "text": chunk})
+                    full_md = clean_markdown("".join(collected))
                 else:
-                    # 包含 AI 题型，正常调用
+                    # 纯 AI 题型
                     async for chunk in stream_ai_chunks(text, task_mode, gen_params, task_model):
                         collected.append(chunk)
                         yield _sse({"type": "chunk", "text": chunk})
