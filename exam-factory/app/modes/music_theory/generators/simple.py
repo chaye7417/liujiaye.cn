@@ -200,6 +200,9 @@ def _build_lily_block(
 
     lines: list[str] = [
         "```lilypond",
+        "\\paper {",
+        "  system-system-spacing = #'((basic-distance . 24) (padding . 6))",
+        "}",
         "{",
         "  \\omit Staff.TimeSignature",
         "  \\omit Score.BarNumber",

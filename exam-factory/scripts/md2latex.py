@@ -505,7 +505,6 @@ def generate_question_latex(q: dict) -> list[str]:
             staffsize = extracted_ss
         lines.append(r'  \begin{lilypond}[staffsize=%d]' % staffsize)
         lines.append(r'  \include "font-settings.ily"')
-        lines.append(r'  \paper { indent = 0 }')
         lines.append(f'  {code}')
         lines.append(r'  \end{lilypond}')
 
@@ -537,7 +536,6 @@ def generate_question_latex(q: dict) -> list[str]:
                 staffsize = extracted_ss
             lines.append(r'    \begin{lilypond}[staffsize=%d]' % staffsize)
             lines.append(r'    \include "font-settings.ily"')
-            lines.append(r'    \paper { indent = 0 }')
             lines.append(f'    {code}')
             lines.append(r'    \end{lilypond}')
         lines.append(r'  }{}')
