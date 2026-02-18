@@ -723,11 +723,6 @@
                         <input type="number" id="mt-rhythm-correction-n" value="2" min="0" max="10" style="width:60px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
                         <span style="font-size:13px;color:var(--text-muted);">题</span>
                     </div>
-                    <div style="display:flex;align-items:center;gap:6px;">
-                        <span style="font-size:14px;">每题</span>
-                        <input type="number" id="mt-rhythm-bars" value="2" min="1" max="4" style="width:60px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
-                        <span style="font-size:13px;color:var(--text-muted);">小节</span>
-                    </div>
                 </div>
             </div>
 
@@ -1403,7 +1398,6 @@
         if (selectedTypes.includes('rhythm')) {
             params.rhythm_writing_n = parseInt(document.getElementById('mt-rhythm-writing-n').value) || 0;
             params.rhythm_correction_n = parseInt(document.getElementById('mt-rhythm-correction-n').value) || 0;
-            params.rhythm_bars = parseInt(document.getElementById('mt-rhythm-bars').value) || 2;
         }
         // 如果选了选择题，附带题数
         if (selectedTypes.includes('choice')) {
