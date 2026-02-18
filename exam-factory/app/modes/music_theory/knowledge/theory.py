@@ -24,6 +24,7 @@ from .data import (
 # ---------------------------------------------------------------------------
 _ACC_TO_LILY = {-2: "eses", -1: "es", 0: "", 1: "is", 2: "isis"}
 _ACC_TO_CHINESE = {-2: "bb", -1: "b", 0: "", 1: "#", 2: "×"}
+_ACC_TO_LATEX = {-2: r"\flat\flat ", -1: r"\flat ", 0: "", 1: r"\sharp ", 2: r"\sharp\sharp "}
 
 
 # ---------------------------------------------------------------------------
@@ -68,18 +69,26 @@ class Note:
             name += "," * (3 - self.octave)
         return name
 
-    def to_chinese(self) -> str:
-        """转中文音名表示，如 ``#C`` / ``bB``。"""
-        return f"{_ACC_TO_CHINESE[self.accidental]}{self.letter}"
+    def to_chinese(self, latex: bool = True) -> str:
+        """转音名表示。
 
-    def to_key_name(self, scale_desc: str) -> str:
-        """转调名表示，如 ``C自然大调`` / ``#f和声小调``。
+        Args:
+            latex: True 用 LaTeX 音乐符号（\\sharp \\flat），
+                   False 用 ASCII（# b）
+        """
+        acc = _ACC_TO_LATEX if latex else _ACC_TO_CHINESE
+        return f"{acc[self.accidental]}{self.letter}"
+
+    def to_key_name(self, scale_desc: str, latex: bool = True) -> str:
+        """转调名表示，如 ``\\sharp f和声小调``。
 
         Args:
             scale_desc: 调式描述，含 "小" 字则用小写字母
+            latex: True 用 LaTeX 音乐符号
         """
+        acc = _ACC_TO_LATEX if latex else _ACC_TO_CHINESE
         letter = self.letter.lower() if "小" in scale_desc else self.letter
-        return f"{_ACC_TO_CHINESE[self.accidental]}{letter}{scale_desc}"
+        return f"{acc[self.accidental]}{letter}{scale_desc}"
 
     def matches(self, other: Note) -> bool:
         """忽略八度比较音名和升降号。"""
@@ -129,7 +138,7 @@ def build_interval(
 
     if not (-2 <= target_acc <= 2):
         raise ValueError(
-            f"音程 {interval_name} 从 {root.to_chinese()} "
+            f"音程 {interval_name} 从 {root.to_chinese(latex=False)} "
             f"{'向上' if direction == 'up' else '向下'} "
             f"产生了超范围的变化音: {target_acc}"
         )
