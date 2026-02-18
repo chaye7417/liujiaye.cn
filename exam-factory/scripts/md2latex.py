@@ -18,18 +18,26 @@ from pathlib import Path
 from typing import Optional
 
 
-def fix_lilypond_code(code: str) -> str:
+def fix_lilypond_code(code: str) -> tuple[str, Optional[int]]:
     """修复 AI 生成的 LilyPond 代码中的常见格式问题。
 
     AI 有时会把 \\omit Staff.BarLine 和音符粘在一起，
     或者把多个音符写在同一行末尾，导致 LilyPond 解析失败。
+    AI 有时还会把 staffsize=20 写进代码块内部，需要提取并移除。
 
     Args:
         code: 原始 LilyPond 代码
 
     Returns:
-        修复后的 LilyPond 代码
+        (修复后的代码, 提取的 staffsize 或 None)
     """
+    # 提取并移除 staffsize=N（AI 误放在代码块内部的）
+    extracted_staffsize: Optional[int] = None
+    staffsize_match = re.search(r'staffsize\s*=\s*(\d+)', code)
+    if staffsize_match:
+        extracted_staffsize = int(staffsize_match.group(1))
+        code = re.sub(r'\s*staffsize\s*=\s*\d+\s*', ' ', code)
+
     # 修复 \omit Staff.XXX 后紧跟音符（无空格/换行）
     # 例: \omit Staff.BarLined'1 → \omit Staff.BarLine\n  d'1
     # 要求音符后必须跟八度标记 '/,，避免误拆 TimeSignature 等属性名
@@ -45,7 +53,7 @@ def fix_lilypond_code(code: str) -> str:
         r'\1\n  \2',
         code
     )
-    return code
+    return code, extracted_staffsize
 
 
 def parse_yaml_header(content: str) -> tuple[dict, str]:
@@ -490,7 +498,9 @@ def generate_question_latex(q: dict) -> list[str]:
     # LilyPond 乐谱代码块（在题干之后、选项之前输出）
     for block in q.get('lilypond_blocks', []):
         staffsize = block.get('staffsize', 20)
-        code = fix_lilypond_code(block['code'])
+        code, extracted_ss = fix_lilypond_code(block['code'])
+        if extracted_ss is not None:
+            staffsize = extracted_ss
         lines.append(r'  \begin{lilypond}[staffsize=%d]' % staffsize)
         lines.append(r'  \include "font-settings.ily"')
         lines.append(f'  {code}')
@@ -519,7 +529,9 @@ def generate_question_latex(q: dict) -> list[str]:
         lines.append(r'    \textbf{\textcolor{themecolor}{【答案】}}')
         for block in q['answer_lilypond_blocks']:
             staffsize = block.get('staffsize', 20)
-            code = fix_lilypond_code(block['code'])
+            code, extracted_ss = fix_lilypond_code(block['code'])
+            if extracted_ss is not None:
+                staffsize = extracted_ss
             lines.append(r'    \begin{lilypond}[staffsize=%d]' % staffsize)
             lines.append(r'    \include "font-settings.ily"')
             lines.append(f'    {code}')

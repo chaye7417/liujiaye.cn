@@ -132,23 +132,28 @@ title: 试卷标题
 > 答案: D
 ```
 
-### 范例二：含谱例的选择题（河北2020风格）
+### 范例二：含谱例的选择题 — 音值组合（河北2020风格）
+
+**注意：音值组合选择题必须保留拍号和小节线，让学生能清楚看到每个小节的划分。**
+每个小节的音符时值总和必须等于拍号要求（如2/4拍每小节2拍）。
 
 ```
 ## [0.6分]
-下列音值组合正确的是（ ）
+在2/4拍中，下列哪个小节的音值组合是正确的？（ ）
 ```lilypond
 {
   \clef treble \time 2/4
-  \omit Staff.BarLine
-  c'8 c'8 c'4 c'8 c'8
+  c'8 c'4 c'8 |
+  c'8[ c'8] c'4 |
+  c'8. c'4 c'16 |
+  c'16 c'4 c'8 c'16 |
 }
 ```
 - A. 第1小节
 - B. 第2小节
 - C. 第3小节
-- D. 以上都不正确
-> 答案: A
+- D. 第4小节
+> 答案: B
 ```
 
 ### 范例三：多项选择题（河北2022风格）
@@ -314,6 +319,7 @@ title: 试卷标题
 - 选择题应大量使用谱例（至少30%的选择题含谱例）
 - 干扰项要有迷惑性，考查常见错误认知
 - 涵盖知识点：音值组合法、音程性质与转位、等音/等音程/等和弦、调式音级、和弦结构、拍号意义、术语含义
+- **音值组合选择题特别规则**：必须保留拍号（`\time`）和小节线（禁止 `\omit Staff.BarLine`），用 `|` 划分小节，每个小节的音符时值之和必须等于拍号要求，让学生能清楚看到各小节边界后判断哪个小节组合正确/错误。参见范例二。
 
 ### 音程构成题规则
 - 给定一个音（在五线谱上），标注要构成的音程名称
@@ -344,14 +350,15 @@ title: 试卷标题
 - 旋律应包含调式特征音（如和声小调的#VII级、五声调式的偏音缺失等）
 - 覆盖：自然/和声/旋律大小调、五声调式、近关系转调
 
-### 节奏组合题规则
+### 节奏组合题规则（写作题，非选择题）
 - **必须使用 LilyPond 谱例**展示节奏，禁止使用 Unicode 符号（♩♪𝅗𝅥等）
 - 使用正常音符头（`\clef treble`），不要用斜线音符
 - 所有音符用 `c'` 表示（只关注时值，不关注音高）
-- 题目中隐藏拍号和小节线（`\omit Staff.TimeSignature` + `\omit Staff.BarLine`）
+- **写作题**题目中隐藏拍号和小节线（`\omit Staff.TimeSignature` + `\omit Staff.BarLine`），让学生自己组合
 - **答案也必须用 LilyPond 谱例**（显示拍号和正确的小节线划分）
 - 拍号覆盖：2/4, 3/4, 4/4, 3/8, 6/8
 - 考查音值组合法则：同拍内的音符需连线、附点使用等
+- **注意区分**：如果是选择题中的音值组合题，必须保留拍号和小节线（参见范例二和选择题规则）
 """
 
 
@@ -365,28 +372,69 @@ def build_user_content(
 ) -> str:
     """根据用户选择的题型列表拼接 user content。
 
+    对可程序化计算的题型（音程、和弦、音阶、调性判断、术语、音名），
+    直接生成 Markdown，不经过 AI；仅将需要 AI 的题型（选择题、旋律、
+    节奏）交给 AI 生成。
+
+    当全部题型均可计算时，返回带 ``__PRECOMPUTED__`` 前缀的完整
+    Markdown，由调用方跳过 AI 调用。
+
     Args:
         generation_params: 出题参数（selected_types、难度等）
         file_content: 可选的参考资料文本
 
     Returns:
-        格式化后的 user content
+        格式化后的 user content（或 __PRECOMPUTED__ + 完整 Markdown）
     """
+    from .generators import (
+        COMPUTABLE_GENERATORS,
+        AI_TYPES,
+        generate_computable_sections,
+    )
+
     selected = generation_params.get("selected_types", [])
     difficulty = generation_params.get("difficulty", "中级")
     extra_requirements = generation_params.get("extra_requirements", "")
     title = generation_params.get("title", "")
 
+    if not selected:
+        return "请至少选择一种题型。"
+
+    # 分离可计算 vs 需 AI 的题型
+    computable = [t for t in selected if t in COMPUTABLE_GENERATORS]
+    needs_ai = [t for t in selected if t in AI_TYPES]
+
+    # 生成可计算部分
+    computed_md = ""
+    if computable:
+        computed_md, _ = generate_computable_sections(
+            selected, difficulty, generation_params,
+        )
+
+    # ---- 全可计算：直接返回，跳过 AI ----
+    if not needs_ai:
+        header = ""
+        if title:
+            header = f"---\ntitle: {title}\n---\n\n"
+        return f"__PRECOMPUTED__\n{header}{computed_md}"
+
+    # ---- 混合模式 / 纯 AI ----
     section_parts: list[str] = []
     total_score = 0.0
     section_num = 0
 
     for key in selected:
+        section_num += 1
+
+        if key in COMPUTABLE_GENERATORS:
+            # 已由程序生成，跳过 AI prompt（但仍计算分值）
+            total_score += QUESTION_TYPE_SCORES.get(key, 0)
+            continue
+
         prompt_text = QUESTION_TYPE_PROMPTS.get(key)
         if not prompt_text:
             continue
-        section_num += 1
-        section_parts.append(f"\n**第{section_num}部分：**\n{prompt_text}")
+        section_parts.append(f"\n**第{section_num}部分（需要你生成）：**\n{prompt_text}")
 
         if key == "choice":
             single_n = int(generation_params.get("choice_single_n", 5))
@@ -400,12 +448,10 @@ def build_user_content(
         else:
             total_score += QUESTION_TYPE_SCORES.get(key, 0)
 
-    if not section_parts:
-        return "请至少选择一种题型。"
-
+    ai_type_count = len(needs_ai)
     parts = [
-        f"请出一套乐理试卷，包含以下 {section_num} 种题型。",
-        "\n## 试卷结构\n",
+        f"请出一套乐理试卷中以下 {ai_type_count} 种题型的部分。",
+        "\n## 需要你生成的题型\n",
         *section_parts,
         f"\n**总分：{total_score:.1f}分**",
         f"\n**难度：**{difficulty}",
@@ -420,17 +466,27 @@ def build_user_content(
     if file_content:
         parts.append(f"\n## 参考资料\n\n{file_content}")
 
+    # 注入已生成的程序化题目
+    if computed_md:
+        parts.append(
+            "\n## 以下题目已由程序预生成（直接使用，不要修改）\n\n"
+            "请将你生成的题型与以下内容合并输出为完整试卷。"
+            "预生成部分的编号和内容保持不变，你只需补充上方列出的题型。\n\n"
+            + computed_md
+        )
+
     parts.append(
         "\n## 重要提醒\n"
         "- 涉及谱例的题目必须使用 ```lilypond``` 代码块\n"
         "- LilyPond 代码必须语法正确\n"
         "- 不要在 LilyPond 代码中写 \\include 或 \\version\n"
         "- 答案必须准确\n"
-        "- 严格按照上述试卷结构出题，题型顺序与上方一致\n"
+        "- 严格按照试卷结构出题，题型顺序与上方一致\n"
         "- 音程/和弦构成题必须用LilyPond谱例给出题目音\n"
         "- 旋律调性分析题必须用LilyPond谱例给出旋律\n"
         "- 节奏组合题必须用LilyPond谱例，禁止使用Unicode音符符号\n"
-        "- 调性判断题的答案必须列出所有可能的调式"
+        "- 调性判断题的答案必须列出所有可能的调式\n"
+        "- **预生成的题目必须原样保留，不要修改其内容或编号**"
     )
 
     return "\n".join(parts)

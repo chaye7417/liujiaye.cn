@@ -9,6 +9,94 @@ from pathlib import Path
 
 from app.config import OUTPUT_DIR, LATEX_TEMPLATE_DIR, MD2LATEX_SCRIPT, FONT_SETTINGS_ILY, UPLOAD_DIR
 
+# 可用的 LilyPond 音乐字体配置
+MUSIC_FONTS: dict[str, dict] = {
+    "gonville": {
+        "label": "Gonville（传统手刻）",
+        "music": "gonville",
+        "brace": "gonville",
+        "layout": "",
+    },
+    "emmentaler": {
+        "label": "Emmentaler（LilyPond 默认）",
+        "music": "emmentaler",
+        "brace": "emmentaler",
+        "layout": "",
+    },
+    "profondo": {
+        "label": "Profondo（现代清晰）",
+        "music": "profondo",
+        "brace": "profondo",
+        "layout": (
+            "\\layout {\n"
+            "  \\override Staff.StaffSymbol.thickness = #1.2\n"
+            "  \\override Staff.Stem.thickness = #1.6\n"
+            "  \\override Staff.Beam.beam-thickness = #0.55\n"
+            "  \\override Staff.Tie.thickness = #1.5\n"
+            "  \\override Staff.Slur.thickness = #1.5\n"
+            "  \\override Staff.PhrasingSlur.thickness = #1.5\n"
+            "}\n"
+        ),
+    },
+    "cadence": {
+        "label": "Cadence（优雅圆润）",
+        "music": "cadence",
+        "brace": "cadence",
+        "layout": "",
+    },
+    "lilyjazz": {
+        "label": "LilyJazz（手写爵士）",
+        "music": "lilyjazz",
+        "brace": "lilyjazz",
+        "layout": (
+            "\\layout {\n"
+            "  \\override Score.Hairpin.thickness = #2\n"
+            "  \\override Score.Stem.thickness = #2\n"
+            "  \\override Staff.Tie.line-thickness = #2\n"
+            "  \\override Staff.Slur.thickness = #3\n"
+            "  \\override Staff.PhrasingSlur.thickness = #3\n"
+            "  \\override Staff.BarLine.hair-thickness = #4\n"
+            "  \\override Staff.BarLine.thick-thickness = #8\n"
+            "}\n"
+        ),
+    },
+    "beethoven": {
+        "label": "Beethoven（古典风格）",
+        "music": "beethoven",
+        "brace": "beethoven",
+        "layout": "",
+    },
+}
+
+DEFAULT_MUSIC_FONT = "gonville"
+
+
+def _generate_font_settings_ily(music_font: str = DEFAULT_MUSIC_FONT) -> str:
+    """根据字体名称生成 font-settings.ily 内容。
+
+    Args:
+        music_font: 字体 key（gonville / emmentaler / profondo 等）
+
+    Returns:
+        LilyPond .ily 文件内容
+    """
+    cfg = MUSIC_FONTS.get(music_font, MUSIC_FONTS[DEFAULT_MUSIC_FONT])
+    lines = [
+        f'% LilyPond 字体设置 - {cfg["label"] if "label" in cfg else music_font}',
+        "\\paper {",
+        "  #(define fonts",
+        "    (set-global-fonts",
+        f'      #:music "{cfg["music"]}"',
+        f'      #:brace "{cfg["brace"]}"',
+        "      #:factor (/ staff-height pt 20)",
+        "    ))",
+        "}",
+        "",
+    ]
+    if cfg.get("layout"):
+        lines.append(cfg["layout"])
+    return "\n".join(lines)
+
 
 def _has_lilypond(tex_content: str) -> bool:
     """检测 LaTeX 内容中是否包含 LilyPond 环境。
@@ -48,11 +136,15 @@ def _create_lilypond_wrapper(work_dir: Path) -> Path:
     return wrapper
 
 
-async def _compile_with_lilypond(work_dir: Path, main_tex: Path) -> Path:
+async def _compile_with_lilypond(
+    work_dir: Path,
+    main_tex: Path,
+    music_font: str = DEFAULT_MUSIC_FONT,
+) -> Path:
     """使用 lilypond-book + xelatex 编译包含乐谱的 LaTeX。
 
     流程：
-    1. 复制 font-settings.ily 到工作目录
+    1. 生成 font-settings.ily（根据用户选择的字体）
     2. 运行 lilypond-book --output=lilypond-out --pdf main.tex
     3. 复制样式文件和资源到 lilypond-out
     4. 在 lilypond-out 中运行 xelatex 两遍
@@ -61,6 +153,7 @@ async def _compile_with_lilypond(work_dir: Path, main_tex: Path) -> Path:
     Args:
         work_dir: 工作目录
         main_tex: main.tex 路径
+        music_font: 音乐字体名称
 
     Returns:
         生成的 PDF 路径
@@ -71,10 +164,9 @@ async def _compile_with_lilypond(work_dir: Path, main_tex: Path) -> Path:
     lilypond_out = work_dir / "lilypond-out"
     lilypond_out.mkdir(exist_ok=True)
 
-    # 确保 font-settings.ily 在工作目录
+    # 动态生成 font-settings.ily
     ily_dest = work_dir / "font-settings.ily"
-    if FONT_SETTINGS_ILY.exists() and not ily_dest.exists():
-        shutil.copy2(FONT_SETTINGS_ILY, ily_dest)
+    ily_dest.write_text(_generate_font_settings_ily(music_font), encoding="utf-8")
 
     # 创建 LilyPond 包装脚本（兼容 Ghostscript 10.x）
     wrapper = _create_lilypond_wrapper(work_dir)
@@ -307,6 +399,7 @@ async def _compile_single(
     show_answer: bool,
     variant: str,
     mode: str = "format",
+    music_font: str = DEFAULT_MUSIC_FONT,
 ) -> Path:
     """编译单个 PDF 变体（试题卷或答案卷）。
 
@@ -319,6 +412,7 @@ async def _compile_single(
         show_answer: 是否显示答案
         variant: 'exam' 或 'answer'
         mode: 模式（format / generate / music_theory）
+        music_font: 音乐字体名称
 
     Returns:
         生成的 PDF 路径
@@ -415,7 +509,7 @@ async def _compile_single(
         main_tex.write_text(main_content, encoding="utf-8")
 
         # 使用 lilypond-book 编译
-        return await _compile_with_lilypond(work_dir, main_tex)
+        return await _compile_with_lilypond(work_dir, main_tex, music_font)
     else:
         # 标准流程：XeLaTeX 编译（两次）
         for _ in range(2):
@@ -445,6 +539,7 @@ async def generate_both_pdfs(
     school: str = "",
     theme: str = "4e9b86",
     mode: str = "format",
+    music_font: str = DEFAULT_MUSIC_FONT,
 ) -> tuple[Path, Path]:
     """生成试题卷和答案卷。
 
@@ -455,16 +550,17 @@ async def generate_both_pdfs(
         school: 学校名称
         theme: 主题色
         mode: 模式
+        music_font: 音乐字体名称
 
     Returns:
         (试题卷路径, 答案卷路径)
     """
     exam_pdf = await _compile_single(
         task_id, markdown_content, title, school, theme,
-        show_answer=False, variant="exam", mode=mode,
+        show_answer=False, variant="exam", mode=mode, music_font=music_font,
     )
     answer_pdf = await _compile_single(
         task_id, markdown_content, title, school, theme,
-        show_answer=True, variant="answer", mode=mode,
+        show_answer=True, variant="answer", mode=mode, music_font=music_font,
     )
     return exam_pdf, answer_pdf

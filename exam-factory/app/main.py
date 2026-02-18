@@ -1,14 +1,17 @@
 """试卷工厂 - FastAPI 主应用，支持排版 / 通用出题 / 乐理出题三种模式。"""
 
+import io
 import json
 import logging
 import traceback
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Request
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -23,7 +26,7 @@ from app.auth import (
 )
 from app.file_parser import parse_file
 from app.ai_service import stream_ai_chunks, clean_markdown, extract_exam_info
-from app.pdf_generator import generate_both_pdfs
+from app.pdf_generator import generate_both_pdfs, MUSIC_FONTS, DEFAULT_MUSIC_FONT
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -107,6 +110,19 @@ async def api_models():
     return [
         {"key": key, "label": cfg["label"]}
         for key, cfg in AI_MODELS.items()
+    ]
+
+
+# ============================================================
+# 音乐字体列表
+# ============================================================
+
+@app.get("/api/music-fonts")
+async def api_music_fonts():
+    """返回可用的 LilyPond 音乐字体列表。"""
+    return [
+        {"key": key, "label": cfg["label"]}
+        for key, cfg in MUSIC_FONTS.items()
     ]
 
 
@@ -381,6 +397,21 @@ async def api_parse_stream(task_id: int, user: dict = Depends(get_current_user))
                 full_md = format_questions_markdown(selected, points, title)
 
                 yield _sse({"type": "chunk", "text": full_md})
+            elif task_mode == "music_theory":
+                # 乐理模式：检查是否全部为程序化生成
+                from app.modes.music_theory import build_user_content as _build_mt
+                user_content = _build_mt(gen_params or {}, text)
+
+                if user_content.startswith("__PRECOMPUTED__"):
+                    # 全可计算题型，不调用 AI，秒出结果
+                    full_md = user_content[len("__PRECOMPUTED__\n"):]
+                    yield _sse({"type": "chunk", "text": full_md})
+                else:
+                    # 包含 AI 题型，正常调用
+                    async for chunk in stream_ai_chunks(text, task_mode, gen_params, task_model):
+                        collected.append(chunk)
+                        yield _sse({"type": "chunk", "text": chunk})
+                    full_md = clean_markdown("".join(collected))
             else:
                 async for chunk in stream_ai_chunks(text, task_mode, gen_params, task_model):
                     collected.append(chunk)
@@ -461,6 +492,15 @@ async def api_generate_pdf(
     theme = task["theme"] or "4e9b86"
     task_mode = task["mode"] or "format"
 
+    # 从 generation_params 中提取音乐字体
+    gen_params = None
+    if task["generation_params"]:
+        try:
+            gen_params = json.loads(task["generation_params"])
+        except json.JSONDecodeError:
+            pass
+    music_font = (gen_params or {}).get("music_font", DEFAULT_MUSIC_FONT)
+
     async def generate():
         try:
             # 保存最新 markdown
@@ -481,12 +521,6 @@ async def api_generate_pdf(
             if task_mode == "music_history":
                 # 音乐史模式：使用旧模板直接编译 CSV
                 from app.pdf_generator import _compile_music_history
-                gen_params = None
-                if task["generation_params"]:
-                    try:
-                        gen_params = json.loads(task["generation_params"])
-                    except json.JSONDecodeError:
-                        pass
                 do_shuffle = gen_params.get("shuffle", True) if gen_params else True
 
                 await _compile_music_history(task_id, title, theme, False, "exam", do_shuffle)
@@ -494,9 +528,9 @@ async def api_generate_pdf(
                 await _compile_music_history(task_id, title, theme, True, "answer", do_shuffle)
             else:
                 from app.pdf_generator import _compile_single
-                await _compile_single(task_id, markdown, title, school, theme, False, "exam", task_mode)
+                await _compile_single(task_id, markdown, title, school, theme, False, "exam", task_mode, music_font)
                 yield _sse({"type": "progress", "pct": 55, "msg": "正在生成答案卷..."})
-                await _compile_single(task_id, markdown, title, school, theme, True, "answer", task_mode)
+                await _compile_single(task_id, markdown, title, school, theme, True, "answer", task_mode, music_font)
 
             # 更新状态
             db3 = await get_db()
@@ -513,6 +547,8 @@ async def api_generate_pdf(
                 "type": "done",
                 "exam_url": f"/api/tasks/{task_id}/download?type=exam",
                 "answer_url": f"/api/tasks/{task_id}/download?type=answer",
+                "tex_url": f"/api/tasks/{task_id}/download-tex?type=exam",
+                "zip_url": f"/api/tasks/{task_id}/download-latex-zip?type=exam",
             })
 
         except Exception as e:
@@ -554,6 +590,120 @@ async def api_download(
     suffix = "答案卷" if variant == "answer" else "试题卷"
     filename = f"{task['title']}_{suffix}.pdf"
     return FileResponse(pdf_path, filename=filename, media_type="application/pdf")
+
+
+# LaTeX 下载时排除的文件扩展名和目录
+_LATEX_ZIP_EXCLUDE_EXTS = {
+    ".aux", ".log", ".out", ".fls", ".fdb_latexmk", ".synctex.gz",
+    ".toc", ".nav", ".snm", ".vrb", ".bbl", ".blg", ".bcf",
+    ".run.xml", ".xdv", ".pdf",
+}
+_LATEX_ZIP_EXCLUDE_DIRS = {"lilypond-out"}
+
+
+@app.get("/api/tasks/{task_id}/download-tex")
+async def api_download_tex(
+    task_id: int,
+    type: str = "exam",
+    user: dict = Depends(get_current_user),
+):
+    """下载单个 LaTeX 源文件（.tex）。"""
+    user_id = int(user["sub"])
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT title, mode FROM tasks WHERE id = ? AND user_id = ?", (task_id, user_id),
+        )
+        task = await cursor.fetchone()
+    finally:
+        await db.close()
+
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    variant = "answer" if type == "answer" else "exam"
+    work_dir = OUTPUT_DIR / str(task_id) / variant
+    task_mode = task["mode"] or "format"
+
+    # 找到主 .tex 文件（LilyPond 项目优先用处理后的版本）
+    if task_mode == "music_history":
+        tex_name = "answer_sheet.tex" if variant == "answer" else "question_paper.tex"
+        tex_path = work_dir / tex_name
+    else:
+        lilypond_tex = work_dir / "lilypond-out" / "main.tex"
+        tex_path = lilypond_tex if lilypond_tex.exists() else work_dir / "main.tex"
+
+    if not tex_path.exists():
+        raise HTTPException(status_code=404, detail="LaTeX 源文件不存在，请先生成 PDF")
+
+    suffix = "答案卷" if variant == "answer" else "试题卷"
+    filename = f"{task['title']}_{suffix}.tex"
+    return FileResponse(tex_path, filename=filename, media_type="application/x-tex")
+
+
+@app.get("/api/tasks/{task_id}/download-latex-zip")
+async def api_download_latex_zip(
+    task_id: int,
+    type: str = "exam",
+    user: dict = Depends(get_current_user),
+):
+    """下载完整 LaTeX 工程压缩包（含模板、样式、资源）。"""
+    user_id = int(user["sub"])
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT title, mode FROM tasks WHERE id = ? AND user_id = ?", (task_id, user_id),
+        )
+        task = await cursor.fetchone()
+    finally:
+        await db.close()
+
+    if not task:
+        raise HTTPException(status_code=404, detail="任务不存在")
+
+    variant = "answer" if type == "answer" else "exam"
+    work_dir = OUTPUT_DIR / str(task_id) / variant
+
+    if not work_dir.exists():
+        raise HTTPException(status_code=404, detail="LaTeX 文件不存在，请先生成 PDF")
+
+    # 打包为 zip
+    # LilyPond 项目使用处理后的 lilypond-out 目录（乐谱已转为图片引用）
+    lilypond_out = work_dir / "lilypond-out"
+    pack_dir = lilypond_out if lilypond_out.exists() else work_dir
+
+    buf = io.BytesIO()
+    suffix = "答案卷" if variant == "answer" else "试题卷"
+    zip_root = f"{task['title']}_{suffix}_LaTeX"
+
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for file_path in sorted(pack_dir.rglob("*")):
+            if not file_path.is_file():
+                continue
+            # 跳过编译产物
+            if file_path.suffix.lower() in _LATEX_ZIP_EXCLUDE_EXTS:
+                # 保留 LilyPond 生成的乐谱图片 PDF（子目录中的 lily-*.pdf）
+                if not (file_path.suffix.lower() == ".pdf" and file_path.name.startswith("lily-")):
+                    continue
+            rel = file_path.relative_to(pack_dir)
+            # 跳过包装脚本、原始模板和中间文件
+            if file_path.name in ("lilypond-wrapper.sh", "main-template.tex", "lock"):
+                continue
+            # 跳过 LilyPond 中间文件（.ly .eps .count .texi .dep）
+            if file_path.suffix.lower() in (".ly", ".eps", ".count", ".texi", ".dep"):
+                continue
+            zf.write(file_path, f"{zip_root}/{rel}")
+
+    buf.seek(0)
+    filename = f"{zip_root}.zip"
+    encoded = quote(filename)
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded}",
+        },
+    )
 
 
 @app.get("/api/me")

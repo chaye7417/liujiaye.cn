@@ -220,6 +220,20 @@ body {
     background: var(--bg);
 }
 
+.btn-outline {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px dashed var(--border);
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-outline:hover {
+    color: var(--text);
+    border-color: var(--text-muted);
+    background: var(--bg);
+}
+
 .btn-block {
     width: 100%;
 }

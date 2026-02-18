@@ -675,6 +675,18 @@
             </div>
 
             <div class="form-group">
+                <label for="mt-font">乐谱字体</label>
+                <select id="mt-font" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg);color:var(--text);">
+                    <option value="gonville">Gonville（传统手刻）</option>
+                    <option value="emmentaler">Emmentaler（LilyPond 默认）</option>
+                    <option value="profondo">Profondo（现代清晰）</option>
+                    <option value="cadence">Cadence（优雅圆润）</option>
+                    <option value="lilyjazz">LilyJazz（手写爵士）</option>
+                    <option value="beethoven">Beethoven（古典风格）</option>
+                </select>
+            </div>
+
+            <div class="form-group">
                 <label for="mt-extra">补充要求（可选）</label>
                 <textarea id="mt-extra" class="extra-textarea" placeholder="如：多出五声调式相关题目，选择题中包含谱例..."></textarea>
             </div>
@@ -861,6 +873,19 @@
                 <div class="icon">&#128221;</div>
                 <div class="label">答案卷</div>
                 <a id="answerLink" class="btn btn-secondary" target="_blank">下载答案卷</a>
+            </div>
+        </div>
+
+        <!-- LaTeX 源文件下载 -->
+        <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+            <p style="margin:0 0 10px;font-size:13px;color:var(--text-muted);">LaTeX 源文件</p>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <a id="texLink" class="btn btn-outline" target="_blank" style="font-size:13px;padding:6px 14px;">
+                    下载 .tex 文件
+                </a>
+                <a id="zipLink" class="btn btn-outline" target="_blank" style="font-size:13px;padding:6px 14px;">
+                    下载完整工程 (.zip)
+                </a>
             </div>
         </div>
 
@@ -1234,6 +1259,7 @@
             difficulty: diffEl ? diffEl.dataset.diff : '中级',
             extra_requirements: document.getElementById('mt-extra').value.trim(),
             title: document.getElementById('mt-title').value.trim(),
+            music_font: document.getElementById('mt-font').value,
         };
         // 如果选了选择题，附带题数
         if (selectedTypes.includes('choice')) {
@@ -1500,6 +1526,8 @@
 
                         document.getElementById('examLink').href = event.exam_url;
                         document.getElementById('answerLink').href = event.answer_url;
+                        document.getElementById('texLink').href = event.tex_url;
+                        document.getElementById('zipLink').href = event.zip_url;
 
                         setTimeout(() => { showPanel('panel4'); }, 500);
                     } else if (event.type === 'error') {
