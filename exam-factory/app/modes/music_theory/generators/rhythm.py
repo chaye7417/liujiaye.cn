@@ -380,29 +380,38 @@ def generate_rhythm(
 
     sections: list[str] = ["# 音值组合\n"]
 
+    # 每道小题用独立的 ## 块（md2latex 每个 ## 只处理一对 仅试题/答案）
     if n_writing > 0:
-        sections.append("## [10分]")
-        sections.append("按照指定拍号，为下列音符划分小节并写出正确的音值组合：")
-        sections.append("")
         for i in range(n_writing):
             ts_key = ts_list[i]
             q_lily, a_lily = _generate_writing_item(ts_key, n_bars)
+            if i == 0:
+                sections.extend([
+                    "## [2分]",
+                    f"按照指定拍号，为下列音符划分小节并写出正确的音值组合。拍号：{ts_key}",
+                ])
+            else:
+                sections.extend(["## [续]", f"拍号：{ts_key}"])
             sections.extend([
-                f"**({i + 1})** 拍号：{ts_key}", "",
                 "> 仅试题:", _wrap_lily(q_lily),
+                "> 五线谱: 1",
                 "> 答案:", _wrap_lily(a_lily), "",
             ])
 
     if n_correction > 0:
-        sections.append("## [10分]")
-        sections.append("下列各组音值组合有误，请改正：")
-        sections.append("")
         for i in range(n_correction):
             ts_key = ts_list[n_writing + i]
             q_lily, a_lily = _generate_correction_item(ts_key, n_bars)
+            if i == 0:
+                sections.extend([
+                    "## [2分]",
+                    "下列各组音值组合有误，请改正：",
+                ])
+            else:
+                sections.append("## [续]")
             sections.extend([
-                f"**({i + 1})**", "",
                 "> 仅试题:", _wrap_lily(q_lily),
+                "> 五线谱: 1",
                 "> 答案:", _wrap_lily(a_lily), "",
             ])
 
