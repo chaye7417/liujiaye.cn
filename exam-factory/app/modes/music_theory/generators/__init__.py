@@ -65,6 +65,7 @@ def generate_computable_sections(
             md = generator(
                 section_num="",
                 difficulty=difficulty,
+                generation_params=generation_params or {},
             )
             computed_sections.append(md)
         else:

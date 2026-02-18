@@ -648,6 +648,38 @@
                 </div>
             </div>
 
+            <!-- 音名标记设置（仅选了"音名标记"时显示） -->
+            <div class="form-group" id="mt-note-names-settings" style="display:none;">
+                <label>音名标记设置</label>
+                <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:14px;">正向（看谱写音名）</span>
+                        <input type="number" id="mt-nn-forward" value="5" min="0" max="20" style="width:60px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
+                        <span style="font-size:13px;color:var(--text-muted);">题</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:14px;">反向（看音名写谱）</span>
+                        <input type="number" id="mt-nn-reverse" value="5" min="0" max="20" style="width:60px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
+                        <span style="font-size:13px;color:var(--text-muted);">题</span>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+                    <span style="font-size:14px;">谱号：</span>
+                    <label style="display:flex;align-items:center;gap:4px;font-size:14px;cursor:pointer;">
+                        <input type="checkbox" class="mt-nn-clef" value="treble" checked> 高音
+                    </label>
+                    <label style="display:flex;align-items:center;gap:4px;font-size:14px;cursor:pointer;">
+                        <input type="checkbox" class="mt-nn-clef" value="bass" checked> 低音
+                    </label>
+                    <label style="display:flex;align-items:center;gap:4px;font-size:14px;cursor:pointer;">
+                        <input type="checkbox" class="mt-nn-clef" value="alto"> 中音
+                    </label>
+                    <label style="display:flex;align-items:center;gap:4px;font-size:14px;cursor:pointer;">
+                        <input type="checkbox" class="mt-nn-clef" value="tenor"> 次中音
+                    </label>
+                </div>
+            </div>
+
             <!-- 选择题设置（仅选了"选择题"时显示） -->
             <div class="form-group" id="mt-choice-settings" style="display:none;">
                 <label>选择题设置</label>
@@ -960,7 +992,7 @@
     // 初始化乐理题型胶囊选择
     const MT_TYPES = [
         { key: 'terms', name: '术语与记号', score: 5 },
-        { key: 'note_names', name: '音名标记', score: 5 },
+        { key: 'note_names', name: '音名标记', score: 0 },
         { key: 'rhythm', name: '音值组合', score: 10 },
         { key: 'intervals', name: '音程构成', score: 10 },
         { key: 'chords', name: '和弦构成', score: 10 },
@@ -997,14 +1029,24 @@
         return sn * 0.6 + mn * 0.8;
     }
 
+    function getMtNoteNamesScore() {
+        const fwd = parseInt(document.getElementById('mt-nn-forward').value) || 0;
+        const rev = parseInt(document.getElementById('mt-nn-reverse').value) || 0;
+        return (fwd > 0 ? 5 : 0) + (rev > 0 ? 5 : 0);
+    }
+
     function updateMtSelection() {
         const selected = document.querySelectorAll('.mt-type-tag.selected');
         let totalScore = 0;
         let hasChoice = false;
+        let hasNoteNames = false;
         selected.forEach(t => {
             if (t.dataset.key === 'choice') {
                 hasChoice = true;
                 totalScore += getMtChoiceScore();
+            } else if (t.dataset.key === 'note_names') {
+                hasNoteNames = true;
+                totalScore += getMtNoteNamesScore();
             } else {
                 totalScore += parseFloat(t.dataset.score) || 0;
             }
@@ -1012,6 +1054,7 @@
         document.getElementById('mtSelectedCount').textContent = selected.length;
         document.getElementById('mtSelectedScore').textContent = totalScore % 1 === 0 ? totalScore : totalScore.toFixed(1);
         document.getElementById('mt-choice-settings').style.display = hasChoice ? '' : 'none';
+        document.getElementById('mt-note-names-settings').style.display = hasNoteNames ? '' : 'none';
         // 同步全选按钮
         const all = document.querySelectorAll('.mt-type-tag');
         document.getElementById('mt-select-all').classList.toggle('active', all.length === selected.length);
@@ -1020,6 +1063,9 @@
     // 选择题数量变化时更新分数
     document.getElementById('mt-choice-single-n').addEventListener('input', updateMtSelection);
     document.getElementById('mt-choice-multi-n').addEventListener('input', updateMtSelection);
+    // 音名标记数量变化时更新分数
+    document.getElementById('mt-nn-forward').addEventListener('input', updateMtSelection);
+    document.getElementById('mt-nn-reverse').addEventListener('input', updateMtSelection);
 
     // 文件拖拽（排版模式）
     const fmtArea = document.getElementById('fmtUploadArea');
@@ -1261,6 +1307,13 @@
             title: document.getElementById('mt-title').value.trim(),
             music_font: document.getElementById('mt-font').value,
         };
+        // 如果选了音名标记，附带正/反向题数和谱号
+        if (selectedTypes.includes('note_names')) {
+            params.note_names_forward_n = parseInt(document.getElementById('mt-nn-forward').value) || 5;
+            params.note_names_reverse_n = parseInt(document.getElementById('mt-nn-reverse').value) || 5;
+            params.note_names_clefs = Array.from(document.querySelectorAll('.mt-nn-clef:checked')).map(c => c.value);
+            if (!params.note_names_clefs.length) params.note_names_clefs = ['treble'];
+        }
         // 如果选了选择题，附带题数
         if (selectedTypes.includes('choice')) {
             params.choice_single_n = parseInt(document.getElementById('mt-choice-single-n').value) || 5;
@@ -1570,6 +1623,7 @@
         document.querySelectorAll('.mt-type-tag.selected').forEach(t => t.classList.remove('selected'));
         document.getElementById('mt-select-all').classList.remove('active');
         document.getElementById('mt-choice-settings').style.display = 'none';
+        document.getElementById('mt-note-names-settings').style.display = 'none';
         updateMtSelection();
         document.getElementById('mhFileInput').value = '';
         document.getElementById('mhFileName').textContent = '';

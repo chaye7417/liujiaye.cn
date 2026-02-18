@@ -62,6 +62,9 @@ _CLEF_CONFIGS: list[dict] = [
     },
 ]
 
+# 谱号 lily 名 → 配置的快速查找
+_CLEF_BY_LILY: dict[str, dict] = {c["lily"]: c for c in _CLEF_CONFIGS}
+
 
 # ---------------------------------------------------------------------------
 # 术语与记号
@@ -96,23 +99,44 @@ def generate_terms(section_num: str, n: int = 5, **kwargs) -> str:
 # ---------------------------------------------------------------------------
 # 音名标记 — 辅助函数
 # ---------------------------------------------------------------------------
+def _filter_clefs(clef_keys: list[str] | None) -> list[dict]:
+    """根据用户选择的谱号 key 筛选配置。
+
+    Args:
+        clef_keys: LilyPond 谱号名列表（如 ["treble", "bass"]），
+                   None 或空列表返回全部。
+
+    Returns:
+        筛选后的谱号配置列表。
+    """
+    if not clef_keys:
+        return _CLEF_CONFIGS
+    filtered = [_CLEF_BY_LILY[k] for k in clef_keys if k in _CLEF_BY_LILY]
+    return filtered or _CLEF_CONFIGS
+
+
 def _pick_notes(
     n: int,
     used: set[tuple[str, int, int]],
-    max_clefs: int = 4,
+    clef_configs: list[dict] | None = None,
+    max_clefs: int | None = None,
 ) -> list[tuple[dict, list[Note]]]:
     """为多种谱号随机选音。
 
     Args:
         n: 总题数
         used: 已使用音符集合（会被修改）
-        max_clefs: 最多使用几种谱号
+        clef_configs: 可用的谱号配置列表（None 用全部）
+        max_clefs: 最多使用几种谱号（None 则自动等于可用谱号数）
 
     Returns:
         [(clef_cfg, [Note, ...]), ...]
     """
-    num_clefs = random.randint(1, min(max_clefs, len(_CLEF_CONFIGS)))
-    chosen_clefs = random.sample(_CLEF_CONFIGS, num_clefs)
+    configs = clef_configs or _CLEF_CONFIGS
+    if max_clefs is None:
+        max_clefs = len(configs)
+    num_clefs = random.randint(1, min(max_clefs, len(configs)))
+    chosen_clefs = random.sample(configs, num_clefs)
 
     base = n // num_clefs
     remainder = n % num_clefs
@@ -141,9 +165,20 @@ def _pick_notes(
 # ---------------------------------------------------------------------------
 # 音名标记 — 正向（看谱写音名）
 # ---------------------------------------------------------------------------
-def _build_forward_notes(n: int, used: set[tuple[str, int, int]]) -> str:
-    """生成正向题：给五线谱音符，写出音名。"""
-    clef_groups = _pick_notes(n, used, max_clefs=4)
+def _build_forward_notes(
+    n: int,
+    used: set[tuple[str, int, int]],
+    clef_configs: list[dict] | None = None,
+) -> str:
+    """生成正向题：给五线谱音符，写出音名。
+
+    Args:
+        n: 题目数量
+        used: 已使用音符集合
+        clef_configs: 可用谱号（决定 max_clefs 上限）
+    """
+    configs = clef_configs or _CLEF_CONFIGS
+    clef_groups = _pick_notes(n, used, clef_configs=configs)
 
     lily_parts: list[str] = []
     all_notes: list[Note] = []
@@ -185,9 +220,20 @@ def _build_forward_notes(n: int, used: set[tuple[str, int, int]]) -> str:
 # ---------------------------------------------------------------------------
 # 音名标记 — 反向（看音名写谱）
 # ---------------------------------------------------------------------------
-def _build_reverse_notes(n: int, used: set[tuple[str, int, int]]) -> str:
-    """生成反向题：给音名，在五线谱上写出音符。"""
-    clef_groups = _pick_notes(n, used, max_clefs=3)
+def _build_reverse_notes(
+    n: int,
+    used: set[tuple[str, int, int]],
+    clef_configs: list[dict] | None = None,
+) -> str:
+    """生成反向题：给音名，在五线谱上写出音符。
+
+    Args:
+        n: 题目数量
+        used: 已使用音符集合
+        clef_configs: 可用谱号（决定 max_clefs 上限）
+    """
+    configs = clef_configs or _CLEF_CONFIGS
+    clef_groups = _pick_notes(n, used, clef_configs=configs)
 
     question_lines: list[str] = []
     answer_lily: list[str] = []
@@ -240,19 +286,32 @@ def generate_note_names(section_num: str, n: int = 0, **kwargs) -> str:
     正向：给五线谱音符，写出音名（含中文音组说明）。
     反向：给音名，在五线谱上写出音符。
 
+    通过 generation_params 读取用户配置：
+        - note_names_forward_n: 正向题数（默认 5）
+        - note_names_reverse_n: 反向题数（默认 5）
+        - note_names_clefs: 可用谱号列表（默认全部）
+
     Args:
         section_num: 大题编号
-        n: 总题数（0 表示随机 6-12）
+        n: 总题数（已弃用，由 forward_n + reverse_n 决定）
     """
-    if n <= 0:
-        n = random.randint(6, 12)
+    gen_params = kwargs.get("generation_params", {})
+    n_forward = gen_params.get("note_names_forward_n", 5)
+    n_reverse = gen_params.get("note_names_reverse_n", 5)
+    clef_keys = gen_params.get("note_names_clefs", None)
 
-    n_forward = max(3, (n + 1) // 2)
-    n_reverse = max(2, n - n_forward)
+    # 筛选可用谱号
+    clef_configs = _filter_clefs(clef_keys)
 
     used: set[tuple[str, int, int]] = set()
+    sections: list[str] = ["# 音名标记\n"]
 
-    forward_md = _build_forward_notes(n_forward, used)
-    reverse_md = _build_reverse_notes(n_reverse, used)
+    if n_forward > 0:
+        sections.append(_build_forward_notes(n_forward, used, clef_configs))
 
-    return "\n".join(["# 音名标记\n", forward_md, "", reverse_md])
+    if n_reverse > 0:
+        if n_forward > 0:
+            sections.append("")
+        sections.append(_build_reverse_notes(n_reverse, used, clef_configs))
+
+    return "\n".join(sections)
