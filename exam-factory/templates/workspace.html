@@ -709,6 +709,28 @@
                 </div>
             </div>
 
+            <!-- 音值组合设置（仅选了"音值组合"时显示） -->
+            <div class="form-group" id="mt-rhythm-settings" style="display:none;">
+                <label>音值组合设置</label>
+                <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:14px;">写作题</span>
+                        <input type="number" id="mt-rhythm-writing-n" value="3" min="0" max="10" style="width:60px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
+                        <span style="font-size:13px;color:var(--text-muted);">题</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:14px;">改错题</span>
+                        <input type="number" id="mt-rhythm-correction-n" value="2" min="0" max="10" style="width:60px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
+                        <span style="font-size:13px;color:var(--text-muted);">题</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:14px;">每题</span>
+                        <input type="number" id="mt-rhythm-bars" value="2" min="1" max="4" style="width:60px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
+                        <span style="font-size:13px;color:var(--text-muted);">小节</span>
+                    </div>
+                </div>
+            </div>
+
             <div class="form-group">
                 <label>难度</label>
                 <div class="difficulty-options" id="mt-diff">
@@ -1005,7 +1027,7 @@
     const MT_TYPES = [
         { key: 'terms', name: '术语与记号', score: 5 },
         { key: 'note_names', name: '音名标记', score: 0 },
-        { key: 'rhythm', name: '音值组合', score: 10 },
+        { key: 'rhythm', name: '音值组合', score: 0 },
         { key: 'intervals', name: '音程构成', score: 10 },
         { key: 'chords', name: '和弦构成', score: 10 },
         { key: 'scales', name: '音阶写作', score: 10 },
@@ -1039,6 +1061,12 @@
         const sn = parseInt(document.getElementById('mt-choice-single-n').value) || 0;
         const mn = parseInt(document.getElementById('mt-choice-multi-n').value) || 0;
         return sn * 0.6 + mn * 0.8;
+    }
+
+    function getMtRhythmScore() {
+        const wn = parseInt(document.getElementById('mt-rhythm-writing-n').value) || 0;
+        const cn = parseInt(document.getElementById('mt-rhythm-correction-n').value) || 0;
+        return (wn + cn) * 2;
     }
 
     function getMtNoteNamesScore() {
@@ -1076,6 +1104,7 @@
         let totalScore = 0;
         let hasChoice = false;
         let hasNoteNames = false;
+        let hasRhythm = false;
         selected.forEach(t => {
             if (t.dataset.key === 'choice') {
                 hasChoice = true;
@@ -1083,6 +1112,9 @@
             } else if (t.dataset.key === 'note_names') {
                 hasNoteNames = true;
                 totalScore += getMtNoteNamesScore();
+            } else if (t.dataset.key === 'rhythm') {
+                hasRhythm = true;
+                totalScore += getMtRhythmScore();
             } else {
                 totalScore += parseFloat(t.dataset.score) || 0;
             }
@@ -1091,6 +1123,7 @@
         document.getElementById('mtSelectedScore').textContent = totalScore % 1 === 0 ? totalScore : totalScore.toFixed(1);
         document.getElementById('mt-choice-settings').style.display = hasChoice ? '' : 'none';
         document.getElementById('mt-note-names-settings').style.display = hasNoteNames ? '' : 'none';
+        document.getElementById('mt-rhythm-settings').style.display = hasRhythm ? '' : 'none';
         // 同步全选按钮
         const all = document.querySelectorAll('.mt-type-tag');
         document.getElementById('mt-select-all').classList.toggle('active', all.length === selected.length);
@@ -1104,6 +1137,9 @@
     document.getElementById('mt-nn-reverse').addEventListener('input', updateMtSelection);
     document.getElementById('mt-nn-enh-forward').addEventListener('input', updateMtSelection);
     document.getElementById('mt-nn-enh-reverse').addEventListener('input', updateMtSelection);
+    // 音值组合数量变化时更新分数
+    document.getElementById('mt-rhythm-writing-n').addEventListener('input', updateMtSelection);
+    document.getElementById('mt-rhythm-correction-n').addEventListener('input', updateMtSelection);
 
     function toggleNnClef(el) {
         el.classList.toggle('selected');
@@ -1362,6 +1398,12 @@
             params.note_names_enharmonic_reverse_n = enhOn ? (parseInt(document.getElementById('mt-nn-enh-reverse').value) || 0) : 0;
             params.note_names_clefs = Array.from(document.querySelectorAll('.mt-nn-clef.selected')).map(c => c.dataset.clef);
             if (!params.note_names_clefs.length) params.note_names_clefs = ['treble'];
+        }
+        // 如果选了音值组合，附带写作/改错题数和小节数
+        if (selectedTypes.includes('rhythm')) {
+            params.rhythm_writing_n = parseInt(document.getElementById('mt-rhythm-writing-n').value) || 0;
+            params.rhythm_correction_n = parseInt(document.getElementById('mt-rhythm-correction-n').value) || 0;
+            params.rhythm_bars = parseInt(document.getElementById('mt-rhythm-bars').value) || 2;
         }
         // 如果选了选择题，附带题数
         if (selectedTypes.includes('choice')) {
@@ -1673,6 +1715,7 @@
         document.getElementById('mt-select-all').classList.remove('active');
         document.getElementById('mt-choice-settings').style.display = 'none';
         document.getElementById('mt-note-names-settings').style.display = 'none';
+        document.getElementById('mt-rhythm-settings').style.display = 'none';
         updateMtSelection();
         document.getElementById('mhFileInput').value = '';
         document.getElementById('mhFileName').textContent = '';

@@ -6,6 +6,7 @@ from ..knowledge.data import CHINESE_NUMS
 from .simple import generate_terms, generate_note_names
 from .pitch import generate_intervals, generate_chords, generate_scales
 from .keys import generate_interval_keys, generate_chord_keys
+from .rhythm import generate_rhythm
 
 # ---------------------------------------------------------------------------
 # 可程序化生成的题型 → 生成函数
@@ -18,10 +19,11 @@ COMPUTABLE_GENERATORS: dict[str, Callable[..., str]] = {
     "scales": generate_scales,
     "interval_keys": generate_interval_keys,
     "chord_keys": generate_chord_keys,
+    "rhythm": generate_rhythm,
 }
 
 # 需要 AI 生成的题型
-AI_TYPES = {"choice", "melody", "rhythm"}
+AI_TYPES = {"choice", "melody"}
 
 # 大题标题映射
 SECTION_TITLES: dict[str, str] = {
