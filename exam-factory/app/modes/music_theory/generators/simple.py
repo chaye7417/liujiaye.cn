@@ -680,8 +680,8 @@ def generate_note_names(section_num: str, n: int = 0, **kwargs) -> str:
     gen_params = kwargs.get("generation_params", {})
     n_forward = gen_params.get("note_names_forward_n", 5)
     n_reverse = gen_params.get("note_names_reverse_n", 5)
-    n_enh_fwd = gen_params.get("note_names_enharmonic_forward_n", 5)
-    n_enh_rev = gen_params.get("note_names_enharmonic_reverse_n", 5)
+    n_enh_fwd = gen_params.get("note_names_enharmonic_forward_n", 0)
+    n_enh_rev = gen_params.get("note_names_enharmonic_reverse_n", 0)
     clef_keys = gen_params.get("note_names_clefs", None)
 
     clef_configs = _filter_clefs(clef_keys)
