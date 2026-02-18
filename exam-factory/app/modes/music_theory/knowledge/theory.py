@@ -26,6 +26,11 @@ _ACC_TO_LILY = {-2: "eses", -1: "es", 0: "", 1: "is", 2: "isis"}
 _ACC_TO_CHINESE = {-2: "bb", -1: "b", 0: "", 1: "#", 2: "×"}
 _ACC_TO_LATEX = {-2: r"\flat\flat ", -1: r"\flat ", 0: "", 1: r"\sharp ", 2: "×"}
 
+# 纯 Unicode 符号（用于音组标记，避免 LaTeX 命令导致字体切换问题）
+_ACC_TO_UNICODE = {-2: "♭♭", -1: "♭", 0: "", 1: "♯", 2: "×"}
+_SUPERSCRIPTS = {1: "¹", 2: "²", 3: "³"}
+_SUBSCRIPTS = {1: "₁", 2: "₂"}
+
 _PITCH_GROUPS = {
     0: "大字二组", 1: "大字一组", 2: "大字组",
     3: "小字组", 4: "小字一组", 5: "小字二组", 6: "小字三组",
@@ -96,9 +101,9 @@ class Note:
         return f"{acc[self.accidental]}{letter}{scale_desc}"
 
     def to_pitch_name(self) -> str:
-        r"""转中国音组标记（LaTeX 格式）。
+        """转中国音组标记（纯 Unicode，无 LaTeX 命令）。
 
-        中央 C (octave=4) = 小字一组 c¹ → ``c\textsuperscript{1}``
+        使用 Unicode 上下标数字，避免 LaTeX 字体切换问题。
 
         体系：
             octave 0 → 大字二组  C₂
@@ -109,28 +114,30 @@ class Note:
             octave 5 → 小字二组  c²
             octave 6 → 小字三组  c³
         """
-        acc = _ACC_TO_LATEX[self.accidental]
+        acc = _ACC_TO_UNICODE[self.accidental]
         if self.octave >= 3:
             letter = self.letter.lower()
             group = self.octave - 3
             if group == 0:
                 return f"{acc}{letter}"
-            return f"{acc}{letter}\\textsuperscript{{{group}}}"
+            sup = _SUPERSCRIPTS.get(group, str(group))
+            return f"{acc}{letter}{sup}"
         else:
             letter = self.letter
             group = 2 - self.octave
             if group == 0:
                 return f"{acc}{letter}"
-            return f"{acc}{letter}\\textsubscript{{{group}}}"
+            sub = _SUBSCRIPTS.get(group, str(group))
+            return f"{acc}{letter}{sub}"
 
     def pitch_group_name(self) -> str:
         """返回中国音组名称，如 '小字一组'。"""
         return _PITCH_GROUPS.get(self.octave, "")
 
     def to_pitch_label(self) -> str:
-        r"""返回中文音组标记（无上下标），如 '小字一组\sharp c'。"""
+        """返回中文音组标记，如 '小字一组♯c'。使用 Unicode 符号。"""
         group = _PITCH_GROUPS.get(self.octave, "")
-        acc = _ACC_TO_LATEX[self.accidental]
+        acc = _ACC_TO_UNICODE[self.accidental]
         letter = self.letter.lower() if self.octave >= 3 else self.letter
         return f"{group}{acc}{letter}"
 
