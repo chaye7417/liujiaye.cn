@@ -7,7 +7,7 @@ from ..knowledge.theory import Note
 
 
 # ---------------------------------------------------------------------------
-# 谱号配置：按八度范围自动生成音符池（7 自然音 + 7 常用变化音 = 14 音/八度）
+# 谱号配置：按八度范围自动生成音符池，超范围用 8va/8vb 八度线
 # ---------------------------------------------------------------------------
 _COMMON_ACCIDENTALS: list[tuple[str, int]] = [
     ("C", 1), ("D", -1), ("E", -1), ("F", 1),
@@ -18,7 +18,7 @@ _COMMON_ACCIDENTALS: list[tuple[str, int]] = [
 def _make_clef_pool(octave_range: list[int]) -> list[Note]:
     """按八度范围生成音符池。
 
-    每个八度包含 7 个自然音 + 7 个常用变化音（#C bD bE #F #G bA bB）。
+    每个八度包含 7 个自然音 + 7 个常用变化音（#C bD bE #F #G bA bB）= 14 音。
 
     Args:
         octave_range: 八度列表，如 [3, 4, 5]
@@ -32,26 +32,53 @@ def _make_clef_pool(octave_range: list[int]) -> list[Note]:
     return notes
 
 
+def _get_ottava(clef_cfg: dict, note: Note) -> int:
+    """判断音符是否需要八度线。
+
+    Args:
+        clef_cfg: 谱号配置（含 ottava_up_from / ottava_down_from）
+        note: 音符
+
+    Returns:
+        1 = 8va, -1 = 8vb, 0 = 正常
+    """
+    up = clef_cfg.get("ottava_up_from")
+    down = clef_cfg.get("ottava_down_from")
+    if up is not None and note.octave >= up:
+        return 1
+    if down is not None and note.octave <= down:
+        return -1
+    return 0
+
+
 _CLEF_CONFIGS: list[dict] = [
-    {   # 高音谱号：G3–G5（3 个八度，42 音）
+    {   # 高音谱号：谱表 3-5，8va 扩展到 6（共 56 音）
         "name": "高音谱号",
         "lily": "treble",
-        "notes": _make_clef_pool([3, 4, 5]),
+        "notes": _make_clef_pool([3, 4, 5, 6]),
+        "ottava_up_from": 6,
+        "ottava_down_from": None,
     },
-    {   # 低音谱号：C2–B3（2 个八度，28 音）
+    {   # 低音谱号：谱表 2-3，8vb 扩展到 1（共 42 音）
         "name": "低音谱号",
         "lily": "bass",
-        "notes": _make_clef_pool([2, 3]),
+        "notes": _make_clef_pool([1, 2, 3]),
+        "ottava_up_from": None,
+        "ottava_down_from": 1,
     },
-    {   # 中音谱号：C3–A4（2 个八度，28 音）
+    {   # 中音谱号：谱表 3-4，8va 扩展到 5（共 42 音）
         "name": "中音谱号",
         "lily": "alto",
-        "notes": _make_clef_pool([3, 4]),
+        "notes": _make_clef_pool([3, 4, 5]),
+        "ottava_up_from": 5,
+        "ottava_down_from": None,
     },
-    {   # 次中音谱号：B2–E4（3 个八度，42 音）
+    {   # 次中音谱号：谱表 2-4，8va 扩展到 5（共 56 音）
         "name": "次中音谱号",
         "lily": "tenor",
-        "notes": _make_clef_pool([2, 3, 4]),
+        "notes": _make_clef_pool([2, 3, 4, 5]),
+        "ottava_up_from": 5,
+        "ottava_down_from": None,
     },
 ]
 
@@ -177,10 +204,10 @@ def _build_blank_staff(
     chunk: list[tuple[dict, Note]],
     note_offset: int = 0,
 ) -> list[str]:
-    """生成空白五线谱 LilyPond 块（带谱号、编号、音名标注）。
+    """生成空白五线谱 LilyPond 块（带谱号、编号、音名标注、八度线）。
 
     用于反向题：谱号显示在谱上，编号在上方，音名在下方，
-    学生在对应位置写出音符。
+    学生在对应位置写出音符。超出谱表范围的音自动添加 8va/8vb。
 
     Args:
         chunk: [(clef_cfg, Note), ...] 每个位置的谱号和目标音符
@@ -199,14 +226,24 @@ def _build_blank_staff(
         "  \\omit Score.BarNumber",
     ]
     current_clef: str | None = None
+    current_ottava: int = 0
 
     for idx, (clef_cfg, note) in enumerate(chunk):
         note_num = note_offset + idx + 1
+        needed_ottava = _get_ottava(clef_cfg, note)
 
-        # 谱号切换
+        # 谱号切换前先取消八度线
         if clef_cfg["lily"] != current_clef:
+            if current_ottava != 0:
+                lines.append("  \\ottava #0")
+                current_ottava = 0
             lines.append(f"  \\clef {clef_cfg['lily']}")
             current_clef = clef_cfg["lily"]
+
+        # 设置八度线
+        if needed_ottava != current_ottava:
+            lines.append(f"  \\ottava #{needed_ottava}")
+            current_ottava = needed_ottava
 
         # 空白小节：编号在上，音名在下（用 Unicode 符号，非 LaTeX 命令）
         label = f"{note.to_pitch_name(latex=False)}，{note.to_pitch_label(latex=False)}"
@@ -218,6 +255,10 @@ def _build_blank_staff(
         if idx < len(chunk) - 1:
             lines.append("  \\noBreak")
 
+    # 结束前取消八度线
+    if current_ottava != 0:
+        lines.append("  \\ottava #0")
+
     lines.extend(["}", "```", ""])
     return lines
 
@@ -227,9 +268,10 @@ def _build_lily_block(
     note_offset: int = 0,
     show_labels: bool = False,
 ) -> list[str]:
-    """生成单个 LilyPond 块，多谱号内联切换，每音一小节。
+    """生成单个 LilyPond 块，多谱号内联切换，每音一小节，支持八度线。
 
     每行最多 _NOTES_PER_LINE 个音符，用 \\noBreak / \\break 控制换行。
+    超出谱表常规范围的音自动添加 8va/8vb 八度线。
 
     Args:
         flat_notes: [(clef_cfg, Note), ...] 展平的音符列表
@@ -250,14 +292,24 @@ def _build_lily_block(
         "  \\omit Score.BarNumber",
     ]
     current_clef: str | None = None
+    current_ottava: int = 0
 
     for idx, (clef_cfg, note) in enumerate(flat_notes):
         note_num = note_offset + idx + 1
+        needed_ottava = _get_ottava(clef_cfg, note)
 
-        # 谱号切换
+        # 谱号切换前先取消八度线
         if clef_cfg["lily"] != current_clef:
+            if current_ottava != 0:
+                lines.append("  \\ottava #0")
+                current_ottava = 0
             lines.append(f"  \\clef {clef_cfg['lily']}")
             current_clef = clef_cfg["lily"]
+
+        # 设置八度线
+        if needed_ottava != current_ottava:
+            lines.append(f"  \\ottava #{needed_ottava}")
+            current_ottava = needed_ottava
 
         # 音符（全音符 = 一小节）+ 编号在上
         note_line = (
@@ -278,6 +330,10 @@ def _build_lily_block(
                 lines.append("  \\break")
             else:
                 lines.append("  \\noBreak")
+
+    # 结束前取消八度线
+    if current_ottava != 0:
+        lines.append("  \\ottava #0")
 
     lines.extend(["}", "```", ""])
     return lines
