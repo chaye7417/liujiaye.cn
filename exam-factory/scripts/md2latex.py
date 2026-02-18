@@ -507,6 +507,7 @@ def generate_question_latex(q: dict) -> list[str]:
         lines.append(r'  \include "font-settings.ily"')
         lines.append(f'  {code}')
         lines.append(r'  \end{lilypond}')
+        lines.append(r'  \vspace{2em}')
 
     # 选择题选项
     if q['type'] == 'choice' and len(q['options']) == 4:
