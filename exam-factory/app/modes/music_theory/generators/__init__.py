@@ -56,19 +56,14 @@ def generate_computable_sections(
     Returns:
         (已生成的 Markdown 文本, 仍需 AI 生成的题型 key 列表)
     """
-    params = generation_params or {}
     computed_sections: list[str] = []
     needs_ai: list[str] = []
-    section_idx = 0
 
     for key in selected_types:
-        section_idx += 1
-        section_num = CHINESE_NUMS[section_idx - 1] if section_idx <= 10 else str(section_idx)
-
         if key in COMPUTABLE_GENERATORS:
             generator = COMPUTABLE_GENERATORS[key]
             md = generator(
-                section_num=section_num,
+                section_num="",
                 difficulty=difficulty,
             )
             computed_sections.append(md)

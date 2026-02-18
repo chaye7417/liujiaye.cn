@@ -48,7 +48,7 @@ def generate_terms(section_num: str, n: int = 5, **kwargs) -> str:
         answer_items.append(f"({i}) {meaning}")
 
     md_parts = [
-        f"# {section_num}、术语与记号\n",
+        f"# 术语与记号\n",
         "## [5分]",
         "写出下列音乐记号或术语的中文含义：",
         "　".join(question_items),
@@ -108,7 +108,7 @@ def generate_note_names(section_num: str, n: int = 5, **kwargs) -> str:
     ]
 
     md_parts = [
-        f"# {section_num}、音名标记\n",
+        f"# 音名标记\n",
         "## [5分]",
         "写出下列各音的音名：",
         *lily_parts,

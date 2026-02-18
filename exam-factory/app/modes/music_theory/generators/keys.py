@@ -76,7 +76,7 @@ def generate_interval_keys(
                 continue
 
     score_each = 10 // n if n > 0 else 2
-    md_parts = [f"# {section_num}、音程调性判断\n"]
+    md_parts = [f"# 音程调性判断\n"]
 
     for i, (note1, note2, interval, keys) in enumerate(questions):
         # LilyPond 谱例
@@ -156,7 +156,7 @@ def generate_chord_keys(
                 continue
 
     score_each = 10 // n if n > 0 else 2
-    md_parts = [f"# {section_num}、和弦调性判断\n"]
+    md_parts = [f"# 和弦调性判断\n"]
 
     for i, (chord_notes, chord_type, keys) in enumerate(questions):
         # LilyPond 谱例（和弦用尖括号）

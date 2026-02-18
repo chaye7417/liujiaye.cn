@@ -151,7 +151,7 @@ def generate_intervals(
     ]
 
     md_parts = [
-        f"# {section_num}、音程构成\n",
+        f"# 音程构成\n",
         "## [10分]",
         "以下列音为根音构成指定音程：",
         *lily_lines,
@@ -240,7 +240,7 @@ def generate_chords(
 
     rows = (n + 1) // 2
     md_parts = [
-        f"# {section_num}、和弦构成\n",
+        f"# 和弦构成\n",
         "## [10分]",
         "以下列音为指定音构成和弦：",
         *lily_lines,
@@ -309,7 +309,7 @@ def generate_scales(
                 continue
 
     # 每个音阶一道题
-    md_parts = [f"# {section_num}、音阶写作\n"]
+    md_parts = [f"# 音阶写作\n"]
     score_each = 10 // n if n > 0 else 2
 
     for i, (tonic, scale_type, scale_notes) in enumerate(questions):

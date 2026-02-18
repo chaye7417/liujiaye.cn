@@ -45,7 +45,7 @@ title: 试卷标题
 > 答案: 答案内容
 ```
 
-每题用 `## [n分]` 开头，同类题放在同一个 `# 大题标题` 下。
+每题用 `## [n分]` 开头，同类题放在同一个 `# 大题标题` 下。大题标题不要加序号（如「一、」），系统会自动编号。
 
 ## LilyPond 语法指南
 
@@ -421,24 +421,21 @@ def build_user_content(
 
     # ---- 混合模式 / 纯 AI ----
     # 构建仅包含 AI 题型的 prompt（不注入预计算内容，避免 AI 篡改）
-    from .generators import CHINESE_NUMS as _CN
+    from .generators import SECTION_TITLES as _TITLES
     section_parts: list[str] = []
     total_score = 0.0
-    section_num = 0
 
     for key in selected:
-        section_num += 1
-
         if key in COMPUTABLE_GENERATORS:
             total_score += QUESTION_TYPE_SCORES.get(key, 0)
             continue
 
-        cn_num = _CN[section_num - 1] if section_num <= 10 else str(section_num)
         prompt_text = QUESTION_TYPE_PROMPTS.get(key)
         if not prompt_text:
             continue
+        ai_title = _TITLES.get(key, key)
         section_parts.append(
-            f"\n**第{cn_num}部分（大题编号用「{cn_num}」）：**\n{prompt_text}"
+            f"\n**{ai_title}：**\n{prompt_text}"
         )
 
         if key == "choice":
@@ -473,7 +470,7 @@ def build_user_content(
     ai_prompt_parts.append(
         "\n## 重要提醒\n"
         "- 只生成上面列出的题型，其他题型已由程序生成，不需要你管\n"
-        "- 大题编号必须使用上面指定的编号（如「三」「五」），不要从「一」开始\n"
+        "- 大题标题用 `# 题型名称` 格式，不要加序号（如「一、」「二、」），系统会自动编号\n"
         "- 涉及谱例的题目必须使用 ```lilypond``` 代码块\n"
         "- LilyPond 代码必须语法正确\n"
         "- 不要在 LilyPond 代码中写 \\include 或 \\version\n"
