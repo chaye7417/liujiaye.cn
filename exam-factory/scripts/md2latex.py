@@ -562,6 +562,7 @@ def generate_question_latex(q: dict) -> list[str]:
     # 使用 \ifshowanswer...\fi 而非 \ifthenelse，
     # 因为 lilypond-book 替换会引入额外花括号，干扰 \ifthenelse 参数扫描
     if q.get('answer_lilypond_blocks'):
+        lines.append(r'  \par')
         lines.append(r'  \ifshowanswer')
         if pts >= 0:
             lines.append(r'    \textbf{\textcolor{themecolor}{【答案】}}')

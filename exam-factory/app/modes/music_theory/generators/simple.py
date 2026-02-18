@@ -381,6 +381,10 @@ def _build_reverse_notes(
                 f"{current_cfg['name']}：{'　'.join(current_items)}"
             )
 
+        # 每行谱号末尾加 LaTeX 强制换行，防止多谱号文字挤在一段
+        for idx in range(len(question_lines) - 1):
+            question_lines[idx] += r"\\"
+
         # 空白五线谱（有小节线+编号，无谱号）
         blank_lily = _build_blank_staff(len(chunk), note_offset=offset)
 
