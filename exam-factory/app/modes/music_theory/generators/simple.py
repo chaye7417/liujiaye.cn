@@ -374,7 +374,7 @@ def _build_reverse_notes(
                 current_clef = clef_cfg["lily"]
                 current_cfg = clef_cfg
                 current_items = []
-            current_items.append(f"({note_num}) {note.to_pitch_label()}")
+            current_items.append(f"({note_num}) {note.to_pitch_name()}，{note.to_pitch_label()}")
 
         if current_items and current_cfg:
             question_lines.append(
