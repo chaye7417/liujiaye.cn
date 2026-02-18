@@ -119,23 +119,22 @@ def _pick_notes(
     n: int,
     used: set[tuple[str, int, int]],
     clef_configs: list[dict] | None = None,
-    max_clefs: int | None = None,
 ) -> list[tuple[dict, list[Note]]]:
     """为多种谱号随机选音。
+
+    所有可用谱号都会出现（题数不够时按题数上限）。
 
     Args:
         n: 总题数
         used: 已使用音符集合（会被修改）
         clef_configs: 可用的谱号配置列表（None 用全部）
-        max_clefs: 最多使用几种谱号（None 则自动等于可用谱号数）
 
     Returns:
         [(clef_cfg, [Note, ...]), ...]
     """
     configs = clef_configs or _CLEF_CONFIGS
-    if max_clefs is None:
-        max_clefs = len(configs)
-    num_clefs = random.randint(1, min(max_clefs, len(configs)))
+    # 所有可用谱号都要出现，题数不够时才减少
+    num_clefs = min(len(configs), n)
     chosen_clefs = random.sample(configs, num_clefs)
 
     base = n // num_clefs
