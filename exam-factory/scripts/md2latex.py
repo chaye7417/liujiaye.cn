@@ -331,6 +331,8 @@ def escape_latex(text) -> str:
         md_placeholders.append(match.group(0))
         return f'\x01MD{idx}\x01'
 
+    # 保护已有的 LaTeX 命令（\textsuperscript{N}, \textsubscript{N}, \sharp, \flat 等）
+    text = re.sub(r'\\text(?:superscript|subscript)\{[^}]*\}', protect_md, text)
     # 保护加粗
     text = re.sub(r'\*\*(.+?)\*\*', protect_md, text)
     # 保护斜体
