@@ -2,7 +2,7 @@
 
 import random
 
-from ..knowledge.data import MUSIC_TERMS, LETTERS, CHINESE_NUMS
+from ..knowledge.data import MUSIC_TERMS, LETTERS, CHINESE_NUMS, LETTER_SEMITONES
 from ..knowledge.theory import Note
 
 
@@ -210,15 +210,17 @@ def _flatten_clef_groups(
 def _build_blank_staff(
     chunk: list[tuple[dict, Note]],
     note_offset: int = 0,
+    labels: list[str] | None = None,
 ) -> list[str]:
-    """生成空白五线谱 LilyPond 块（带谱号、编号、音名标注、八度线）。
+    """生成空白五线谱 LilyPond 块（带谱号、编号、标注）。
 
-    用于反向题：谱号显示在谱上，编号在上方，音名在下方，
-    学生在对应位置写出音符。超出谱表范围的音自动添加 8va/8vb。
+    用于反向题：谱号显示在谱上，编号在上方，标注在下方，
+    学生在对应位置写出音符。
 
     Args:
         chunk: [(clef_cfg, Note), ...] 每个位置的谱号和目标音符
         note_offset: 编号起始偏移
+        labels: 自定义下方标注列表（None 则用默认音名标注）
 
     Returns:
         LilyPond 代码行列表（含 ```lilypond 围栏）
@@ -242,8 +244,12 @@ def _build_blank_staff(
             lines.append(f"  \\clef {clef_cfg['lily']}")
             current_clef = clef_cfg["lily"]
 
-        # 空白小节：编号在上，音名在下（用 Unicode 符号，非 LaTeX 命令）
-        label = f"{note.to_pitch_name(latex=False)}，{note.to_pitch_label(latex=False)}"
+        # 下方标注
+        if labels is not None:
+            label = labels[idx]
+        else:
+            label = f"{note.to_pitch_name(latex=False)}，{note.to_pitch_label(latex=False)}"
+
         lines.append(
             f'  s1^\\markup {{ \\small "({note_num})" }}'
             f'_\\markup {{ \\small "{label}" }}'
@@ -464,41 +470,252 @@ def _build_reverse_notes(
 
 
 # ---------------------------------------------------------------------------
+# 等音 — 辅助函数
+# ---------------------------------------------------------------------------
+_ACC_UNICODE: dict[int, str] = {
+    -2: "♭♭", -1: "♭", 0: "", 1: "♯", 2: "×",
+}
+
+
+def _find_enharmonics(letter: str, acc: int) -> list[tuple[str, int]]:
+    """找出一个音名的所有等音（不含自身）。
+
+    限制变化记号在 [-2, 2] 范围内。
+    G♯/A♭ 只有 1 个等音，其余都有 2 个。
+
+    Args:
+        letter: 音名字母
+        acc: 升降号值
+
+    Returns:
+        等音列表 [(letter, accidental), ...]
+    """
+    pc = (LETTER_SEMITONES[letter] + acc) % 12
+    results: list[tuple[str, int]] = []
+    for l in LETTERS:
+        for a in range(-2, 3):
+            if l == letter and a == acc:
+                continue
+            if (LETTER_SEMITONES[l] + a) % 12 == pc:
+                results.append((l, a))
+    return results
+
+
+def _enharmonic_note(source: Note, enh_letter: str, enh_acc: int) -> Note:
+    """计算等音的正确八度。
+
+    等音的绝对半音值必须与原音相同，据此推算八度。
+    例如 C4 的等音 B♯ 位于 octave 3（B♯3 = C4）。
+    """
+    target_abs = source.abs_semitone()
+    octave = (target_abs - enh_acc - LETTER_SEMITONES[enh_letter]) // 12
+    return Note(enh_letter, enh_acc, octave)
+
+
+# ---------------------------------------------------------------------------
+# 等音 — 正向（看谱写等音名称）
+# ---------------------------------------------------------------------------
+def _build_forward_enharmonics(
+    n: int,
+    used: set[tuple[str, str, int, int]],
+    clef_configs: list[dict] | None = None,
+) -> str:
+    """正向等音题：给出音符（五线谱）→ 写出所有等音名称。
+
+    Args:
+        n: 题目数量（原始音个数）
+        used: 已使用音符集合
+        clef_configs: 可用谱号
+    """
+    configs = clef_configs or _CLEF_CONFIGS
+    clef_groups = _pick_notes(n, used, clef_configs=configs)
+    flat = _flatten_clef_groups(clef_groups)
+    random.shuffle(flat)
+
+    chunks = [
+        flat[i:i + _NOTES_PER_LINE]
+        for i in range(0, len(flat), _NOTES_PER_LINE)
+    ]
+
+    sections: list[str] = []
+    for chunk_idx, chunk in enumerate(chunks):
+        offset = chunk_idx * _NOTES_PER_LINE
+
+        # 试题谱：音符 + 编号
+        lily_question = _build_lily_block(chunk, note_offset=offset)
+
+        # 文字答案
+        answer_parts: list[str] = []
+        for idx, (_, note) in enumerate(chunk):
+            note_num = offset + idx + 1
+            enhs = _find_enharmonics(note.letter, note.accidental)
+            enh_names = [
+                Note(l, a).to_chinese(latex=True) for l, a in enhs
+            ]
+            answer_parts.append(f"({note_num}) {'、'.join(enh_names)}")
+
+        if chunk_idx == 0:
+            parts = [
+                "## [5分]",
+                "写出下列各音的所有等音：",
+                "> 仅试题:",
+                *lily_question,
+                "> 行数: 2",
+                "> 答案: " + "  ".join(answer_parts),
+            ]
+        else:
+            parts = [
+                "## [续]",
+                "> 仅试题:",
+                *lily_question,
+                "> 行数: 2",
+                "> 答案: " + "  ".join(answer_parts),
+            ]
+
+        sections.append("\n".join(parts))
+
+    return "\n\n".join(sections)
+
+
+# ---------------------------------------------------------------------------
+# 等音 — 反向（看音名在谱上写等音）
+# ---------------------------------------------------------------------------
+def _build_reverse_enharmonics(
+    n: int,
+    used: set[tuple[str, str, int, int]],
+    clef_configs: list[dict] | None = None,
+) -> str:
+    """反向等音题：给出音名 → 在五线谱上写出所有等音。
+
+    每个原始音展开为 1-2 个等音，各占一个小节。
+    空白谱下方标注原始音名，答案谱显示正确等音。
+
+    Args:
+        n: 题目数量（原始音个数）
+        used: 已使用音符集合
+        clef_configs: 可用谱号
+    """
+    configs = clef_configs or _CLEF_CONFIGS
+    clef_groups = _pick_notes(n, used, clef_configs=configs)
+    flat = _flatten_clef_groups(clef_groups)
+    random.shuffle(flat)
+
+    # 展开：每个原始音 → 其所有等音
+    expanded_notes: list[tuple[dict, Note]] = []
+    expanded_labels: list[str] = []
+    for clef_cfg, original in flat:
+        enhs = _find_enharmonics(original.letter, original.accidental)
+        original_name = (
+            f"{_ACC_UNICODE[original.accidental]}{original.letter}"
+        )
+        for enh_letter, enh_acc in enhs:
+            enh_note = _enharmonic_note(original, enh_letter, enh_acc)
+            expanded_notes.append((clef_cfg, enh_note))
+            expanded_labels.append(f"{original_name}的等音")
+
+    # 按 _NOTES_PER_LINE 分组
+    chunks_n = [
+        expanded_notes[i:i + _NOTES_PER_LINE]
+        for i in range(0, len(expanded_notes), _NOTES_PER_LINE)
+    ]
+    chunks_l = [
+        expanded_labels[i:i + _NOTES_PER_LINE]
+        for i in range(0, len(expanded_labels), _NOTES_PER_LINE)
+    ]
+
+    sections: list[str] = []
+    offset = 0
+    for chunk_idx in range(len(chunks_n)):
+        chunk = chunks_n[chunk_idx]
+        lbls = chunks_l[chunk_idx]
+
+        blank_lily = _build_blank_staff(
+            chunk, note_offset=offset, labels=lbls,
+        )
+        answer_lily = _build_lily_block(
+            chunk, note_offset=offset, show_labels=True,
+        )
+
+        if chunk_idx == 0:
+            parts = [
+                "## [5分]",
+                "在五线谱上写出下列各音的所有等音：",
+                "> 仅试题:",
+                *blank_lily,
+                "> 答案:",
+                *answer_lily,
+            ]
+        else:
+            parts = [
+                "## [续]",
+                "> 仅试题:",
+                *blank_lily,
+                "> 答案:",
+                *answer_lily,
+            ]
+
+        sections.append("\n".join(parts))
+        offset += len(chunk)
+
+    return "\n\n".join(sections)
+
+
+# ---------------------------------------------------------------------------
 # 音名标记 — 主入口
 # ---------------------------------------------------------------------------
 def generate_note_names(section_num: str, n: int = 0, **kwargs) -> str:
-    """生成音名标记题（正向 + 反向）。
-
-    正向：给五线谱音符，写出音名（含中文音组说明）。
-    反向：给音名，在五线谱上写出音符。
+    """生成音名标记题（正向 + 反向 + 等音正向 + 等音反向）。
 
     通过 generation_params 读取用户配置：
         - note_names_forward_n: 正向题数（默认 5）
         - note_names_reverse_n: 反向题数（默认 5）
+        - note_names_enharmonic_forward_n: 等音正向题数（默认 5）
+        - note_names_enharmonic_reverse_n: 等音反向题数（默认 5）
         - note_names_clefs: 可用谱号列表（默认全部）
 
     Args:
         section_num: 大题编号
-        n: 总题数（已弃用，由 forward_n + reverse_n 决定）
+        n: 总题数（已弃用）
     """
     gen_params = kwargs.get("generation_params", {})
     n_forward = gen_params.get("note_names_forward_n", 5)
     n_reverse = gen_params.get("note_names_reverse_n", 5)
+    n_enh_fwd = gen_params.get("note_names_enharmonic_forward_n", 5)
+    n_enh_rev = gen_params.get("note_names_enharmonic_reverse_n", 5)
     clef_keys = gen_params.get("note_names_clefs", None)
 
-    # 筛选可用谱号
     clef_configs = _filter_clefs(clef_keys)
 
     sections: list[str] = ["# 音名标记\n"]
+    has_prev = False
 
     if n_forward > 0:
         used_fwd: set[tuple[str, str, int, int]] = set()
         sections.append(_build_forward_notes(n_forward, used_fwd, clef_configs))
+        has_prev = True
 
     if n_reverse > 0:
-        if n_forward > 0:
+        if has_prev:
             sections.append("")
         used_rev: set[tuple[str, str, int, int]] = set()
         sections.append(_build_reverse_notes(n_reverse, used_rev, clef_configs))
+        has_prev = True
+
+    if n_enh_fwd > 0:
+        if has_prev:
+            sections.append("")
+        used_enh_fwd: set[tuple[str, str, int, int]] = set()
+        sections.append(
+            _build_forward_enharmonics(n_enh_fwd, used_enh_fwd, clef_configs)
+        )
+        has_prev = True
+
+    if n_enh_rev > 0:
+        if has_prev:
+            sections.append("")
+        used_enh_rev: set[tuple[str, str, int, int]] = set()
+        sections.append(
+            _build_reverse_enharmonics(n_enh_rev, used_enh_rev, clef_configs)
+        )
 
     return "\n".join(sections)
