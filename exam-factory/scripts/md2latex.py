@@ -559,7 +559,8 @@ def generate_question_latex(q: dict) -> list[str]:
     # 答案 LilyPond 谱例（仅答案卷显示）
     if q.get('answer_lilypond_blocks'):
         lines.append(r'  \ifthenelse{\boolean{showanswer}}{%')
-        lines.append(r'    \textbf{\textcolor{themecolor}{【答案】}}')
+        if pts >= 0:
+            lines.append(r'    \textbf{\textcolor{themecolor}{【答案】}}')
         for block in q['answer_lilypond_blocks']:
             staffsize = block.get('staffsize', 20)
             code, extracted_ss = fix_lilypond_code(block['code'])
