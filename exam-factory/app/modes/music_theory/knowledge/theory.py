@@ -91,34 +91,32 @@ class Note:
         return f"{acc[self.accidental]}{letter}{scale_desc}"
 
     def to_pitch_name(self) -> str:
-        """转中国音组标记（LaTeX 格式）。
+        r"""转中国音组标记（LaTeX 格式）。
 
-        中央 C (octave=4) = 小字一组 c¹ → ``c$^1$``
+        中央 C (octave=4) = 小字一组 c¹ → ``c\textsuperscript{1}``
 
         体系：
-            octave 0 → 大字二组  C₂  (C$_2$)
-            octave 1 → 大字一组  C₁  (C$_1$)
+            octave 0 → 大字二组  C₂
+            octave 1 → 大字一组  C₁
             octave 2 → 大字组    C
             octave 3 → 小字组    c
-            octave 4 → 小字一组  c¹  (c$^1$)
-            octave 5 → 小字二组  c²  (c$^2$)
-            octave 6 → 小字三组  c³  (c$^3$)
+            octave 4 → 小字一组  c¹
+            octave 5 → 小字二组  c²
+            octave 6 → 小字三组  c³
         """
         acc = _ACC_TO_LATEX[self.accidental]
         if self.octave >= 3:
-            # 小字组及以上：小写字母
             letter = self.letter.lower()
-            group = self.octave - 3  # 0=小字组, 1=小字一组, ...
+            group = self.octave - 3
             if group == 0:
                 return f"{acc}{letter}"
-            return f"{acc}{letter}$^{group}$"
+            return f"{acc}{letter}\\textsuperscript{{{group}}}"
         else:
-            # 大字组及以下：大写字母
             letter = self.letter
-            group = 2 - self.octave  # 0=大字组, 1=大字一组, ...
+            group = 2 - self.octave
             if group == 0:
                 return f"{acc}{letter}"
-            return f"{acc}{letter}$_{group}$"
+            return f"{acc}{letter}\\textsubscript{{{group}}}"
 
     def matches(self, other: Note) -> bool:
         """忽略八度比较音名和升降号。"""
