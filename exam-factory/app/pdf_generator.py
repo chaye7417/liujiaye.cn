@@ -86,7 +86,7 @@ def _generate_font_settings_ily(music_font: str = DEFAULT_MUSIC_FONT) -> str:
         "\\paper {",
         "  indent = 0",
         "  ragged-right = ##f",
-        "  line-width = 16.2\\cm",
+        "  line-width = 15.8\\cm",
         "  system-system-spacing = #'((basic-distance . 24) (padding . 6))",
         "  #(define fonts",
         "    (set-global-fonts",
