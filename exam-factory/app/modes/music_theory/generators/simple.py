@@ -445,15 +445,16 @@ def generate_note_names(section_num: str, n: int = 0, **kwargs) -> str:
     # 筛选可用谱号
     clef_configs = _filter_clefs(clef_keys)
 
-    used: set[tuple[str, str, int, int]] = set()
     sections: list[str] = ["# 音名标记\n"]
 
     if n_forward > 0:
-        sections.append(_build_forward_notes(n_forward, used, clef_configs))
+        used_fwd: set[tuple[str, str, int, int]] = set()
+        sections.append(_build_forward_notes(n_forward, used_fwd, clef_configs))
 
     if n_reverse > 0:
         if n_forward > 0:
             sections.append("")
-        sections.append(_build_reverse_notes(n_reverse, used, clef_configs))
+        used_rev: set[tuple[str, str, int, int]] = set()
+        sections.append(_build_reverse_notes(n_reverse, used_rev, clef_configs))
 
     return "\n".join(sections)
