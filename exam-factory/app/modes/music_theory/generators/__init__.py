@@ -7,6 +7,7 @@ from .simple import generate_terms, generate_note_names
 from .pitch import generate_intervals, generate_chords, generate_scales
 from .keys import generate_interval_keys, generate_chord_keys
 from .rhythm import generate_rhythm
+from .jianpu_gen import generate_jianpu
 
 # ---------------------------------------------------------------------------
 # 可程序化生成的题型 → 生成函数
@@ -20,10 +21,11 @@ COMPUTABLE_GENERATORS: dict[str, Callable[..., str]] = {
     "interval_keys": generate_interval_keys,
     "chord_keys": generate_chord_keys,
     "rhythm": generate_rhythm,
+    "jianpu": generate_jianpu,
 }
 
 # 需要 AI 生成的题型
-AI_TYPES = {"choice", "melody", "jianpu"}
+AI_TYPES = {"choice", "melody"}
 
 # 大题标题映射
 SECTION_TITLES: dict[str, str] = {

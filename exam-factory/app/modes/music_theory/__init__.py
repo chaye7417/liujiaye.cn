@@ -447,15 +447,6 @@ def build_user_content(
                 f"- 本卷要求：单选{single_n}题 + 多选{multi_n}题，"
                 f"共{choice_score:.1f}分"
             )
-        elif key == "jianpu":
-            jp_n = int(generation_params.get("jianpu_n", 5))
-            jp_bars = int(generation_params.get("jianpu_bars", 4))
-            jp_score = jp_n * 2
-            total_score += jp_score
-            section_parts.append(
-                f"- 本卷要求：共{jp_n}道互译题，每题{jp_bars}小节，"
-                f"每题2分，共{jp_score}分"
-            )
         else:
             total_score += QUESTION_TYPE_SCORES.get(key, 0)
 
@@ -486,10 +477,6 @@ def build_user_content(
         "- 答案必须准确\n"
         "- 旋律调性分析题必须用LilyPond谱例给出旋律\n"
         "- 节奏组合题必须用LilyPond谱例，禁止使用Unicode音符符号\n"
-        "- 简谱互译题的简谱必须用 ```jianpu 代码块（jianpu-ly 格式），不要用 ```lilypond\n"
-        "- jianpu 代码块中不要写 title/subtitle/composer 等头信息\n"
-        "- jianpu 代码的拍号只用 4/4 或 3/4，每小节拍数必须精确匹配拍号\n"
-        "- jianpu 代码中 1=1拍 q1=0.5拍 1.=1.5拍 (1 -)=2拍 0=1拍，写完必须逐小节验算\n"
     )
 
     ai_prompt = "\n".join(ai_prompt_parts)
