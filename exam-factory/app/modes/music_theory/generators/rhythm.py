@@ -283,19 +283,17 @@ def _generate_writing_item(ts_key: str, n_bars: int) -> tuple[str, str]:
 
     q_notes = " ".join(_evt_to_lily(t) for t in question_ticks)
     q_lily = (
-        f"\\new RhythmicStaff {{ "
+        f"\\new RhythmicStaff {{ \\omit Score.BarNumber "
         f"\\omit Staff.TimeSignature \\omit Staff.BarLine "
         f"\\time {ts_key} {q_notes} }}"
     )
 
     answer_bars = _regroup(question_ticks, ts_key)
-    a_parts = [f"\\new RhythmicStaff {{ \\time {ts_key}"]
-    for idx, bar in enumerate(answer_bars):
-        a_parts.append(_ticks_to_lily(bar))
-        if idx < len(answer_bars) - 1:
-            a_parts.append("|")
-    a_parts.append("}")
-    a_lily = " ".join(a_parts)
+    bar_strs = [_ticks_to_lily(bar) for bar in answer_bars]
+    a_lily = (
+        f"\\new RhythmicStaff {{ \\omit Score.BarNumber "
+        f"\\time {ts_key} {_join_bars(bar_strs)} }}"
+    )
 
     return q_lily, a_lily
 
@@ -345,27 +343,22 @@ def _generate_correction_item(ts_key: str, n_bars: int) -> tuple[str, str]:
         error_bars.append(new_bar)
 
     # 题目：带拍号和小节线，但有错误分组
-    q_parts = [f"\\new RhythmicStaff {{ \\time {ts_key}"]
-    for idx, bar in enumerate(error_bars):
-        notes = " ".join(_evt_to_lily(t) for t in bar)
-        q_parts.append(notes)
-        if idx < len(error_bars) - 1:
-            q_parts.append("|")
-    q_parts.append("}")
-    q_lily = " ".join(q_parts)
+    q_bar_strs = [" ".join(_evt_to_lily(t) for t in bar) for bar in error_bars]
+    q_lily = (
+        f"\\new RhythmicStaff {{ \\omit Score.BarNumber "
+        f"\\time {ts_key} {_join_bars(q_bar_strs)} }}"
+    )
 
     # 答案：从题目的 flat 序列推导正确分组
     flat_from_error: list[_Evt] = []
     for bar in error_bars:
         flat_from_error.extend(bar)
     answer_bars = _regroup(flat_from_error, ts_key)
-    a_parts = [f"\\new RhythmicStaff {{ \\time {ts_key}"]
-    for idx, bar in enumerate(answer_bars):
-        a_parts.append(_ticks_to_lily(bar))
-        if idx < len(answer_bars) - 1:
-            a_parts.append("|")
-    a_parts.append("}")
-    a_lily = " ".join(a_parts)
+    a_bar_strs = [_ticks_to_lily(bar) for bar in answer_bars]
+    a_lily = (
+        f"\\new RhythmicStaff {{ \\omit Score.BarNumber "
+        f"\\time {ts_key} {_join_bars(a_bar_strs)} }}"
+    )
 
     return q_lily, a_lily
 
@@ -399,6 +392,26 @@ def _pick_time_signatures(n: int, difficulty: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# LilyPond 输出辅助
+# ---------------------------------------------------------------------------
+_BARS_PER_LINE = 4
+
+_RHYTHM_HEAD = "\\new RhythmicStaff {{ \\omit Score.BarNumber \\time {ts}"
+
+
+def _join_bars(bar_strs: list[str], bars_per_line: int = _BARS_PER_LINE) -> str:
+    """用 | 连接小节，每 bars_per_line 小节插入 \\break。"""
+    parts: list[str] = []
+    for idx, bar_str in enumerate(bar_strs):
+        parts.append(bar_str)
+        if idx < len(bar_strs) - 1:
+            parts.append("|")
+            if (idx + 1) % bars_per_line == 0:
+                parts.append("\\break")
+    return " ".join(parts)
+
+
+# ---------------------------------------------------------------------------
 # Markdown 输出
 # ---------------------------------------------------------------------------
 def _wrap_lily(code: str) -> str:
@@ -417,7 +430,7 @@ def generate_rhythm(
     通过 generation_params 读取参数：
         - rhythm_writing_n: 写作题数量（默认 3）
         - rhythm_correction_n: 改错题数量（默认 2）
-        - rhythm_bars: 每题小节数（默认 2）
+        - rhythm_bars: 每题小节数（默认 8）
 
     Args:
         section_num: 大题编号
@@ -427,7 +440,7 @@ def generate_rhythm(
     params = generation_params or {}
     n_writing = params.get("rhythm_writing_n", 3)
     n_correction = params.get("rhythm_correction_n", 2)
-    n_bars = params.get("rhythm_bars", 2)
+    n_bars = params.get("rhythm_bars", 8)
 
     total = n_writing + n_correction
     ts_list = _pick_time_signatures(total, difficulty)
@@ -448,7 +461,7 @@ def generate_rhythm(
                 sections.extend(["## [续]", f"拍号：{ts_key}"])
             sections.extend([
                 "> 仅试题:", _wrap_lily(q_lily),
-                "> 单线谱: 1",
+                "> 单线谱: 2",
                 "> 答案:", _wrap_lily(a_lily), "",
             ])
 
@@ -465,7 +478,7 @@ def generate_rhythm(
                 sections.append("## [续]")
             sections.extend([
                 "> 仅试题:", _wrap_lily(q_lily),
-                "> 单线谱: 1",
+                "> 单线谱: 2",
                 "> 答案:", _wrap_lily(a_lily), "",
             ])
 
