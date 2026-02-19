@@ -428,6 +428,8 @@ async def _preprocess_jianpu(markdown: str, work_dir: Path) -> str:
             '% \\header { tagline="" }',
             '\\header { tagline="" }',
         )
+        # 注入字体设置，使 jianpu 谱例与全局音乐字体一致
+        ly_content = '\\include "font-settings.ily"\n' + ly_content
         ly_file = work_dir / f"{name}.ly"
         ly_file.write_text(ly_content, encoding="utf-8")
 
