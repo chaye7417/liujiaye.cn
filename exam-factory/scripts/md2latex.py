@@ -193,6 +193,8 @@ def parse_single_question(content: str, points: float) -> dict:
         'lilypond_blocks': [],
         'question_only_lilypond_blocks': [],
         'answer_lilypond_blocks': [],
+        'lilypondfile_refs': [],
+        'answer_lilypondfile_refs': [],
     }
 
     lines = content.split('\n')
@@ -301,6 +303,16 @@ def parse_single_question(content: str, points: float) -> dict:
                 continue  # 跳过空的引用行
             else:
                 in_essay_box = False  # 退出要求框
+
+        # 检测 [LILYPONDFILE:xxx.ly] 标记（jianpu 预处理生成）
+        lyfile_match = re.match(r'^\[LILYPONDFILE:(.+\.ly)\]$', line_stripped)
+        if lyfile_match:
+            ref = lyfile_match.group(1)
+            if after_answer:
+                question['answer_lilypondfile_refs'].append(ref)
+            else:
+                question['lilypondfile_refs'].append(ref)
+            continue
 
         # 普通内容作为题干
         if line_stripped and not line_stripped.startswith('>'):
@@ -533,6 +545,10 @@ def generate_question_latex(q: dict) -> list[str]:
         lines.append(f'  {code}')
         lines.append(r'  \end{lilypond}')
 
+    # jianpu lilypondfile 引用（在题干之后、选项之前输出）
+    for ref in q.get('lilypondfile_refs', []):
+        lines.append(r'  \lilypondfile[staffsize=20]{%s}' % ref)
+
     # 仅试题谱例（答案模式隐藏）
     # 使用 \ifshowanswer...\fi 而非 \ifthenelse，
     # 因为 lilypond-book 替换会引入额外花括号，干扰 \ifthenelse 参数扫描
@@ -571,12 +587,13 @@ def generate_question_latex(q: dict) -> list[str]:
     # 答案 LilyPond 谱例（仅答案卷显示）
     # 使用 \ifshowanswer...\fi 而非 \ifthenelse，
     # 因为 lilypond-book 替换会引入额外花括号，干扰 \ifthenelse 参数扫描
-    if q.get('answer_lilypond_blocks'):
+    has_answer_ly = q.get('answer_lilypond_blocks') or q.get('answer_lilypondfile_refs')
+    if has_answer_ly:
         lines.append(r'  \par')
         lines.append(r'  \ifshowanswer')
         if pts >= 0:
             lines.append(r'    \textbf{\textcolor{themecolor}{【答案】}}')
-        for block in q['answer_lilypond_blocks']:
+        for block in q.get('answer_lilypond_blocks', []):
             staffsize = block.get('staffsize', 20)
             code, extracted_ss = fix_lilypond_code(block['code'])
             if extracted_ss is not None:
@@ -585,6 +602,8 @@ def generate_question_latex(q: dict) -> list[str]:
             lines.append(r'    \include "font-settings.ily"')
             lines.append(f'    {code}')
             lines.append(r'    \end{lilypond}')
+        for ref in q.get('answer_lilypondfile_refs', []):
+            lines.append(r'    \lilypondfile[staffsize=20]{%s}' % ref)
         lines.append(r'  \fi')
 
     # 答案（文本）

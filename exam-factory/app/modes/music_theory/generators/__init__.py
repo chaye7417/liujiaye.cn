@@ -23,7 +23,7 @@ COMPUTABLE_GENERATORS: dict[str, Callable[..., str]] = {
 }
 
 # 需要 AI 生成的题型
-AI_TYPES = {"choice", "melody"}
+AI_TYPES = {"choice", "melody", "jianpu"}
 
 # 大题标题映射
 SECTION_TITLES: dict[str, str] = {
@@ -36,6 +36,7 @@ SECTION_TITLES: dict[str, str] = {
     "chord_keys": "和弦调性判断",
     "choice": "选择题",
     "melody": "旋律调性分析",
+    "jianpu": "简谱五线谱互译",
     "rhythm": "音值组合",
 }
 

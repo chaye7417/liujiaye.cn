@@ -477,6 +477,8 @@ def build_user_content(
         "- 答案必须准确\n"
         "- 旋律调性分析题必须用LilyPond谱例给出旋律\n"
         "- 节奏组合题必须用LilyPond谱例，禁止使用Unicode音符符号\n"
+        "- 简谱互译题的简谱必须用 ```jianpu 代码块（jianpu-ly 格式），不要用 ```lilypond\n"
+        "- jianpu 代码块中不要写 title/subtitle/composer 等头信息\n"
     )
 
     ai_prompt = "\n".join(ai_prompt_parts)

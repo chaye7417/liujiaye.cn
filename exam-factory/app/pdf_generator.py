@@ -103,15 +103,15 @@ def _generate_font_settings_ily(music_font: str = DEFAULT_MUSIC_FONT) -> str:
 
 
 def _has_lilypond(tex_content: str) -> bool:
-    """检测 LaTeX 内容中是否包含 LilyPond 环境。
+    """检测 LaTeX 内容中是否包含 LilyPond 环境或文件引用。
 
     Args:
         tex_content: LaTeX 文件内容
 
     Returns:
-        是否包含 \\begin{lilypond}
+        是否包含 \\begin{lilypond} 或 \\lilypondfile
     """
-    return r'\begin{lilypond}' in tex_content
+    return r'\begin{lilypond}' in tex_content or r'\lilypondfile' in tex_content
 
 
 def _create_lilypond_wrapper(work_dir: Path) -> Path:
@@ -394,6 +394,63 @@ async def _compile_music_history(
         return final_pdf
 
 
+async def _preprocess_jianpu(markdown: str, work_dir: Path) -> str:
+    """预处理 Markdown 中的 jianpu 代码块：转为 .ly 文件供 lilypond-book 编译。
+
+    检测 ```jianpu ... ``` 代码块，通过 jianpu-ly 转换为独立的 LilyPond
+    文件，然后用 [LILYPONDFILE:filename.ly] 标记替换原代码块。
+    md2latex.py 会将标记转为 \\lilypondfile 命令，由 lilypond-book 统一编译。
+
+    Args:
+        markdown: 原始 Markdown 内容
+        work_dir: 工作目录（.ly 文件输出位置）
+
+    Returns:
+        替换后的 Markdown 内容
+    """
+    pattern = re.compile(r'```jianpu\s*\n(.*?)```', re.DOTALL)
+    matches = list(pattern.finditer(markdown))
+    if not matches:
+        return markdown
+
+    result = markdown
+    # 从后往前替换，避免偏移量变化
+    for i, match in enumerate(reversed(matches)):
+        idx = len(matches) - 1 - i
+        jianpu_text = match.group(1).strip()
+        name = f"jianpu_{idx}"
+
+        # 写入 jianpu-ly 输入文件
+        input_file = work_dir / f"{name}.txt"
+        input_file.write_text(jianpu_text, encoding="utf-8")
+
+        # 运行 jianpu-ly 转换为 LilyPond
+        ly_file = work_dir / f"{name}.ly"
+        proc = await asyncio.create_subprocess_exec(
+            "jianpu-ly", str(input_file),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"jianpu-ly 转换失败:\n{stderr.decode(errors='replace')[-1000:]}"
+            )
+
+        # 后处理 .ly：启用 tagline="" 去掉 LilyPond 水印
+        ly_content = stdout.decode(errors="replace")
+        ly_content = ly_content.replace(
+            '% \\header { tagline="" }',
+            '\\header { tagline="" }',
+        )
+        ly_file.write_text(ly_content, encoding="utf-8")
+
+        # 替换 markdown 中的 jianpu 代码块为 lilypondfile 标记
+        result = result[:match.start()] + f"[LILYPONDFILE:{name}.ly]" + result[match.end():]
+
+    return result
+
+
 async def _compile_single(
     task_id: int,
     markdown_content: str,
@@ -433,6 +490,10 @@ async def _compile_single(
     markdown_body = re.sub(
         r'^---\s*\n.*?\n---\s*\n', '', markdown_content, count=1, flags=re.DOTALL
     )
+
+    # 预处理 jianpu 代码块（转为 .ly 文件 + [LILYPONDFILE:...] 标记）
+    markdown_body = await _preprocess_jianpu(markdown_body, work_dir)
+
     md_with_meta = f'---\ntitle: "{title}"\nschool: "{school}"\ntheme: {theme}\n---\n\n{markdown_body}\n'
 
     md_path = content_dir / "exam.md"
