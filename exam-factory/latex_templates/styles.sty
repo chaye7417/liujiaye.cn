@@ -323,6 +323,23 @@
   }{}
 }
 
+% Single-line rhythm staff answer area (Music Module)
+\newcommand{\rhythmlines}[1]{
+  \nopagebreak[4]%
+  \ifthenelse{\NOT \boolean{showanswer}}{
+    \vspace{0.5em}
+    \foreach \n in {1,...,#1}{%
+      \begin{center}
+        \begin{tikzpicture}
+          \draw[line width=0.5pt] (0,0) -- (0.9\textwidth,0);
+        \end{tikzpicture}
+        \vspace{1.5em}
+      \end{center}
+    }
+    \vspace{0.3em}
+  }{}
+}
+
 % Short staff (Music Module)
 \newcommand{\staffshort}[1][0.1]{
   \nopagebreak[4]%

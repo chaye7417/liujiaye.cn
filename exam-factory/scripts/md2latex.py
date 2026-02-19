@@ -186,6 +186,7 @@ def parse_single_question(content: str, points: float) -> dict:
         'answer_num': 0,
         'lines': 0,
         'staff_lines': 0,
+        'rhythm_lines': 0,
         'piano_staff': 0,
         'essay_box': None,
         'essay_items': [],
@@ -268,6 +269,12 @@ def parse_single_question(content: str, points: float) -> dict:
         staff_match = re.match(r'^>\s*五线谱[:：]\s*(\d+)$', line_stripped)
         if staff_match:
             question['staff_lines'] = int(staff_match.group(1))
+            continue
+
+        # 解析单线谱 (> 单线谱: n)
+        rhythm_match = re.match(r'^>\s*单线谱[:：]\s*(\d+)$', line_stripped)
+        if rhythm_match:
+            question['rhythm_lines'] = int(rhythm_match.group(1))
             continue
 
         # 解析钢琴谱 (> 钢琴谱: n)
@@ -554,6 +561,9 @@ def generate_question_latex(q: dict) -> list[str]:
 
     if q['staff_lines'] > 0:
         lines.append(r'  \stafflines{%d}' % q['staff_lines'])
+
+    if q.get('rhythm_lines', 0) > 0:
+        lines.append(r'  \rhythmlines{%d}' % q['rhythm_lines'])
 
     if q['piano_staff'] > 0:
         lines.append(r'  \pianostaff{%d}' % q['piano_staff'])

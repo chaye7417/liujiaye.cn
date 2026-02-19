@@ -283,16 +283,18 @@ def _generate_writing_item(ts_key: str, n_bars: int) -> tuple[str, str]:
 
     q_notes = " ".join(_evt_to_lily(t) for t in question_ticks)
     q_lily = (
+        f"\\new RhythmicStaff {{ "
         f"\\omit Staff.TimeSignature \\omit Staff.BarLine "
-        f"\\time {ts_key} \\clef treble {q_notes}"
+        f"\\time {ts_key} {q_notes} }}"
     )
 
     answer_bars = _regroup(question_ticks, ts_key)
-    a_parts = [f"\\time {ts_key}", "\\clef treble"]
+    a_parts = [f"\\new RhythmicStaff {{ \\time {ts_key}"]
     for idx, bar in enumerate(answer_bars):
         a_parts.append(_ticks_to_lily(bar))
         if idx < len(answer_bars) - 1:
             a_parts.append("|")
+    a_parts.append("}")
     a_lily = " ".join(a_parts)
 
     return q_lily, a_lily
@@ -343,12 +345,13 @@ def _generate_correction_item(ts_key: str, n_bars: int) -> tuple[str, str]:
         error_bars.append(new_bar)
 
     # 题目：带拍号和小节线，但有错误分组
-    q_parts = [f"\\time {ts_key}", "\\clef treble"]
+    q_parts = [f"\\new RhythmicStaff {{ \\time {ts_key}"]
     for idx, bar in enumerate(error_bars):
         notes = " ".join(_evt_to_lily(t) for t in bar)
         q_parts.append(notes)
         if idx < len(error_bars) - 1:
             q_parts.append("|")
+    q_parts.append("}")
     q_lily = " ".join(q_parts)
 
     # 答案：从题目的 flat 序列推导正确分组
@@ -356,11 +359,12 @@ def _generate_correction_item(ts_key: str, n_bars: int) -> tuple[str, str]:
     for bar in error_bars:
         flat_from_error.extend(bar)
     answer_bars = _regroup(flat_from_error, ts_key)
-    a_parts = [f"\\time {ts_key}", "\\clef treble"]
+    a_parts = [f"\\new RhythmicStaff {{ \\time {ts_key}"]
     for idx, bar in enumerate(answer_bars):
         a_parts.append(_ticks_to_lily(bar))
         if idx < len(answer_bars) - 1:
             a_parts.append("|")
+    a_parts.append("}")
     a_lily = " ".join(a_parts)
 
     return q_lily, a_lily
@@ -444,7 +448,7 @@ def generate_rhythm(
                 sections.extend(["## [续]", f"拍号：{ts_key}"])
             sections.extend([
                 "> 仅试题:", _wrap_lily(q_lily),
-                "> 五线谱: 1",
+                "> 单线谱: 1",
                 "> 答案:", _wrap_lily(a_lily), "",
             ])
 
@@ -461,7 +465,7 @@ def generate_rhythm(
                 sections.append("## [续]")
             sections.extend([
                 "> 仅试题:", _wrap_lily(q_lily),
-                "> 五线谱: 1",
+                "> 单线谱: 1",
                 "> 答案:", _wrap_lily(a_lily), "",
             ])
 
