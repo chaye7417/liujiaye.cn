@@ -395,6 +395,16 @@
     .mt-type-tag.selected .mt-tag-score {
         opacity: 0.85;
     }
+    .mt-rhythm-pat {
+        padding: 4px 10px;
+    }
+    .mt-rhythm-pat img {
+        height: 20px;
+        display: block;
+    }
+    .mt-rhythm-pat.selected img {
+        filter: invert(1);
+    }
     .mt-stat-bar {
         margin-top: 16px;
         padding: 10px 16px;
@@ -745,16 +755,16 @@
                 <div>
                     <span style="font-size:13px;color:var(--text-muted);margin-bottom:6px;display:block;">节奏型（不选则全部随机）</span>
                     <div class="mt-type-tags" id="mt-rhythm-pattern-tags">
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="eighth_sixteenths" onclick="this.classList.toggle('selected')">前八后十六</span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="sixteenths_eighth" onclick="this.classList.toggle('selected')">前十六后八</span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="dotted_front" onclick="this.classList.toggle('selected')">前附点</span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="dotted_back" onclick="this.classList.toggle('selected')">后附点</span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="syncopation" onclick="this.classList.toggle('selected')">切分</span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="big_sync" onclick="this.classList.toggle('selected')">大切分</span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="ties" onclick="this.classList.toggle('selected')">同音连线</span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="triplet" onclick="this.classList.toggle('selected')">三连音</span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="duplet" onclick="this.classList.toggle('selected')">二连音</span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="quadruplet" onclick="this.classList.toggle('selected')">四连音</span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="eighth_sixteenths" onclick="this.classList.toggle('selected')" title="前八后十六"><img src="/static/img/rhythm/eighth_sixteenths.svg" alt="前八后十六"></span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="sixteenths_eighth" onclick="this.classList.toggle('selected')" title="前十六后八"><img src="/static/img/rhythm/sixteenths_eighth.svg" alt="前十六后八"></span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="dotted_front" onclick="this.classList.toggle('selected')" title="前附点"><img src="/static/img/rhythm/dotted_front.svg" alt="前附点"></span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="dotted_back" onclick="this.classList.toggle('selected')" title="后附点"><img src="/static/img/rhythm/dotted_back.svg" alt="后附点"></span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="syncopation" onclick="this.classList.toggle('selected')" title="切分"><img src="/static/img/rhythm/syncopation.svg" alt="切分"></span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="big_sync" onclick="this.classList.toggle('selected')" title="大切分"><img src="/static/img/rhythm/big_sync.svg" alt="大切分"></span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="ties" onclick="this.classList.toggle('selected')" title="同音连线"><img src="/static/img/rhythm/ties.svg" alt="同音连线"></span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="triplet" onclick="this.classList.toggle('selected')" title="三连音"><img src="/static/img/rhythm/triplet.svg" alt="三连音"></span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="duplet" onclick="this.classList.toggle('selected')" title="二连音"><img src="/static/img/rhythm/duplet.svg" alt="二连音"></span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="quadruplet" onclick="this.classList.toggle('selected')" title="四连音"><img src="/static/img/rhythm/quadruplet.svg" alt="四连音"></span>
                     </div>
                 </div>
             </div>
