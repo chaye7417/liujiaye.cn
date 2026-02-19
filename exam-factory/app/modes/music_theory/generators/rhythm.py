@@ -7,6 +7,7 @@ Tick 系统：1 四分音符 = 12 ticks。
 连音符（原子单元，不可拆分）：
   - 单拍子（2/4, 3/4, 4/4 等）：三连音
   - 复拍子（6/8, 9/8, 12/8）：二连音、四连音
+节奏型胶囊选择：用户可控制哪些节奏型和拍号出现在题目中。
 """
 
 import random
@@ -47,57 +48,168 @@ def _evt_to_lily(evt: _Evt) -> str:
 
 
 # ---------------------------------------------------------------------------
-# 拍内节奏型模板（含连音符）
+# 拍内节奏型模板：base（始终包含）+ groups（按胶囊选择）
 # ---------------------------------------------------------------------------
-_P12: list[list[_Evt]] = [
-    [12], [6, 6], [9, 3], [3, 9],
-    [3, 3, 6], [6, 3, 3], [3, 3, 3, 3], [3, 6, 3],
-    # 三连音（3 个八分音符占 1 拍）
-    [(12, "\\tuplet 3/2 { c'8 c'8 c'8 }")],
-]
 
-_P18: list[list[_Evt]] = [
-    [18], [12, 6], [6, 12], [6, 6, 6], [9, 9],
-    [9, 3, 6], [6, 9, 3], [3, 3, 6, 6], [6, 6, 3, 3],
-    # 二连音（2 个八分音符占 1 复拍）
-    [(18, "\\tuplet 2/3 { c'8 c'8 }")],
-    # 四连音（4 个八分音符占 1 复拍）
-    [(18, "\\tuplet 4/3 { c'8 c'8 c'8 c'8 }")],
+# ---- P12: 四分音符拍（2/4, 3/4, 4/4, C, 5/4）----
+_P12_BASE: list[list[_Evt]] = [
+    [12], [6, 6], [3, 3, 3, 3],
 ]
-
-_P6: list[list[_Evt]] = [
-    [6], [3, 3],
-    # 三连音（3 个十六分音符占 1 拍）
-    [(6, "\\tuplet 3/2 { c'16 c'16 c'16 }")],
-]
-
-_P24: list[list[_Evt]] = [
-    [24], [12, 12], [12, 6, 6], [6, 6, 12],
-    [6, 6, 6, 6], [18, 6], [6, 18],
-    # 三连音（3 个四分音符占 1 拍）
-    [(24, "\\tuplet 3/2 { c'4 c'4 c'4 }")],
-]
-
-# ---------------------------------------------------------------------------
-# 拍号配置
-# split_at = 强边界（半小节/复合拍组），始终拆分
-# 拍内边界由 beat 大小自动计算，仅拆分起始于拍中间的音符
-# ---------------------------------------------------------------------------
-_TS: dict[str, dict] = {
-    "2/4":  {"bar": 24, "beat": 12, "n_beats": 2, "split_at": [],       "patterns": _P12},
-    "3/4":  {"bar": 36, "beat": 12, "n_beats": 3, "split_at": [],       "patterns": _P12},
-    "4/4":  {"bar": 48, "beat": 12, "n_beats": 4, "split_at": [24],     "patterns": _P12},
-    "6/8":  {"bar": 36, "beat": 18, "n_beats": 2, "split_at": [18],     "patterns": _P18},
-    "9/8":  {"bar": 54, "beat": 18, "n_beats": 3, "split_at": [18, 36], "patterns": _P18},
-    "12/8": {"bar": 72, "beat": 18, "n_beats": 4, "split_at": [36],     "patterns": _P18},
-    "2/2":  {"bar": 48, "beat": 24, "n_beats": 2, "split_at": [],       "patterns": _P24},
-    "3/8":  {"bar": 18, "beat": 6,  "n_beats": 3, "split_at": [],       "patterns": _P6},
-    "5/4":  {"bar": 60, "beat": 12, "n_beats": 5, "split_at": [24],     "patterns": _P12},
+_P12_GROUPS: dict[str, list[list[_Evt]]] = {
+    "eighth_sixteenths": [[6, 3, 3]],
+    "sixteenths_eighth": [[3, 3, 6]],
+    "dotted_front": [[9, 3]],
+    "dotted_back": [[3, 9]],
+    "syncopation": [[3, 6, 3]],
+    "triplet": [[(12, "\\tuplet 3/2 { c'8 c'8 c'8 }")]],
 }
 
+# ---- P18: 附点四分音符拍（6/8, 9/8, 12/8）----
+_P18_BASE: list[list[_Evt]] = [
+    [18], [6, 6, 6], [12, 6], [6, 12],
+]
+_P18_GROUPS: dict[str, list[list[_Evt]]] = {
+    "eighth_sixteenths": [[6, 6, 3, 3]],
+    "sixteenths_eighth": [[3, 3, 6, 6]],
+    "dotted_front": [[9, 9], [9, 3, 6]],
+    "dotted_back": [[6, 9, 3]],
+    "duplet": [[(18, "\\tuplet 2/3 { c'8 c'8 }")]],
+    "quadruplet": [[(18, "\\tuplet 4/3 { c'8 c'8 c'8 c'8 }")]],
+}
+
+# ---- P6: 八分音符拍（3/8）----
+_P6_BASE: list[list[_Evt]] = [
+    [6], [3, 3],
+]
+_P6_GROUPS: dict[str, list[list[_Evt]]] = {
+    "triplet": [[(6, "\\tuplet 3/2 { c'16 c'16 c'16 }")]],
+}
+
+# ---- P24: 二分音符拍（2/2, ₵）----
+_P24_BASE: list[list[_Evt]] = [
+    [24], [12, 12], [6, 6, 6, 6],
+]
+_P24_GROUPS: dict[str, list[list[_Evt]]] = {
+    "eighth_sixteenths": [[12, 6, 6]],
+    "sixteenths_eighth": [[6, 6, 12]],
+    "dotted_front": [[18, 6]],
+    "dotted_back": [[6, 18]],
+    "triplet": [[(24, "\\tuplet 3/2 { c'4 c'4 c'4 }")]],
+}
+
+# ---------------------------------------------------------------------------
+# 拍号配置（11 种）
+# lily_ts: 答案中显示的拍号命令（含 numeric/default 前缀）
+# time_frac: 纯 \time 分数（用于隐藏拍号的写作题）
+# display: 题目文本中的人类可读名称
+# ---------------------------------------------------------------------------
+_TS: dict[str, dict] = {
+    "2/4": {
+        "bar": 24, "beat": 12, "n_beats": 2, "split_at": [],
+        "base": _P12_BASE, "groups": _P12_GROUPS,
+        "lily_ts": "\\numericTimeSignature \\time 2/4",
+        "time_frac": "2/4", "display": "2/4",
+    },
+    "3/4": {
+        "bar": 36, "beat": 12, "n_beats": 3, "split_at": [],
+        "base": _P12_BASE, "groups": _P12_GROUPS,
+        "lily_ts": "\\numericTimeSignature \\time 3/4",
+        "time_frac": "3/4", "display": "3/4",
+    },
+    "4/4": {
+        "bar": 48, "beat": 12, "n_beats": 4, "split_at": [24],
+        "base": _P12_BASE, "groups": _P12_GROUPS,
+        "lily_ts": "\\numericTimeSignature \\time 4/4",
+        "time_frac": "4/4", "display": "4/4",
+    },
+    "C": {
+        "bar": 48, "beat": 12, "n_beats": 4, "split_at": [24],
+        "base": _P12_BASE, "groups": _P12_GROUPS,
+        "lily_ts": "\\defaultTimeSignature \\time 4/4",
+        "time_frac": "4/4", "display": "C",
+    },
+    "3/8": {
+        "bar": 18, "beat": 6, "n_beats": 3, "split_at": [],
+        "base": _P6_BASE, "groups": _P6_GROUPS,
+        "lily_ts": "\\numericTimeSignature \\time 3/8",
+        "time_frac": "3/8", "display": "3/8",
+    },
+    "6/8": {
+        "bar": 36, "beat": 18, "n_beats": 2, "split_at": [18],
+        "base": _P18_BASE, "groups": _P18_GROUPS,
+        "lily_ts": "\\numericTimeSignature \\time 6/8",
+        "time_frac": "6/8", "display": "6/8",
+    },
+    "2/2": {
+        "bar": 48, "beat": 24, "n_beats": 2, "split_at": [],
+        "base": _P24_BASE, "groups": _P24_GROUPS,
+        "lily_ts": "\\numericTimeSignature \\time 2/2",
+        "time_frac": "2/2", "display": "2/2",
+    },
+    "cut_c": {
+        "bar": 48, "beat": 24, "n_beats": 2, "split_at": [],
+        "base": _P24_BASE, "groups": _P24_GROUPS,
+        "lily_ts": "\\defaultTimeSignature \\time 2/2",
+        "time_frac": "2/2", "display": "\u20b5",
+    },
+    "9/8": {
+        "bar": 54, "beat": 18, "n_beats": 3, "split_at": [18, 36],
+        "base": _P18_BASE, "groups": _P18_GROUPS,
+        "lily_ts": "\\numericTimeSignature \\time 9/8",
+        "time_frac": "9/8", "display": "9/8",
+    },
+    "12/8": {
+        "bar": 72, "beat": 18, "n_beats": 4, "split_at": [36],
+        "base": _P18_BASE, "groups": _P18_GROUPS,
+        "lily_ts": "\\numericTimeSignature \\time 12/8",
+        "time_frac": "12/8", "display": "12/8",
+    },
+    "5/4": {
+        "bar": 60, "beat": 12, "n_beats": 5, "split_at": [24],
+        "base": _P12_BASE, "groups": _P12_GROUPS,
+        "lily_ts": "\\numericTimeSignature \\time 5/4",
+        "time_frac": "5/4", "display": "5/4",
+    },
+}
+
+# 难度默认拍号池（胶囊未选择时的后备）
 _TS_BASIC = ["2/4", "3/4", "4/4"]
 _TS_INTERMEDIATE = _TS_BASIC + ["3/8", "6/8", "2/2"]
-_TS_ADVANCED = _TS_INTERMEDIATE + ["9/8", "12/8", "5/4"]
+_TS_ADVANCED = list(_TS.keys())
+
+# 节奏型胶囊：模板组 key（影响 _build_patterns）
+_PATTERN_GROUP_KEYS = frozenset({
+    "eighth_sixteenths", "sixteenths_eighth",
+    "dotted_front", "dotted_back", "syncopation",
+    "triplet", "duplet", "quadruplet",
+})
+
+# 合并行为标志 key（影响 _merge_random）
+_MERGE_FLAG_KEYS = frozenset({"big_sync", "ties"})
+
+
+# ---------------------------------------------------------------------------
+# 模板构建
+# ---------------------------------------------------------------------------
+def _build_patterns(
+    ts_key: str,
+    enabled_groups: set[str],
+) -> list[list[_Evt]]:
+    """根据胶囊选择构建可用节奏型列表。
+
+    Args:
+        ts_key: 拍号 key
+        enabled_groups: 用户启用的节奏型胶囊 key 集合
+
+    Returns:
+        可用的拍内节奏型列表
+    """
+    cfg = _TS[ts_key]
+    patterns: list[list[_Evt]] = list(cfg["base"])
+    for group_key, group_patterns in cfg["groups"].items():
+        if group_key in enabled_groups:
+            patterns.extend(group_patterns)
+    return patterns
 
 
 # ---------------------------------------------------------------------------
@@ -125,7 +237,6 @@ def _ticks_to_lily(ticks_with_ties: list[tuple[_Evt, bool]]) -> str:
     parts: list[str] = []
     for evt, tie_after in ticks_with_ties:
         if isinstance(evt, tuple):
-            # 连音符 — 直接输出 LilyPond 字符串（不需要连线）
             parts.append(evt[1])
         elif evt in _VALID_TICKS:
             ns = f"c'{_TICK_TO_LILY[evt]}"
@@ -156,7 +267,7 @@ def _regroup(flat_ticks: list[_Evt], ts_key: str) -> list[list[tuple[_Evt, bool]
 
     Args:
         flat_ticks: 扁平事件序列（int 或 tuple）
-        ts_key: 拍号
+        ts_key: 拍号 key
 
     Returns:
         小节列表，每小节是 [(_Evt, tie_after), ...] 列表
@@ -189,10 +300,8 @@ def _regroup(flat_ticks: list[_Evt], ts_key: str) -> list[list[tuple[_Evt, bool]
         end = pos + tick
 
         if isinstance(evt, tuple):
-            # 连音符是原子单元，永不拆分
             result.append((evt, False))
         else:
-            # 普通音符 — 按边界拆分
             cuts: set[int] = set()
 
             # 1. 强边界（始终拆分）
@@ -208,7 +317,6 @@ def _regroup(flat_ticks: list[_Evt], ts_key: str) -> list[list[tuple[_Evt, bool]
                 if next_beat < end:
                     cuts.add(next_beat)
 
-            # 执行拆分
             if not cuts:
                 result.append((tick, False))
             else:
@@ -242,57 +350,111 @@ def _regroup(flat_ticks: list[_Evt], ts_key: str) -> list[list[tuple[_Evt, bool]
 # ---------------------------------------------------------------------------
 # 序列生成
 # ---------------------------------------------------------------------------
-def _generate_flat(ts_key: str, n_bars: int) -> list[_Evt]:
+def _generate_flat(
+    ts_key: str,
+    patterns: list[list[_Evt]],
+    n_bars: int,
+) -> list[_Evt]:
     """按拍生成正确节奏型，展平为事件列表。"""
     cfg = _TS[ts_key]
     flat: list[_Evt] = []
     for _ in range(n_bars):
         for _ in range(cfg["n_beats"]):
-            flat.extend(random.choice(cfg["patterns"]))
+            flat.extend(random.choice(patterns))
     return flat
 
 
-def _merge_random(flat: list[_Evt]) -> list[_Evt]:
-    """随机合并相邻普通音符（跳过连音符，合并值必须是合法时值）。"""
+def _merge_random(
+    flat: list[_Evt],
+    ts_key: str,
+    allow_cross_beat: bool = True,
+    allow_cross_bar: bool = True,
+) -> list[_Evt]:
+    """随机合并相邻普通音符（跳过连音符）。
+
+    合并范围由胶囊设置控制：
+      - 拍内合并：始终允许
+      - 跨拍合并（大切分）：仅当 allow_cross_beat=True
+      - 跨小节线合并（同音连线）：仅当 allow_cross_bar=True
+
+    Args:
+        flat: 扁平事件序列
+        ts_key: 拍号 key
+        allow_cross_beat: 是否允许跨拍合并
+        allow_cross_bar: 是否允许跨小节线合并
+    """
+    cfg = _TS[ts_key]
+    bar_size = cfg["bar"]
+    beat_size = cfg["beat"]
+
     ticks = list(flat)
-    # 多次尝试以产生更多合并（更多同音连线）
     for _ in range(len(ticks) * 2):
         if len(ticks) < 3:
             break
         i = random.randint(0, len(ticks) - 2)
-        # 跳过连音符
         if isinstance(ticks[i], tuple) or isinstance(ticks[i + 1], tuple):
             continue
         merged = ticks[i] + ticks[i + 1]
-        if merged in _VALID_TICKS:
-            ticks = ticks[:i] + [merged] + ticks[i + 2:]
+        if merged not in _VALID_TICKS:
+            continue
+
+        # 计算合并位置
+        pos = sum(_evt_tick(e) for e in ticks[:i])
+        end = pos + merged
+
+        # 检查是否跨小节线
+        bar_of_start = pos // bar_size
+        bar_of_end = (end - 1) // bar_size
+        if bar_of_start != bar_of_end:
+            if not allow_cross_bar:
+                continue
+        else:
+            # 同一小节内 — 检查是否跨拍线
+            bar_start = bar_of_start * bar_size
+            beat_of_start = (pos - bar_start) // beat_size
+            beat_of_end = (end - 1 - bar_start) // beat_size
+            if beat_of_start != beat_of_end and not allow_cross_beat:
+                continue
+
+        ticks = ticks[:i] + [merged] + ticks[i + 2:]
     return ticks
 
 
 # ---------------------------------------------------------------------------
 # 写作题
 # ---------------------------------------------------------------------------
-def _generate_writing_item(ts_key: str, n_bars: int) -> tuple[str, str]:
+def _generate_writing_item(
+    ts_key: str,
+    patterns: list[list[_Evt]],
+    n_bars: int,
+    allow_cross_beat: bool,
+    allow_cross_bar: bool,
+) -> tuple[str, str]:
     """生成一道写作题。
 
     题目：合并后的音符（无拍号、无小节线）。
     答案：从题目推导的正确分组。
     """
-    flat = _generate_flat(ts_key, n_bars)
-    question_ticks = _merge_random(flat)
+    cfg = _TS[ts_key]
+    flat = _generate_flat(ts_key, patterns, n_bars)
+    question_ticks = _merge_random(
+        flat, ts_key,
+        allow_cross_beat=allow_cross_beat,
+        allow_cross_bar=allow_cross_bar,
+    )
 
     q_notes = " ".join(_evt_to_lily(t) for t in question_ticks)
     q_lily = (
         f"\\new RhythmicStaff {{ \\omit Score.BarNumber "
         f"\\omit Staff.TimeSignature \\omit Staff.BarLine "
-        f"\\time {ts_key} {q_notes} }}"
+        f"\\time {cfg['time_frac']} {q_notes} }}"
     )
 
     answer_bars = _regroup(question_ticks, ts_key)
     bar_strs = [_ticks_to_lily(bar) for bar in answer_bars]
     a_lily = (
         f"\\new RhythmicStaff {{ \\omit Score.BarNumber "
-        f"\\time {ts_key} {_join_bars(bar_strs)} }}"
+        f"{cfg['lily_ts']} {_join_bars(bar_strs)} }}"
     )
 
     return q_lily, a_lily
@@ -301,7 +463,11 @@ def _generate_writing_item(ts_key: str, n_bars: int) -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 # 改错题
 # ---------------------------------------------------------------------------
-def _generate_correction_item(ts_key: str, n_bars: int) -> tuple[str, str]:
+def _generate_correction_item(
+    ts_key: str,
+    patterns: list[list[_Evt]],
+    n_bars: int,
+) -> tuple[str, str]:
     """生成一道改错题。
 
     题目：有拍号和小节线，但部分音符跨越分组边界。
@@ -311,21 +477,18 @@ def _generate_correction_item(ts_key: str, n_bars: int) -> tuple[str, str]:
     split_points = cfg["split_at"]
     beat_size = cfg["beat"]
 
-    # 逐小节生成并制造错误
     error_bars: list[list[_Evt]] = []
     for _ in range(n_bars):
         beat_ticks: list[_Evt] = []
         for _ in range(cfg["n_beats"]):
-            beat_ticks.extend(random.choice(cfg["patterns"]))
+            beat_ticks.extend(random.choice(patterns))
 
-        # 尝试合并跨边界的相邻普通音符（允许多个错误）
         new_bar: list[_Evt] = list(beat_ticks)
         merge_count = 0
         for _ in range(25):
             if len(new_bar) < 2 or merge_count >= 3:
                 break
             i = random.randint(0, len(new_bar) - 2)
-            # 跳过连音符
             if isinstance(new_bar[i], tuple) or isinstance(new_bar[i + 1], tuple):
                 continue
             merged = new_bar[i] + new_bar[i + 1]
@@ -333,7 +496,6 @@ def _generate_correction_item(ts_key: str, n_bars: int) -> tuple[str, str]:
                 continue
             pos = sum(_evt_tick(e) for e in new_bar[:i])
             end = pos + merged
-            # 检查是否跨越强边界或拍线
             crosses_strong = any(pos < sp < end for sp in split_points)
             beat_pos = pos % beat_size
             crosses_beat = beat_pos != 0 and (pos + beat_size - beat_pos) < end
@@ -342,14 +504,12 @@ def _generate_correction_item(ts_key: str, n_bars: int) -> tuple[str, str]:
                 merge_count += 1
         error_bars.append(new_bar)
 
-    # 题目：带拍号和小节线，但有错误分组
     q_bar_strs = [" ".join(_evt_to_lily(t) for t in bar) for bar in error_bars]
     q_lily = (
         f"\\new RhythmicStaff {{ \\omit Score.BarNumber "
-        f"\\time {ts_key} {_join_bars(q_bar_strs)} }}"
+        f"{cfg['lily_ts']} {_join_bars(q_bar_strs)} }}"
     )
 
-    # 答案：从题目的 flat 序列推导正确分组
     flat_from_error: list[_Evt] = []
     for bar in error_bars:
         flat_from_error.extend(bar)
@@ -357,7 +517,7 @@ def _generate_correction_item(ts_key: str, n_bars: int) -> tuple[str, str]:
     a_bar_strs = [_ticks_to_lily(bar) for bar in answer_bars]
     a_lily = (
         f"\\new RhythmicStaff {{ \\omit Score.BarNumber "
-        f"\\time {ts_key} {_join_bars(a_bar_strs)} }}"
+        f"{cfg['lily_ts']} {_join_bars(a_bar_strs)} }}"
     )
 
     return q_lily, a_lily
@@ -366,18 +526,26 @@ def _generate_correction_item(ts_key: str, n_bars: int) -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 # 拍号选择
 # ---------------------------------------------------------------------------
-def _get_ts_pool(difficulty: str) -> list[str]:
-    """根据难度返回可用拍号列表。"""
+def _get_ts_pool(
+    difficulty: str,
+    user_ts: Optional[list[str]] = None,
+) -> list[str]:
+    """返回可用拍号列表。优先使用用户胶囊选择，否则按难度。"""
+    if user_ts:
+        valid = [ts for ts in user_ts if ts in _TS]
+        if valid:
+            return valid
     if difficulty == "高级":
         return _TS_ADVANCED
-    elif difficulty == "中级":
+    if difficulty == "中级":
         return _TS_INTERMEDIATE
     return _TS_BASIC
 
 
-def _pick_time_signatures(n: int, difficulty: str) -> list[str]:
+def _pick_time_signatures(n: int, pool: list[str]) -> list[str]:
     """为 n 道题选择拍号，尽量覆盖不同拍号。"""
-    pool = _get_ts_pool(difficulty)
+    if not pool:
+        pool = _TS_BASIC
     result: list[str] = []
     shuffled = list(pool)
     random.shuffle(shuffled)
@@ -396,8 +564,6 @@ def _pick_time_signatures(n: int, difficulty: str) -> list[str]:
 # ---------------------------------------------------------------------------
 _BARS_PER_LINE = 4
 
-_RHYTHM_HEAD = "\\new RhythmicStaff {{ \\omit Score.BarNumber \\time {ts}"
-
 
 def _join_bars(bar_strs: list[str], bars_per_line: int = _BARS_PER_LINE) -> str:
     """用 | 连接小节，每 bars_per_line 小节插入 \\break。"""
@@ -411,14 +577,14 @@ def _join_bars(bar_strs: list[str], bars_per_line: int = _BARS_PER_LINE) -> str:
     return " ".join(parts)
 
 
-# ---------------------------------------------------------------------------
-# Markdown 输出
-# ---------------------------------------------------------------------------
 def _wrap_lily(code: str) -> str:
     """包装 LilyPond 代码块。"""
     return f"```lilypond\n{{ {code} }}\n```"
 
 
+# ---------------------------------------------------------------------------
+# 主入口：生成音值组合 Markdown
+# ---------------------------------------------------------------------------
 def generate_rhythm(
     section_num: str,
     difficulty: str = "中级",
@@ -431,6 +597,8 @@ def generate_rhythm(
         - rhythm_writing_n: 写作题数量（默认 3）
         - rhythm_correction_n: 改错题数量（默认 2）
         - rhythm_bars: 每题小节数（默认 8）
+        - rhythm_time_sigs: 选中的拍号 key 列表（默认按难度）
+        - rhythm_patterns: 选中的节奏型 key 列表（默认全部）
 
     Args:
         section_num: 大题编号
@@ -442,23 +610,49 @@ def generate_rhythm(
     n_correction = params.get("rhythm_correction_n", 2)
     n_bars = params.get("rhythm_bars", 8)
 
+    # 胶囊选择
+    user_ts: Optional[list[str]] = params.get("rhythm_time_sigs")
+    user_patterns: Optional[list[str]] = params.get("rhythm_patterns")
+
+    # 解析启用的节奏型组（模板过滤）
+    if user_patterns is not None:
+        enabled_groups = set(user_patterns) & _PATTERN_GROUP_KEYS
+        allow_cross_beat = "big_sync" in user_patterns
+        allow_cross_bar = "ties" in user_patterns
+    else:
+        # 未指定胶囊 → 全部启用
+        enabled_groups = set(_PATTERN_GROUP_KEYS)
+        allow_cross_beat = True
+        allow_cross_bar = True
+
+    # 改错题需要跨边界合并才能制造错误，若不允许则转为写作题
+    if n_correction > 0 and not allow_cross_beat:
+        n_writing += n_correction
+        n_correction = 0
+
     total = n_writing + n_correction
-    ts_list = _pick_time_signatures(total, difficulty)
+    ts_pool = _get_ts_pool(difficulty, user_ts)
+    ts_list = _pick_time_signatures(total, ts_pool)
 
     sections: list[str] = ["# 音值组合\n"]
 
-    # 每道小题用独立的 ## 块（md2latex 每个 ## 只处理一对 仅试题/答案）
     if n_writing > 0:
         for i in range(n_writing):
             ts_key = ts_list[i]
-            q_lily, a_lily = _generate_writing_item(ts_key, n_bars)
+            cfg = _TS[ts_key]
+            patterns = _build_patterns(ts_key, enabled_groups)
+            q_lily, a_lily = _generate_writing_item(
+                ts_key, patterns, n_bars,
+                allow_cross_beat, allow_cross_bar,
+            )
             if i == 0:
                 sections.extend([
                     "## [2分]",
-                    f"按照指定拍号，为下列音符划分小节并写出正确的音值组合。拍号：{ts_key}",
+                    "按照指定拍号，为下列音符划分小节并写出正确的音值组合。"
+                    f"拍号：{cfg['display']}",
                 ])
             else:
-                sections.extend(["## [续]", f"拍号：{ts_key}"])
+                sections.extend(["## [续]", f"拍号：{cfg['display']}"])
             sections.extend([
                 "> 仅试题:", _wrap_lily(q_lily),
                 "> 单线谱: 2",
@@ -468,7 +662,11 @@ def generate_rhythm(
     if n_correction > 0:
         for i in range(n_correction):
             ts_key = ts_list[n_writing + i]
-            q_lily, a_lily = _generate_correction_item(ts_key, n_bars)
+            cfg = _TS[ts_key]
+            patterns = _build_patterns(ts_key, enabled_groups)
+            q_lily, a_lily = _generate_correction_item(
+                ts_key, patterns, n_bars,
+            )
             if i == 0:
                 sections.extend([
                     "## [2分]",

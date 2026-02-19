@@ -724,6 +724,39 @@
                         <span style="font-size:13px;color:var(--text-muted);">题</span>
                     </div>
                 </div>
+                <!-- 拍号胶囊 -->
+                <div style="margin-bottom:10px;">
+                    <span style="font-size:13px;color:var(--text-muted);margin-bottom:6px;display:block;">拍号（不选则按难度自动分配）</span>
+                    <div class="mt-type-tags" id="mt-rhythm-ts-tags">
+                        <span class="mt-type-tag mt-rhythm-ts" data-ts="2/4" onclick="this.classList.toggle('selected')">2/4</span>
+                        <span class="mt-type-tag mt-rhythm-ts" data-ts="3/4" onclick="this.classList.toggle('selected')">3/4</span>
+                        <span class="mt-type-tag mt-rhythm-ts" data-ts="4/4" onclick="this.classList.toggle('selected')">4/4</span>
+                        <span class="mt-type-tag mt-rhythm-ts" data-ts="C" onclick="this.classList.toggle('selected')">C</span>
+                        <span class="mt-type-tag mt-rhythm-ts" data-ts="3/8" onclick="this.classList.toggle('selected')">3/8</span>
+                        <span class="mt-type-tag mt-rhythm-ts" data-ts="6/8" onclick="this.classList.toggle('selected')">6/8</span>
+                        <span class="mt-type-tag mt-rhythm-ts" data-ts="2/2" onclick="this.classList.toggle('selected')">2/2</span>
+                        <span class="mt-type-tag mt-rhythm-ts" data-ts="cut_c" onclick="this.classList.toggle('selected')">&#8373;</span>
+                        <span class="mt-type-tag mt-rhythm-ts" data-ts="9/8" onclick="this.classList.toggle('selected')">9/8</span>
+                        <span class="mt-type-tag mt-rhythm-ts" data-ts="12/8" onclick="this.classList.toggle('selected')">12/8</span>
+                        <span class="mt-type-tag mt-rhythm-ts" data-ts="5/4" onclick="this.classList.toggle('selected')">5/4</span>
+                    </div>
+                </div>
+                <!-- 节奏型胶囊 -->
+                <div>
+                    <span style="font-size:13px;color:var(--text-muted);margin-bottom:6px;display:block;">节奏型（不选则全部随机）</span>
+                    <div class="mt-type-tags" id="mt-rhythm-pattern-tags">
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="eighth_sixteenths" onclick="this.classList.toggle('selected')">前八后十六</span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="sixteenths_eighth" onclick="this.classList.toggle('selected')">前十六后八</span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="dotted_front" onclick="this.classList.toggle('selected')">前附点</span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="dotted_back" onclick="this.classList.toggle('selected')">后附点</span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="syncopation" onclick="this.classList.toggle('selected')">切分</span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="big_sync" onclick="this.classList.toggle('selected')">大切分</span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="ties" onclick="this.classList.toggle('selected')">同音连线</span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="triplet" onclick="this.classList.toggle('selected')">三连音</span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="duplet" onclick="this.classList.toggle('selected')">二连音</span>
+                        <span class="mt-type-tag mt-rhythm-pat" data-pat="quadruplet" onclick="this.classList.toggle('selected')">四连音</span>
+                    </div>
+                </div>
             </div>
 
             <div class="form-group">
@@ -1045,7 +1078,7 @@
     }
 
     function toggleAllMtTypes() {
-        const tags = document.querySelectorAll('.mt-type-tag');
+        const tags = document.querySelectorAll('.mt-type-tag[data-key]');
         const allSelected = Array.from(tags).every(t => t.classList.contains('selected'));
         tags.forEach(t => { allSelected ? t.classList.remove('selected') : t.classList.add('selected'); });
         document.getElementById('mt-select-all').classList.toggle('active', !allSelected);
@@ -1095,7 +1128,7 @@
     }
 
     function updateMtSelection() {
-        const selected = document.querySelectorAll('.mt-type-tag.selected');
+        const selected = document.querySelectorAll('.mt-type-tag[data-key].selected');
         let totalScore = 0;
         let hasChoice = false;
         let hasNoteNames = false;
@@ -1120,7 +1153,7 @@
         document.getElementById('mt-note-names-settings').style.display = hasNoteNames ? '' : 'none';
         document.getElementById('mt-rhythm-settings').style.display = hasRhythm ? '' : 'none';
         // 同步全选按钮
-        const all = document.querySelectorAll('.mt-type-tag');
+        const all = document.querySelectorAll('.mt-type-tag[data-key]');
         document.getElementById('mt-select-all').classList.toggle('active', all.length === selected.length);
     }
 
@@ -1374,7 +1407,7 @@
     }
 
     function collectMtParams() {
-        const selectedTypes = Array.from(document.querySelectorAll('.mt-type-tag.selected')).map(t => t.dataset.key);
+        const selectedTypes = Array.from(document.querySelectorAll('.mt-type-tag[data-key].selected')).map(t => t.dataset.key);
         const diffEl = document.querySelector('#mt-diff .diff-option.selected');
         const params = {
             selected_types: selectedTypes,
@@ -1394,10 +1427,14 @@
             params.note_names_clefs = Array.from(document.querySelectorAll('.mt-nn-clef.selected')).map(c => c.dataset.clef);
             if (!params.note_names_clefs.length) params.note_names_clefs = ['treble'];
         }
-        // 如果选了音值组合，附带写作/改错题数和小节数
+        // 如果选了音值组合，附带写作/改错题数、拍号胶囊、节奏型胶囊
         if (selectedTypes.includes('rhythm')) {
             params.rhythm_writing_n = parseInt(document.getElementById('mt-rhythm-writing-n').value) || 0;
             params.rhythm_correction_n = parseInt(document.getElementById('mt-rhythm-correction-n').value) || 0;
+            const selTs = Array.from(document.querySelectorAll('.mt-rhythm-ts.selected')).map(e => e.dataset.ts);
+            if (selTs.length) params.rhythm_time_sigs = selTs;
+            const selPat = Array.from(document.querySelectorAll('.mt-rhythm-pat.selected')).map(e => e.dataset.pat);
+            if (selPat.length) params.rhythm_patterns = selPat;
         }
         // 如果选了选择题，附带题数
         if (selectedTypes.includes('choice')) {
