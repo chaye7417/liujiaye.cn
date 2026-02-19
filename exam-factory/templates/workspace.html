@@ -835,7 +835,7 @@
                     <span class="mt-type-tag mt-font-tag" data-font="beethoven" onclick="selectMtFont(this)">Beethoven</span>
                 </div>
                 <div id="mt-font-preview" style="margin-top:8px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);text-align:center;overflow-x:auto;">
-                    <img src="/static/img/fonts/gonville.svg" alt="字体预览" style="height:40px;max-width:100%;">
+                    <img src="/static/img/fonts/gonville.svg?v=3" alt="字体预览" style="height:40px;max-width:100%;">
                 </div>
             </div>
 
@@ -1291,7 +1291,7 @@
         document.querySelectorAll('.mt-font-tag').forEach(t => t.classList.remove('selected'));
         el.classList.add('selected');
         const font = el.dataset.font;
-        document.querySelector('#mt-font-preview img').src = '/static/img/fonts/' + font + '.svg';
+        document.querySelector('#mt-font-preview img').src = '/static/img/fonts/' + font + '.svg?v=3';
     }
 
     function toggleNnClef(el) {
