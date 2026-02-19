@@ -420,35 +420,76 @@ async def _preprocess_jianpu(markdown: str, work_dir: Path) -> str:
         jianpu_text = match.group(1).strip()
         name = f"jianpu_{idx}"
 
-        # 写入 jianpu-ly 输入文件
-        input_file = work_dir / f"{name}.txt"
-        input_file.write_text(jianpu_text, encoding="utf-8")
-
-        # 运行 jianpu-ly 转换为 LilyPond
-        ly_file = work_dir / f"{name}.ly"
-        proc = await asyncio.create_subprocess_exec(
-            "jianpu-ly", str(input_file),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-        stdout, stderr = await proc.communicate()
-        if proc.returncode != 0:
-            raise RuntimeError(
-                f"jianpu-ly 转换失败:\n{stderr.decode(errors='replace')[-1000:]}"
-            )
+        # 尝试转换，若失败则修复后重试一次
+        ly_content = await _run_jianpu_ly(jianpu_text, name, work_dir)
 
         # 后处理 .ly：启用 tagline="" 去掉 LilyPond 水印
-        ly_content = stdout.decode(errors="replace")
         ly_content = ly_content.replace(
             '% \\header { tagline="" }',
             '\\header { tagline="" }',
         )
+        ly_file = work_dir / f"{name}.ly"
         ly_file.write_text(ly_content, encoding="utf-8")
 
         # 替换 markdown 中的 jianpu 代码块为 lilypondfile 标记
         result = result[:match.start()] + f"[LILYPONDFILE:{name}.ly]" + result[match.end():]
 
     return result
+
+
+async def _run_jianpu_ly(jianpu_text: str, name: str, work_dir: Path) -> str:
+    """运行 jianpu-ly 转换，失败时自动修复后重试。
+
+    常见 AI 错误：末尾小节不完整。修复策略：
+    1. 确保末尾有小节线 |
+    2. 如仍失败，截掉最后一个不完整小节
+
+    Args:
+        jianpu_text: jianpu-ly 源码
+        name: 文件名前缀
+        work_dir: 工作目录
+
+    Returns:
+        转换后的 LilyPond 代码
+
+    Raises:
+        RuntimeError: 修复后仍无法转换
+    """
+    async def try_convert(text: str) -> tuple[int, str, str]:
+        input_file = work_dir / f"{name}.txt"
+        input_file.write_text(text, encoding="utf-8")
+        proc = await asyncio.create_subprocess_exec(
+            "jianpu-ly", str(input_file),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        return proc.returncode, stdout.decode(errors="replace"), stderr.decode(errors="replace")
+
+    # 第一次尝试
+    rc, stdout, stderr = await try_convert(jianpu_text)
+    if rc == 0:
+        return stdout
+
+    # 修复尝试 1：确保末尾有 |
+    fixed = jianpu_text.rstrip()
+    if not fixed.endswith("|"):
+        fixed += " |"
+        rc, stdout, stderr = await try_convert(fixed)
+        if rc == 0:
+            return stdout
+
+    # 修复尝试 2：删掉最后一个不完整小节（从最后一个 | 截断）
+    last_bar = fixed.rfind("|", 0, len(fixed) - 1)
+    if last_bar > 0:
+        truncated = fixed[:last_bar + 1]
+        rc, stdout, stderr = await try_convert(truncated)
+        if rc == 0:
+            return stdout
+
+    raise RuntimeError(
+        f"jianpu-ly 转换失败（已尝试自动修复）:\n{stderr[-1000:]}"
+    )
 
 
 async def _compile_single(

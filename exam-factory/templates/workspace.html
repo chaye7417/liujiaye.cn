@@ -705,6 +705,23 @@
                 </div>
             </div>
 
+            <!-- 简谱互译设置（仅选了"简谱互译"时显示） -->
+            <div class="form-group" id="mt-jianpu-settings" style="display:none;">
+                <label>简谱互译设置</label>
+                <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:14px;">题目数量</span>
+                        <input type="number" id="mt-jianpu-n" value="5" min="1" max="10" style="width:60px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
+                        <span style="font-size:13px;color:var(--text-muted);">题（每题2分）</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:14px;">每题小节数</span>
+                        <input type="number" id="mt-jianpu-bars" value="4" min="2" max="8" style="width:60px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;">
+                        <span style="font-size:13px;color:var(--text-muted);">小节</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- 选择题设置（仅选了"选择题"时显示） -->
             <div class="form-group" id="mt-choice-settings" style="display:none;">
                 <label>选择题设置</label>
@@ -1187,12 +1204,18 @@
         updateMtSelection();
     }
 
+    function getMtJianpuScore() {
+        const n = parseInt(document.getElementById('mt-jianpu-n').value) || 0;
+        return n * 2;
+    }
+
     function updateMtSelection() {
         const selected = document.querySelectorAll('.mt-type-tag[data-key].selected');
         let totalScore = 0;
         let hasChoice = false;
         let hasNoteNames = false;
         let hasRhythm = false;
+        let hasJianpu = false;
         selected.forEach(t => {
             if (t.dataset.key === 'choice') {
                 hasChoice = true;
@@ -1203,6 +1226,9 @@
             } else if (t.dataset.key === 'rhythm') {
                 hasRhythm = true;
                 totalScore += getMtRhythmScore();
+            } else if (t.dataset.key === 'jianpu') {
+                hasJianpu = true;
+                totalScore += getMtJianpuScore();
             } else {
                 totalScore += parseFloat(t.dataset.score) || 0;
             }
@@ -1212,6 +1238,7 @@
         document.getElementById('mt-choice-settings').style.display = hasChoice ? '' : 'none';
         document.getElementById('mt-note-names-settings').style.display = hasNoteNames ? '' : 'none';
         document.getElementById('mt-rhythm-settings').style.display = hasRhythm ? '' : 'none';
+        document.getElementById('mt-jianpu-settings').style.display = hasJianpu ? '' : 'none';
         // 难度按钮：只选了音值组合时隐藏（预设已接管）
         const hasNonRhythm = Array.from(selected).some(t => t.dataset.key !== 'rhythm');
         document.getElementById('mt-diff').closest('.form-group').style.display =
@@ -1229,6 +1256,9 @@
     document.getElementById('mt-nn-reverse').addEventListener('input', updateMtSelection);
     document.getElementById('mt-nn-enh-forward').addEventListener('input', updateMtSelection);
     document.getElementById('mt-nn-enh-reverse').addEventListener('input', updateMtSelection);
+    // 简谱互译数量变化时更新分数
+    document.getElementById('mt-jianpu-n').addEventListener('input', updateMtSelection);
+    document.getElementById('mt-jianpu-bars').addEventListener('input', updateMtSelection);
     // 音值组合数量变化时更新分数
     document.getElementById('mt-rhythm-writing-n').addEventListener('input', updateMtSelection);
     document.getElementById('mt-rhythm-correction-n').addEventListener('input', updateMtSelection);
@@ -1567,6 +1597,11 @@
             params.choice_single_n = parseInt(document.getElementById('mt-choice-single-n').value) || 5;
             params.choice_multi_n = parseInt(document.getElementById('mt-choice-multi-n').value) || 5;
         }
+        // 如果选了简谱互译，附带题数和小节数
+        if (selectedTypes.includes('jianpu')) {
+            params.jianpu_n = parseInt(document.getElementById('mt-jianpu-n').value) || 5;
+            params.jianpu_bars = parseInt(document.getElementById('mt-jianpu-bars').value) || 4;
+        }
         return params;
     }
 
@@ -1873,6 +1908,7 @@
         document.getElementById('mt-choice-settings').style.display = 'none';
         document.getElementById('mt-note-names-settings').style.display = 'none';
         document.getElementById('mt-rhythm-settings').style.display = 'none';
+        document.getElementById('mt-jianpu-settings').style.display = 'none';
         updateMtSelection();
         document.getElementById('mhFileInput').value = '';
         document.getElementById('mhFileName').textContent = '';

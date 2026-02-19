@@ -447,6 +447,15 @@ def build_user_content(
                 f"- 本卷要求：单选{single_n}题 + 多选{multi_n}题，"
                 f"共{choice_score:.1f}分"
             )
+        elif key == "jianpu":
+            jp_n = int(generation_params.get("jianpu_n", 5))
+            jp_bars = int(generation_params.get("jianpu_bars", 4))
+            jp_score = jp_n * 2
+            total_score += jp_score
+            section_parts.append(
+                f"- 本卷要求：共{jp_n}道互译题，每题{jp_bars}小节，"
+                f"每题2分，共{jp_score}分"
+            )
         else:
             total_score += QUESTION_TYPE_SCORES.get(key, 0)
 
