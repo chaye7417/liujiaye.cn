@@ -420,6 +420,13 @@ async def _preprocess_jianpu(markdown: str, work_dir: Path) -> str:
         jianpu_text = match.group(1).strip()
         name = f"jianpu_{idx}"
 
+        # 检测并提取谱号标记（CLEF:bass 等）
+        clef = "treble"
+        if jianpu_text.startswith("CLEF:"):
+            first_nl = jianpu_text.index("\n")
+            clef = jianpu_text[5:first_nl].strip()
+            jianpu_text = jianpu_text[first_nl + 1:]
+
         # 尝试转换，若失败则修复后重试一次
         ly_content = await _run_jianpu_ly(jianpu_text, name, work_dir)
 
@@ -428,6 +435,16 @@ async def _preprocess_jianpu(markdown: str, work_dir: Path) -> str:
             '% \\header { tagline="" }',
             '\\header { tagline="" }',
         )
+        # 注入谱号（非高音谱号时替换或插入 \clef）
+        if clef != "treble":
+            if "\\clef treble" in ly_content:
+                ly_content = ly_content.replace(
+                    "\\clef treble", f"\\clef {clef}", 1,
+                )
+            else:
+                ly_content = re.sub(
+                    r"(\\key\s)", rf"\\clef {clef} \1", ly_content, count=1,
+                )
         # 注入字体设置，使 jianpu 谱例与全局音乐字体一致
         ly_content = '\\include "font-settings.ily"\n' + ly_content
         ly_file = work_dir / f"{name}.ly"
