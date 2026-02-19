@@ -737,37 +737,80 @@
                         <span style="font-size:13px;color:var(--text-muted);">题</span>
                     </div>
                 </div>
-                <!-- 拍号胶囊 -->
+                <!-- 预设按钮 -->
                 <div style="margin-bottom:10px;">
-                    <span style="font-size:13px;color:var(--text-muted);margin-bottom:6px;display:block;">拍号（不选则按难度自动分配）</span>
-                    <div class="mt-type-tags" id="mt-rhythm-ts-tags">
-                        <span class="mt-type-tag mt-rhythm-ts" data-ts="2/4" onclick="this.classList.toggle('selected')">2/4</span>
-                        <span class="mt-type-tag mt-rhythm-ts" data-ts="3/4" onclick="this.classList.toggle('selected')">3/4</span>
-                        <span class="mt-type-tag mt-rhythm-ts" data-ts="4/4" onclick="this.classList.toggle('selected')">4/4</span>
-                        <span class="mt-type-tag mt-rhythm-ts" data-ts="C" onclick="this.classList.toggle('selected')">C</span>
-                        <span class="mt-type-tag mt-rhythm-ts" data-ts="3/8" onclick="this.classList.toggle('selected')">3/8</span>
-                        <span class="mt-type-tag mt-rhythm-ts" data-ts="6/8" onclick="this.classList.toggle('selected')">6/8</span>
-                        <span class="mt-type-tag mt-rhythm-ts" data-ts="2/2" onclick="this.classList.toggle('selected')">2/2</span>
-                        <span class="mt-type-tag mt-rhythm-ts" data-ts="cut_c" onclick="this.classList.toggle('selected')">&#8373;</span>
-                        <span class="mt-type-tag mt-rhythm-ts" data-ts="9/8" onclick="this.classList.toggle('selected')">9/8</span>
-                        <span class="mt-type-tag mt-rhythm-ts" data-ts="12/8" onclick="this.classList.toggle('selected')">12/8</span>
-                        <span class="mt-type-tag mt-rhythm-ts" data-ts="5/4" onclick="this.classList.toggle('selected')">5/4</span>
+                    <span style="font-size:13px;color:var(--text-muted);margin-bottom:6px;display:block;">快速预设</span>
+                    <div class="difficulty-options" id="mt-rhythm-presets">
+                        <div class="diff-option selected" data-preset="basic" onclick="applyRhythmPreset('basic')">基础</div>
+                        <div class="diff-option" data-preset="intermediate" onclick="applyRhythmPreset('intermediate')">进阶</div>
+                        <div class="diff-option" data-preset="compound" onclick="applyRhythmPreset('compound')">复拍子</div>
+                        <div class="diff-option" data-preset="all" onclick="applyRhythmPreset('all')">综合</div>
                     </div>
                 </div>
-                <!-- 节奏型胶囊 -->
-                <div>
-                    <span style="font-size:13px;color:var(--text-muted);margin-bottom:6px;display:block;">节奏型（不选则全部随机）</span>
-                    <div class="mt-type-tags" id="mt-rhythm-pattern-tags">
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="eighth_sixteenths" onclick="this.classList.toggle('selected')" title="前八后十六"><img src="/static/img/rhythm/eighth_sixteenths.svg" alt="前八后十六"></span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="sixteenths_eighth" onclick="this.classList.toggle('selected')" title="前十六后八"><img src="/static/img/rhythm/sixteenths_eighth.svg" alt="前十六后八"></span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="dotted_front" onclick="this.classList.toggle('selected')" title="前附点"><img src="/static/img/rhythm/dotted_front.svg" alt="前附点"></span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="dotted_back" onclick="this.classList.toggle('selected')" title="后附点"><img src="/static/img/rhythm/dotted_back.svg" alt="后附点"></span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="syncopation" onclick="this.classList.toggle('selected')" title="切分"><img src="/static/img/rhythm/syncopation.svg" alt="切分"></span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="big_sync" onclick="this.classList.toggle('selected')" title="大切分"><img src="/static/img/rhythm/big_sync.svg" alt="大切分"></span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="ties" onclick="this.classList.toggle('selected')" title="同音连线"><img src="/static/img/rhythm/ties.svg" alt="同音连线"></span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="triplet" onclick="this.classList.toggle('selected')" title="三连音"><img src="/static/img/rhythm/triplet.svg" alt="三连音"></span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="duplet" onclick="this.classList.toggle('selected')" title="二连音"><img src="/static/img/rhythm/duplet.svg" alt="二连音"></span>
-                        <span class="mt-type-tag mt-rhythm-pat" data-pat="quadruplet" onclick="this.classList.toggle('selected')" title="四连音"><img src="/static/img/rhythm/quadruplet.svg" alt="四连音"></span>
+                <!-- 自定义展开按钮 -->
+                <div style="margin-bottom:6px;">
+                    <span onclick="toggleRhythmCustom()" style="font-size:13px;color:var(--primary);cursor:pointer;user-select:none;" id="mt-rhythm-custom-toggle">
+                        ▶ 自定义拍号和节奏型
+                    </span>
+                </div>
+                <!-- 可折叠的自定义区 -->
+                <div id="mt-rhythm-custom" style="display:none;">
+                    <!-- 拍号胶囊 -->
+                    <div style="margin-bottom:10px;">
+                        <span style="font-size:13px;color:var(--text-muted);margin-bottom:6px;display:block;">拍号</span>
+                        <div class="mt-type-tags" id="mt-rhythm-ts-tags">
+                            <span class="mt-type-tag mt-rhythm-ts" data-ts="2/4" onclick="this.classList.toggle('selected');clearRhythmPreset()">2/4</span>
+                            <span class="mt-type-tag mt-rhythm-ts" data-ts="3/4" onclick="this.classList.toggle('selected');clearRhythmPreset()">3/4</span>
+                            <span class="mt-type-tag mt-rhythm-ts" data-ts="4/4" onclick="this.classList.toggle('selected');clearRhythmPreset()">4/4</span>
+                            <span class="mt-type-tag mt-rhythm-ts" data-ts="C" onclick="this.classList.toggle('selected');clearRhythmPreset()">C</span>
+                            <span class="mt-type-tag mt-rhythm-ts" data-ts="3/8" onclick="this.classList.toggle('selected');clearRhythmPreset()">3/8</span>
+                            <span class="mt-type-tag mt-rhythm-ts" data-ts="6/8" onclick="this.classList.toggle('selected');clearRhythmPreset()">6/8</span>
+                            <span class="mt-type-tag mt-rhythm-ts" data-ts="2/2" onclick="this.classList.toggle('selected');clearRhythmPreset()">2/2</span>
+                            <span class="mt-type-tag mt-rhythm-ts" data-ts="cut_c" onclick="this.classList.toggle('selected');clearRhythmPreset()">&#8373;</span>
+                            <span class="mt-type-tag mt-rhythm-ts" data-ts="9/8" onclick="this.classList.toggle('selected');clearRhythmPreset()">9/8</span>
+                            <span class="mt-type-tag mt-rhythm-ts" data-ts="12/8" onclick="this.classList.toggle('selected');clearRhythmPreset()">12/8</span>
+                            <span class="mt-type-tag mt-rhythm-ts" data-ts="5/4" onclick="this.classList.toggle('selected');clearRhythmPreset()">5/4</span>
+                        </div>
+                    </div>
+                    <!-- 节奏型胶囊 -->
+                    <div>
+                        <span style="font-size:13px;color:var(--text-muted);margin-bottom:4px;display:block;">通用</span>
+                        <div class="mt-type-tags" id="mt-rhythm-pattern-tags" style="margin-bottom:8px;">
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="double_eighth" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="双八"><img src="/static/img/rhythm/double_eighth.svg" alt="双八"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="four_sixteenths" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="四个十六"><img src="/static/img/rhythm/four_sixteenths.svg" alt="四个十六"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="eighth_sixteenths" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="前八后十六"><img src="/static/img/rhythm/eighth_sixteenths.svg" alt="前八后十六"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="sixteenths_eighth" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="前十六后八"><img src="/static/img/rhythm/sixteenths_eighth.svg" alt="前十六后八"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="dotted_front" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="前附点"><img src="/static/img/rhythm/dotted_front.svg" alt="前附点"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="dotted_back" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="后附点"><img src="/static/img/rhythm/dotted_back.svg" alt="后附点"></span>
+                        </div>
+                        <span style="font-size:13px;color:var(--text-muted);margin-bottom:4px;display:block;">单拍子</span>
+                        <div class="mt-type-tags" style="margin-bottom:8px;">
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="syncopation" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="切分"><img src="/static/img/rhythm/syncopation.svg" alt="切分"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="triplet" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="三连音"><img src="/static/img/rhythm/triplet.svg" alt="三连音"></span>
+                        </div>
+                        <span style="font-size:13px;color:var(--text-muted);margin-bottom:4px;display:block;">复拍子</span>
+                        <div class="mt-type-tags" style="margin-bottom:8px;">
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="quarter_eighth" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="前四后八"><img src="/static/img/rhythm/quarter_eighth.svg" alt="前四后八"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="eighth_quarter" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="前八后四"><img src="/static/img/rhythm/eighth_quarter.svg" alt="前八后四"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="duplet" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="二连音"><img src="/static/img/rhythm/duplet.svg" alt="二连音"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="quadruplet" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="四连音"><img src="/static/img/rhythm/quadruplet.svg" alt="四连音"></span>
+                        </div>
+                        <span style="font-size:13px;color:var(--text-muted);margin-bottom:4px;display:block;">跨拍</span>
+                        <div class="mt-type-tags" style="margin-bottom:8px;">
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="half_note" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="二分音符"><img src="/static/img/rhythm/half_note.svg" alt="二分音符"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="dotted_half" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="附点二分"><img src="/static/img/rhythm/dotted_half.svg" alt="附点二分"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="whole_note" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="全音符"><img src="/static/img/rhythm/whole_note.svg" alt="全音符"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="big_sync" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="大切分"><img src="/static/img/rhythm/big_sync.svg" alt="大切分"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="big_sync_16f" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="前十六大切分"><img src="/static/img/rhythm/big_sync_16f.svg" alt="前十六大切分"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="big_sync_16b" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="后十六大切分"><img src="/static/img/rhythm/big_sync_16b.svg" alt="后十六大切分"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="big_sync_16fb" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="前十六后十六大切分"><img src="/static/img/rhythm/big_sync_16fb.svg" alt="前十六后十六大切分"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="big_sync_dot_f" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="前附点大切分"><img src="/static/img/rhythm/big_sync_dot_f.svg" alt="前附点大切分"></span>
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="big_sync_dot_b" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="后附点大切分"><img src="/static/img/rhythm/big_sync_dot_b.svg" alt="后附点大切分"></span>
+                        </div>
+                        <span style="font-size:13px;color:var(--text-muted);margin-bottom:4px;display:block;">其他</span>
+                        <div class="mt-type-tags">
+                            <span class="mt-type-tag mt-rhythm-pat" data-pat="ties" onclick="this.classList.toggle('selected');clearRhythmPreset()" title="同音连线"><img src="/static/img/rhythm/ties.svg" alt="同音连线"></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -782,15 +825,18 @@
             </div>
 
             <div class="form-group">
-                <label for="mt-font">乐谱字体</label>
-                <select id="mt-font" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg);color:var(--text);">
-                    <option value="gonville">Gonville（传统手刻）</option>
-                    <option value="emmentaler">Emmentaler（LilyPond 默认）</option>
-                    <option value="profondo">Profondo（现代清晰）</option>
-                    <option value="cadence">Cadence（优雅圆润）</option>
-                    <option value="lilyjazz">LilyJazz（手写爵士）</option>
-                    <option value="beethoven">Beethoven（古典风格）</option>
-                </select>
+                <label>乐谱字体</label>
+                <div class="mt-type-tags" id="mt-font-tags">
+                    <span class="mt-type-tag mt-font-tag selected" data-font="gonville" onclick="selectMtFont(this)">Gonville</span>
+                    <span class="mt-type-tag mt-font-tag" data-font="emmentaler" onclick="selectMtFont(this)">Emmentaler</span>
+                    <span class="mt-type-tag mt-font-tag" data-font="profondo" onclick="selectMtFont(this)">Profondo</span>
+                    <span class="mt-type-tag mt-font-tag" data-font="cadence" onclick="selectMtFont(this)">Cadence</span>
+                    <span class="mt-type-tag mt-font-tag" data-font="lilyjazz" onclick="selectMtFont(this)">LilyJazz</span>
+                    <span class="mt-type-tag mt-font-tag" data-font="beethoven" onclick="selectMtFont(this)">Beethoven</span>
+                </div>
+                <div id="mt-font-preview" style="margin-top:8px;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);text-align:center;overflow-x:auto;">
+                    <img src="/static/img/fonts/gonville.svg" alt="字体预览" style="height:40px;max-width:100%;">
+                </div>
             </div>
 
             <div class="form-group">
@@ -1165,6 +1211,10 @@
         document.getElementById('mt-choice-settings').style.display = hasChoice ? '' : 'none';
         document.getElementById('mt-note-names-settings').style.display = hasNoteNames ? '' : 'none';
         document.getElementById('mt-rhythm-settings').style.display = hasRhythm ? '' : 'none';
+        // 难度按钮：只选了音值组合时隐藏（预设已接管）
+        const hasNonRhythm = Array.from(selected).some(t => t.dataset.key !== 'rhythm');
+        document.getElementById('mt-diff').closest('.form-group').style.display =
+            (selected.length === 0 || hasNonRhythm) ? '' : 'none';
         // 同步全选按钮
         const all = document.querySelectorAll('.mt-type-tag[data-key]');
         document.getElementById('mt-select-all').classList.toggle('active', all.length === selected.length);
@@ -1181,6 +1231,68 @@
     // 音值组合数量变化时更新分数
     document.getElementById('mt-rhythm-writing-n').addEventListener('input', updateMtSelection);
     document.getElementById('mt-rhythm-correction-n').addEventListener('input', updateMtSelection);
+
+    // --- 音值组合预设系统 ---
+    const RHYTHM_PRESETS = {
+        basic: {
+            ts: ['2/4', '3/4', '4/4'],
+            pats: ['double_eighth', 'four_sixteenths', 'eighth_sixteenths', 'sixteenths_eighth', 'dotted_front', 'dotted_back'],
+        },
+        intermediate: {
+            ts: ['2/4', '3/4', '4/4'],
+            pats: ['double_eighth', 'four_sixteenths', 'eighth_sixteenths', 'sixteenths_eighth', 'dotted_front', 'dotted_back', 'syncopation', 'triplet', 'big_sync', 'half_note'],
+        },
+        compound: {
+            ts: ['6/8', '9/8', '12/8'],
+            pats: ['double_eighth', 'quarter_eighth', 'eighth_quarter', 'four_sixteenths', 'eighth_sixteenths', 'sixteenths_eighth', 'dotted_front', 'dotted_back', 'duplet', 'quadruplet', 'half_note'],
+        },
+        all: {
+            ts: ['2/4', '3/4', '4/4', 'C', '3/8', '6/8', '2/2', 'cut_c', '9/8', '12/8', '5/4'],
+            pats: ['double_eighth', 'four_sixteenths', 'eighth_sixteenths', 'sixteenths_eighth', 'dotted_front', 'dotted_back', 'syncopation', 'triplet', 'quarter_eighth', 'eighth_quarter', 'duplet', 'quadruplet', 'half_note', 'dotted_half', 'whole_note', 'big_sync', 'big_sync_16f', 'big_sync_16b', 'big_sync_16fb', 'big_sync_dot_f', 'big_sync_dot_b', 'ties'],
+        },
+    };
+
+    function applyRhythmPreset(name) {
+        const preset = RHYTHM_PRESETS[name];
+        if (!preset) return;
+        // 高亮预设按钮
+        document.querySelectorAll('#mt-rhythm-presets .diff-option').forEach(el => {
+            el.classList.toggle('selected', el.dataset.preset === name);
+        });
+        // 设置拍号
+        document.querySelectorAll('.mt-rhythm-ts').forEach(el => {
+            el.classList.toggle('selected', preset.ts.includes(el.dataset.ts));
+        });
+        // 设置节奏型
+        document.querySelectorAll('.mt-rhythm-pat').forEach(el => {
+            el.classList.toggle('selected', preset.pats.includes(el.dataset.pat));
+        });
+    }
+
+    function clearRhythmPreset() {
+        document.querySelectorAll('#mt-rhythm-presets .diff-option').forEach(el => {
+            el.classList.remove('selected');
+        });
+    }
+
+    function toggleRhythmCustom() {
+        const panel = document.getElementById('mt-rhythm-custom');
+        const toggle = document.getElementById('mt-rhythm-custom-toggle');
+        const open = panel.style.display === 'none';
+        panel.style.display = open ? '' : 'none';
+        toggle.textContent = (open ? '▼ ' : '▶ ') + '自定义拍号和节奏型';
+    }
+
+    // 页面加载时自动应用默认预设
+    applyRhythmPreset('basic');
+
+    // --- 乐谱字体胶囊 ---
+    function selectMtFont(el) {
+        document.querySelectorAll('.mt-font-tag').forEach(t => t.classList.remove('selected'));
+        el.classList.add('selected');
+        const font = el.dataset.font;
+        document.querySelector('#mt-font-preview img').src = '/static/img/fonts/' + font + '.svg';
+    }
 
     function toggleNnClef(el) {
         el.classList.toggle('selected');
@@ -1427,7 +1539,7 @@
             difficulty: diffEl ? diffEl.dataset.diff : '中级',
             extra_requirements: document.getElementById('mt-extra').value.trim(),
             title: document.getElementById('mt-title').value.trim(),
-            music_font: document.getElementById('mt-font').value,
+            music_font: (document.querySelector('.mt-font-tag.selected') || {}).dataset?.font || 'gonville',
         };
         // 如果选了音名标记，附带子类题数和谱号
         if (selectedTypes.includes('note_names')) {

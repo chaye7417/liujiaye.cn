@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.2" width="10.21mm" height="6.65mm" viewBox="0.0000 -0.0000 5.8084 3.7850">
+<style type="text/css">
+<![CDATA[
+tspan { white-space: pre; }
+]]>
+</style>
+<a style="color:inherit;" xlink:href="textedit:///tmp/double_eighth.ly:15:7:8">
+<g transform="translate(3.1742, 0.2400)">
+<polygon stroke-linejoin="round" stroke-linecap="round" stroke-width="0.0800" fill="currentColor" stroke="currentColor" points="2.5942 -0.2000 2.5942 0.2000 0.0400 0.2000 0.0400 -0.2000"/>
+</g>
+</a>
+<a style="color:inherit;" xlink:href="textedit:///tmp/double_eighth.ly:15:4:5">
+<g transform="translate(2.0000, 3.2400)">
+<path transform="scale(0.0040, -0.0040)" d="M218 136c66 0 108 -36 108 -89c0 -89 -113 -183 -218 -183c-66 0 -108 36 -108 89c0 89 113 183 218 183z" fill="currentColor"/>
+</g>
+</a>
+<g transform="translate(3.2392, 3.2400)">
+<rect x="-0.0650" y="-3.0000" width="0.1300" height="2.8139" ry="0.0400" fill="currentColor"/>
+</g>
+<a style="color:inherit;" xlink:href="textedit:///tmp/double_eighth.ly:15:9:10">
+<g transform="translate(4.5042, 3.2400)">
+<path transform="scale(0.0040, -0.0040)" d="M218 136c66 0 108 -36 108 -89c0 -89 -113 -183 -218 -183c-66 0 -108 36 -108 89c0 89 113 183 218 183z" fill="currentColor"/>
+</g>
+</a>
+<g transform="translate(5.7434, 3.2400)">
+<rect x="-0.0650" y="-3.0000" width="0.1300" height="2.8139" ry="0.0400" fill="currentColor"/>
+</g>
+</svg>
