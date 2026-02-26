@@ -74,3 +74,7 @@ QUIZ_BANK_DIR = BASE_DIR / "app" / "modes" / "music_history" / "quiz_bank"
 LATEX_TEMPLATE_DIR = BASE_DIR / "latex_templates"
 MD2LATEX_SCRIPT = BASE_DIR / "scripts" / "md2latex.py"
 FONT_SETTINGS_ILY = LATEX_TEMPLATE_DIR / "font-settings.ily"
+
+# 管理员配置
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")

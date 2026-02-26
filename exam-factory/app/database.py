@@ -23,7 +23,14 @@ async def init_db() -> None:
                 avatar_url TEXT,
                 wechat_openid TEXT UNIQUE,
                 login_method TEXT DEFAULT 'email',
+                profile_completed INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'active',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS verify_codes (
@@ -80,6 +87,10 @@ async def init_db() -> None:
             await db.execute("ALTER TABLE users ADD COLUMN wechat_openid TEXT")
         if "login_method" not in user_columns:
             await db.execute("ALTER TABLE users ADD COLUMN login_method TEXT DEFAULT 'email'")
+        if "profile_completed" not in user_columns:
+            await db.execute("ALTER TABLE users ADD COLUMN profile_completed INTEGER DEFAULT 0")
+        if "status" not in user_columns:
+            await db.execute("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'")
 
         await db.commit()
     finally:

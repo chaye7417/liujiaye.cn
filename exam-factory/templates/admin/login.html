@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}管理后台 - 试卷工厂{% endblock %}
+
+{% block head %}
+<style>
+    :root {
+        --admin-primary: #2c3e50;
+        --admin-primary-dark: #1a252f;
+        --admin-primary-light: #ecf0f1;
+    }
+
+    .admin-login-wrapper {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #1a252f, #2c3e50, #34495e);
+    }
+
+    .admin-login-card {
+        background: var(--card-bg);
+        border-radius: var(--radius);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        padding: 40px;
+        width: 400px;
+    }
+
+    .admin-login-card h1 {
+        text-align: center;
+        color: var(--admin-primary);
+        margin-bottom: 8px;
+        font-size: 28px;
+    }
+
+    .admin-login-card .subtitle {
+        text-align: center;
+        color: var(--text-muted);
+        margin-bottom: 32px;
+        font-size: 15px;
+    }
+
+    .admin-login-card .badge {
+        display: inline-block;
+        background: var(--admin-primary);
+        color: white;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        margin-left: 6px;
+        vertical-align: middle;
+    }
+
+    .admin-login-card .btn-admin {
+        background: var(--admin-primary);
+        color: white;
+        width: 100%;
+        padding: 12px;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .admin-login-card .btn-admin:hover {
+        background: var(--admin-primary-dark);
+    }
+
+    .admin-login-card .btn-admin:disabled {
+        background: #7f8c8d;
+        cursor: not-allowed;
+    }
+
+    @media (max-width: 768px) {
+        .admin-login-card {
+            width: 90%;
+            padding: 24px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="admin-login-wrapper">
+    <div class="admin-login-card">
+        <h1>管理后台 <span class="badge">ADMIN</span></h1>
+        <p class="subtitle">请输入管理员账号登录</p>
+
+        <div id="alert" class="alert"></div>
+
+        <form id="adminLoginForm" onsubmit="return false;">
+            <div class="form-group">
+                <label for="username">用户名</label>
+                <input type="text" id="username" placeholder="管理员用户名" required autocomplete="username">
+            </div>
+
+            <div class="form-group">
+                <label for="password">密码</label>
+                <input type="password" id="password" placeholder="管理员密码" required autocomplete="current-password">
+            </div>
+
+            <button type="submit" class="btn-admin" id="loginBtn" onclick="adminLogin()">
+                登录
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function showAlert(msg, type) {
+        const el = document.getElementById('alert');
+        el.textContent = msg;
+        el.className = 'alert show alert-' + type;
+        if (type === 'success') setTimeout(function() { el.classList.remove('show'); }, 3000);
+    }
+
+    async function adminLogin() {
+        var username = document.getElementById('username').value.trim();
+        var password = document.getElementById('password').value.trim();
+        if (!username || !password) {
+            showAlert('请填写用户名和密码', 'error');
+            return;
+        }
+
+        var btn = document.getElementById('loginBtn');
+        btn.disabled = true;
+        btn.textContent = '登录中...';
+
+        try {
+            var form = new FormData();
+            form.append('username', username);
+            form.append('password', password);
+            var res = await fetch('/api/admin/login', { method: 'POST', body: form });
+            var data = await res.json();
+
+            if (res.ok) {
+                window.location.href = '/admin/dashboard';
+            } else {
+                showAlert(data.detail || '登录失败', 'error');
+                btn.disabled = false;
+                btn.textContent = '登录';
+            }
+        } catch (e) {
+            showAlert('网络错误', 'error');
+            btn.disabled = false;
+            btn.textContent = '登录';
+        }
+    }
+
+    document.getElementById('password').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') adminLogin();
+    });
+</script>
+{% endblock %}

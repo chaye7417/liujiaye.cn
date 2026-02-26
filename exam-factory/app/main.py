@@ -30,6 +30,8 @@ from app.auth import (
 from app.file_parser import parse_file
 from app.ai_service import stream_ai_chunks, clean_markdown, extract_exam_info
 from app.pdf_generator import generate_both_pdfs, MUSIC_FONTS, DEFAULT_MUSIC_FONT
+from app.profile.router import router as profile_router
+from app.admin.router import router as admin_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -38,6 +40,9 @@ app = FastAPI(title="试卷工厂", version="2.0.0")
 
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
+
+app.include_router(profile_router)
+app.include_router(admin_router)
 
 VALID_MODES = {"format", "generate", "music_theory", "music_history"}
 
@@ -768,8 +773,42 @@ async def page_login(request: Request):
 
 @app.get("/workspace", response_class=HTMLResponse)
 async def page_workspace(request: Request):
-    """工作台：未登录用户重定向到登录页。"""
+    """工作台：未登录重定向登录页，未完善资料重定向资料页。"""
     token = request.cookies.get("token")
     if not token or not verify_token(token):
         return RedirectResponse("/login", status_code=302)
+    # 检查是否已完善资料
+    payload = verify_token(token)
+    user_id = int(payload["sub"])
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT profile_completed FROM users WHERE id = ?", (user_id,)
+        )
+        row = await cursor.fetchone()
+    finally:
+        await db.close()
+    if not row or not row["profile_completed"]:
+        return RedirectResponse("/profile/setup", status_code=302)
     return templates.TemplateResponse("workspace.html", {"request": request})
+
+
+@app.get("/profile/setup", response_class=HTMLResponse)
+async def page_profile_setup(request: Request):
+    """资料补全页：未登录重定向登录页，已补全重定向工作台。"""
+    token = request.cookies.get("token")
+    if not token or not verify_token(token):
+        return RedirectResponse("/login", status_code=302)
+    payload = verify_token(token)
+    user_id = int(payload["sub"])
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT profile_completed FROM users WHERE id = ?", (user_id,)
+        )
+        row = await cursor.fetchone()
+    finally:
+        await db.close()
+    if row and row["profile_completed"]:
+        return RedirectResponse("/workspace", status_code=302)
+    return templates.TemplateResponse("profile_setup.html", {"request": request})

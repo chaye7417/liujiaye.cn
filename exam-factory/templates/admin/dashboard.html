@@ -1,0 +1,709 @@
+{% extends "base.html" %}
+{% block title %}管理后台 - 试卷工厂{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="/static/css/admin.css">
+<style>
+    :root {
+        --admin-primary: #2c3e50;
+        --admin-primary-dark: #1a252f;
+        --admin-primary-light: #ecf0f1;
+    }
+
+    body {
+        background: #f5f6fa;
+    }
+
+    /* 顶部导航 */
+    .admin-navbar {
+        background: var(--admin-primary);
+        color: white;
+        padding: 0 24px;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+
+    .admin-navbar .logo {
+        font-size: 18px;
+        font-weight: 700;
+        color: white;
+        text-decoration: none;
+    }
+
+    .admin-navbar .logo span {
+        font-weight: 400;
+        opacity: 0.7;
+        margin-left: 4px;
+        font-size: 14px;
+    }
+
+    .admin-navbar .btn-logout {
+        background: none;
+        border: 1px solid rgba(255,255,255,0.3);
+        color: white;
+        padding: 6px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.2s;
+    }
+
+    .admin-navbar .btn-logout:hover {
+        background: rgba(255,255,255,0.1);
+        border-color: rgba(255,255,255,0.5);
+    }
+
+    /* Tab 切换栏 */
+    .tab-bar {
+        background: white;
+        border-bottom: 1px solid var(--border);
+        padding: 0 24px;
+        display: flex;
+        gap: 0;
+    }
+
+    .tab-item {
+        padding: 14px 24px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-muted);
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        transition: all 0.2s;
+        user-select: none;
+    }
+
+    .tab-item:hover {
+        color: var(--admin-primary);
+    }
+
+    .tab-item.active {
+        color: var(--admin-primary);
+        border-bottom-color: var(--admin-primary);
+    }
+
+    /* 内容容器 */
+    .admin-content {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px;
+    }
+
+    .tab-panel {
+        display: none;
+    }
+
+    .tab-panel.active {
+        display: block;
+    }
+
+    /* 统计卡片 */
+    .stat-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: var(--radius);
+        padding: 24px;
+        box-shadow: var(--shadow);
+        text-align: center;
+    }
+
+    .stat-card .value {
+        font-size: 36px;
+        font-weight: 700;
+        color: var(--admin-primary);
+        margin-bottom: 4px;
+    }
+
+    .stat-card .label {
+        font-size: 14px;
+        color: var(--text-muted);
+    }
+
+    /* 工具栏 */
+    .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .toolbar input,
+    .toolbar select {
+        padding: 8px 14px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 14px;
+        font-family: inherit;
+    }
+
+    .toolbar input:focus,
+    .toolbar select:focus {
+        outline: none;
+        border-color: var(--admin-primary);
+    }
+
+    .toolbar input {
+        width: 260px;
+    }
+
+    /* 数据表格 */
+    .data-table-wrapper {
+        background: white;
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+    }
+
+    .data-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+    }
+
+    .data-table thead {
+        background: var(--admin-primary-light);
+    }
+
+    .data-table th {
+        padding: 12px 16px;
+        text-align: left;
+        font-weight: 600;
+        color: var(--text);
+        white-space: nowrap;
+    }
+
+    .data-table td {
+        padding: 12px 16px;
+        border-top: 1px solid #f0f0f0;
+        color: var(--text);
+    }
+
+    .data-table tbody tr:hover {
+        background: #fafbfc;
+    }
+
+    .data-table .empty-row td {
+        text-align: center;
+        color: var(--text-muted);
+        padding: 32px;
+    }
+
+    /* 状态标签 */
+    .status-tag {
+        display: inline-block;
+        padding: 2px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .status-tag.active {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .status-tag.disabled {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .status-tag.pending {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .status-tag.draft {
+        background: #cce5ff;
+        color: #004085;
+    }
+
+    .status-tag.done {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    /* 操作按钮 */
+    .btn-sm {
+        padding: 4px 12px;
+        font-size: 12px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: white;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-right: 4px;
+    }
+
+    .btn-sm:hover {
+        background: var(--bg);
+    }
+
+    .btn-sm.danger {
+        color: var(--danger);
+        border-color: var(--danger);
+    }
+
+    .btn-sm.danger:hover {
+        background: #fde8e8;
+    }
+
+    .btn-sm.warning {
+        color: #e67e22;
+        border-color: #e67e22;
+    }
+
+    .btn-sm.warning:hover {
+        background: #fef5e7;
+    }
+
+    .btn-sm.success {
+        color: var(--success);
+        border-color: var(--success);
+    }
+
+    .btn-sm.success:hover {
+        background: #d4edda;
+    }
+
+    /* 分页 */
+    .pagination {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        padding: 16px;
+    }
+
+    .pagination button {
+        padding: 6px 14px;
+        border: 1px solid var(--border);
+        background: white;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.2s;
+    }
+
+    .pagination button:hover:not(:disabled) {
+        background: var(--admin-primary-light);
+        border-color: var(--admin-primary);
+    }
+
+    .pagination button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+
+    .pagination .page-info {
+        font-size: 13px;
+        color: var(--text-muted);
+    }
+
+    /* 设置表单 */
+    .settings-card {
+        background: white;
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 32px;
+        max-width: 600px;
+    }
+
+    .settings-card h3 {
+        font-size: 16px;
+        margin-bottom: 20px;
+        color: var(--text);
+    }
+
+    .settings-card .form-group {
+        margin-bottom: 20px;
+    }
+
+    .settings-card .form-group label {
+        display: block;
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 6px;
+    }
+
+    .settings-card .form-group input {
+        width: 100%;
+        padding: 10px 14px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 15px;
+    }
+
+    .settings-card .form-group input:focus {
+        outline: none;
+        border-color: var(--admin-primary);
+        box-shadow: 0 0 0 3px rgba(44, 62, 80, 0.1);
+    }
+
+    .settings-card .btn-save {
+        background: var(--admin-primary);
+        color: white;
+        border: none;
+        padding: 10px 32px;
+        border-radius: 8px;
+        font-size: 15px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .settings-card .btn-save:hover {
+        background: var(--admin-primary-dark);
+    }
+
+    /* 响应式 */
+    @media (max-width: 768px) {
+        .admin-content {
+            padding: 16px;
+        }
+        .stat-cards {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .toolbar input {
+            width: 100%;
+        }
+        .data-table-wrapper {
+            overflow-x: auto;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<!-- 顶部导航 -->
+<div class="admin-navbar">
+    <a href="/admin/dashboard" class="logo">试卷工厂 <span>管理后台</span></a>
+    <button class="btn-logout" onclick="adminLogout()">退出</button>
+</div>
+
+<!-- Tab 切换栏 -->
+<div class="tab-bar">
+    <div class="tab-item active" data-tab="overview" onclick="switchTab('overview')">数据概览</div>
+    <div class="tab-item" data-tab="users" onclick="switchTab('users')">用户管理</div>
+    <div class="tab-item" data-tab="tasks" onclick="switchTab('tasks')">任务记录</div>
+    <div class="tab-item" data-tab="settings" onclick="switchTab('settings')">系统配置</div>
+</div>
+
+<!-- 内容区 -->
+<div class="admin-content">
+    <!-- Tab 1: 数据概览 -->
+    <div id="panel-overview" class="tab-panel active">
+        <div class="stat-cards" id="statCards">
+            <div class="stat-card">
+                <div class="value" id="statTotalUsers">-</div>
+                <div class="label">总用户数</div>
+            </div>
+            <div class="stat-card">
+                <div class="value" id="statTodayNew">-</div>
+                <div class="label">今日新增</div>
+            </div>
+            <div class="stat-card">
+                <div class="value" id="statTodayActive">-</div>
+                <div class="label">今日活跃</div>
+            </div>
+            <div class="stat-card">
+                <div class="value" id="statTotalTasks">-</div>
+                <div class="label">总任务数</div>
+            </div>
+            <div class="stat-card">
+                <div class="value" id="statTodayTasks">-</div>
+                <div class="label">今日任务</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab 2: 用户管理 -->
+    <div id="panel-users" class="tab-panel">
+        <div class="toolbar">
+            <input type="text" id="userSearch" placeholder="搜索邮箱..." oninput="debounceUserSearch()">
+        </div>
+        <div class="data-table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>昵称</th>
+                        <th>邮箱</th>
+                        <th>登录方式</th>
+                        <th>注册时间</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                    <tr class="empty-row"><td colspan="7">加载中...</td></tr>
+                </tbody>
+            </table>
+            <div class="pagination" id="usersPagination"></div>
+        </div>
+    </div>
+
+    <!-- Tab 3: 任务记录 -->
+    <div id="panel-tasks" class="tab-panel">
+        <div class="toolbar">
+            <select id="taskStatusFilter" onchange="loadTasks(1)">
+                <option value="">全部状态</option>
+                <option value="pending">pending</option>
+                <option value="draft">draft</option>
+                <option value="done">done</option>
+            </select>
+            <select id="taskModeFilter" onchange="loadTasks(1)">
+                <option value="">全部模式</option>
+                <option value="format">排版</option>
+                <option value="generate">出题</option>
+                <option value="music_theory">乐理</option>
+                <option value="music_history">音乐史</option>
+            </select>
+        </div>
+        <div class="data-table-wrapper">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>用户</th>
+                        <th>标题</th>
+                        <th>模式</th>
+                        <th>状态</th>
+                        <th>创建时间</th>
+                    </tr>
+                </thead>
+                <tbody id="tasksTableBody">
+                    <tr class="empty-row"><td colspan="6">加载中...</td></tr>
+                </tbody>
+            </table>
+            <div class="pagination" id="tasksPagination"></div>
+        </div>
+    </div>
+
+    <!-- Tab 4: 系统配置 -->
+    <div id="panel-settings" class="tab-panel">
+        <div class="settings-card">
+            <h3>使用限制</h3>
+            <div class="form-group">
+                <label for="settingDailyLimit">每日使用限额</label>
+                <input type="number" id="settingDailyLimit" min="1" placeholder="如：10">
+            </div>
+            <button class="btn-save" onclick="saveSettings()">保存配置</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    /* ============================================================
+     * 全局状态
+     * ============================================================ */
+    var usersPage = 1;
+    var tasksPage = 1;
+    var userSearchTimer = null;
+
+    /* ============================================================
+     * 全局 fetch 封装（401 自动跳转）
+     * ============================================================ */
+    async function adminFetch(url, options) {
+        var res = await fetch(url, options);
+        if (res.status === 401) {
+            window.location.href = '/admin/login';
+            return null;
+        }
+        return res;
+    }
+
+    /* ============================================================
+     * Tab 切换
+     * ============================================================ */
+    function switchTab(name) {
+        document.querySelectorAll('.tab-item').forEach(function(el) {
+            el.classList.toggle('active', el.dataset.tab === name);
+        });
+        document.querySelectorAll('.tab-panel').forEach(function(el) {
+            el.classList.toggle('active', el.id === 'panel-' + name);
+        });
+
+        if (name === 'overview') loadStats();
+        if (name === 'users') loadUsers(1);
+        if (name === 'tasks') loadTasks(1);
+        if (name === 'settings') loadSettings();
+    }
+
+    /* ============================================================
+     * 退出登录
+     * ============================================================ */
+    async function adminLogout() {
+        await fetch('/api/admin/logout', { method: 'POST' });
+        window.location.href = '/admin/login';
+    }
+
+    /* ============================================================
+     * Tab 1: 数据概览
+     * ============================================================ */
+    async function loadStats() {
+        var res = await adminFetch('/api/admin/stats');
+        if (!res) return;
+        var data = await res.json();
+        document.getElementById('statTotalUsers').textContent = data.total_users;
+        document.getElementById('statTodayNew').textContent = data.today_new_users;
+        document.getElementById('statTodayActive').textContent = data.today_active;
+        document.getElementById('statTotalTasks').textContent = data.total_tasks;
+        document.getElementById('statTodayTasks').textContent = data.today_tasks;
+    }
+
+    /* ============================================================
+     * Tab 2: 用户管理
+     * ============================================================ */
+    function debounceUserSearch() {
+        clearTimeout(userSearchTimer);
+        userSearchTimer = setTimeout(function() { loadUsers(1); }, 300);
+    }
+
+    async function loadUsers(page) {
+        usersPage = page;
+        var search = document.getElementById('userSearch').value.trim();
+        var url = '/api/admin/users?page=' + page + '&per_page=20';
+        if (search) url += '&search=' + encodeURIComponent(search);
+
+        var res = await adminFetch(url);
+        if (!res) return;
+        var data = await res.json();
+
+        var tbody = document.getElementById('usersTableBody');
+        if (data.users.length === 0) {
+            tbody.innerHTML = '<tr class="empty-row"><td colspan="7">暂无数据</td></tr>';
+        } else {
+            tbody.innerHTML = data.users.map(function(u) {
+                var statusClass = u.status === 'active' ? 'active' : 'disabled';
+                var statusLabel = u.status === 'active' ? '正常' : '已禁用';
+                var toggleBtn = u.status === 'active'
+                    ? '<button class="btn-sm warning" onclick="toggleUserStatus(' + u.id + ', \'disabled\')">禁用</button>'
+                    : '<button class="btn-sm success" onclick="toggleUserStatus(' + u.id + ', \'active\')">启用</button>';
+                return '<tr>' +
+                    '<td>' + u.id + '</td>' +
+                    '<td>' + (u.nickname || '-') + '</td>' +
+                    '<td>' + (u.email || '-') + '</td>' +
+                    '<td>' + (u.login_method || '-') + '</td>' +
+                    '<td>' + (u.created_at || '-') + '</td>' +
+                    '<td><span class="status-tag ' + statusClass + '">' + statusLabel + '</span></td>' +
+                    '<td>' + toggleBtn +
+                    '<button class="btn-sm danger" onclick="deleteUser(' + u.id + ')">删除</button></td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        renderPagination('usersPagination', data.total, data.page, data.per_page, 'loadUsers');
+    }
+
+    async function toggleUserStatus(userId, status) {
+        var form = new FormData();
+        form.append('status', status);
+        var res = await adminFetch('/api/admin/users/' + userId + '/status', {
+            method: 'PUT',
+            body: form,
+        });
+        if (res && res.ok) loadUsers(usersPage);
+    }
+
+    async function deleteUser(userId) {
+        if (!confirm('确定要删除此用户吗？该操作不可恢复，将同时删除该用户的所有任务和使用记录。')) return;
+        var res = await adminFetch('/api/admin/users/' + userId, { method: 'DELETE' });
+        if (res && res.ok) loadUsers(usersPage);
+    }
+
+    /* ============================================================
+     * Tab 3: 任务记录
+     * ============================================================ */
+    async function loadTasks(page) {
+        tasksPage = page;
+        var status = document.getElementById('taskStatusFilter').value;
+        var mode = document.getElementById('taskModeFilter').value;
+        var url = '/api/admin/tasks?page=' + page + '&per_page=20';
+        if (status) url += '&status=' + status;
+        if (mode) url += '&mode=' + mode;
+
+        var res = await adminFetch(url);
+        if (!res) return;
+        var data = await res.json();
+
+        var tbody = document.getElementById('tasksTableBody');
+        if (data.tasks.length === 0) {
+            tbody.innerHTML = '<tr class="empty-row"><td colspan="6">暂无数据</td></tr>';
+        } else {
+            tbody.innerHTML = data.tasks.map(function(t) {
+                var statusClass = t.status || 'pending';
+                var modeMap = { format: '排版', generate: '出题', music_theory: '乐理', music_history: '音乐史' };
+                return '<tr>' +
+                    '<td>' + t.id + '</td>' +
+                    '<td>' + (t.user_email || '-') + '</td>' +
+                    '<td>' + (t.title || '-') + '</td>' +
+                    '<td>' + (modeMap[t.mode] || t.mode || '-') + '</td>' +
+                    '<td><span class="status-tag ' + statusClass + '">' + (t.status || '-') + '</span></td>' +
+                    '<td>' + (t.created_at || '-') + '</td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        renderPagination('tasksPagination', data.total, data.page, data.per_page, 'loadTasks');
+    }
+
+    /* ============================================================
+     * Tab 4: 系统配置
+     * ============================================================ */
+    async function loadSettings() {
+        var res = await adminFetch('/api/admin/settings');
+        if (!res) return;
+        var data = await res.json();
+        document.getElementById('settingDailyLimit').value = data.daily_limit || '';
+    }
+
+    async function saveSettings() {
+        var dailyLimit = document.getElementById('settingDailyLimit').value;
+        var body = {};
+        if (dailyLimit) body.daily_limit = dailyLimit;
+
+        var res = await adminFetch('/api/admin/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (res && res.ok) {
+            alert('配置已保存');
+        }
+    }
+
+    /* ============================================================
+     * 通用分页渲染
+     * ============================================================ */
+    function renderPagination(containerId, total, page, perPage, loadFn) {
+        var container = document.getElementById(containerId);
+        var totalPages = Math.ceil(total / perPage);
+        if (totalPages <= 1) {
+            container.innerHTML = '<span class="page-info">共 ' + total + ' 条</span>';
+            return;
+        }
+        var html = '<button ' + (page <= 1 ? 'disabled' : '') + ' onclick="' + loadFn + '(' + (page - 1) + ')">上一页</button>' +
+            '<span class="page-info">第 ' + page + ' / ' + totalPages + ' 页（共 ' + total + ' 条）</span>' +
+            '<button ' + (page >= totalPages ? 'disabled' : '') + ' onclick="' + loadFn + '(' + (page + 1) + ')">下一页</button>';
+        container.innerHTML = html;
+    }
+
+    /* ============================================================
+     * 页面初始化
+     * ============================================================ */
+    loadStats();
+</script>
+{% endblock %}
