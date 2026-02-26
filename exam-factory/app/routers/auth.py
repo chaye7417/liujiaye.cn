@@ -7,18 +7,34 @@ from app.auth import (
     generate_code, send_verify_code, save_code, check_code,
     get_or_create_user, create_token, verify_token, login_by_password,
 )
+from app.config import UserStatus
+from app.database import db_session
 
 router = APIRouter(tags=["auth"])
 
 
 async def get_current_user(request: Request) -> dict:
-    """从请求中获取当前用户，未登录抛出 401。"""
+    """从请求中获取当前用户，未登录抛出 401，被禁用抛出 403。"""
     token = request.cookies.get("token")
     if not token:
         raise HTTPException(status_code=401, detail="未登录")
     payload = verify_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="登录已过期")
+
+    # 检查用户是否被禁用
+    user_id = payload.get("sub")
+    async with db_session() as db:
+        cursor = await db.execute(
+            "SELECT COALESCE(status, ?) FROM users WHERE id = ?",
+            (UserStatus.ACTIVE, user_id),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=401, detail="用户不存在")
+        if row[0] != UserStatus.ACTIVE:
+            raise HTTPException(status_code=403, detail="账号已被禁用")
+
     return payload
 
 
@@ -42,7 +58,7 @@ async def api_login(email: str = Form(...), code: str = Form(...)):
     user = await get_or_create_user(email)
     token = create_token(user["id"], email)
     response = JSONResponse({"message": "登录成功", "email": email, "nickname": user["nickname"]})
-    response.set_cookie(key="token", value=token, httponly=True, max_age=86400, samesite="lax")
+    response.set_cookie(key="token", value=token, httponly=True, secure=True, max_age=86400, samesite="lax")
     return response
 
 
@@ -54,7 +70,7 @@ async def api_login_password(nickname: str = Form(...), password: str = Form(...
         raise HTTPException(status_code=400, detail="用户名或密码错误")
     token = create_token(user["id"], user["email"])
     response = JSONResponse({"message": "登录成功", "email": user["email"], "nickname": user["nickname"]})
-    response.set_cookie(key="token", value=token, httponly=True, max_age=86400, samesite="lax")
+    response.set_cookie(key="token", value=token, httponly=True, secure=True, max_age=86400, samesite="lax")
     return response
 
 

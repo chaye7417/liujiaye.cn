@@ -1087,6 +1087,7 @@
 <script>
     let currentTaskId = null;
     let currentMode = 'format';
+    let isProcessing = false;
 
     // 每个模式各自的主题色
     const modeThemes = { format: '4e9b86', generate: '4e9b86', music_theory: '4e9b86', music_history: '4e9b86' };
@@ -1501,9 +1502,19 @@
 
     // ============ 文件选择回调 ============
 
+    const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+
     async function fmtFileSelected(input) {
         const file = input.files[0];
         if (!file) return;
+        if (file.size > MAX_FILE_SIZE) {
+            showAlert('文件大小超过 20MB 限制，请选择更小的文件', 'error');
+            input.value = '';
+            document.getElementById('fmtFileName').textContent = '';
+            document.getElementById('fmtUploadBtn').disabled = true;
+            return;
+        }
+        document.getElementById('fmtUploadBtn').disabled = false;
         document.getElementById('fmtFileName').textContent = file.name;
 
         const titleInput = document.getElementById('fmt-title');
@@ -1529,11 +1540,31 @@
     }
 
     function genFileSelected(input) {
-        if (input.files[0]) document.getElementById('genFileName').textContent = input.files[0].name;
+        const file = input.files[0];
+        if (!file) return;
+        if (file.size > MAX_FILE_SIZE) {
+            showAlert('文件大小超过 20MB 限制，请选择更小的文件', 'error');
+            input.value = '';
+            document.getElementById('genFileName').textContent = '';
+            document.getElementById('genUploadBtn').disabled = true;
+            return;
+        }
+        document.getElementById('genUploadBtn').disabled = false;
+        document.getElementById('genFileName').textContent = file.name;
     }
 
     function mtFileSelected(input) {
-        if (input.files[0]) document.getElementById('mtFileName').textContent = input.files[0].name;
+        const file = input.files[0];
+        if (!file) return;
+        if (file.size > MAX_FILE_SIZE) {
+            showAlert('文件大小超过 20MB 限制，请选择更小的文件', 'error');
+            input.value = '';
+            document.getElementById('mtFileName').textContent = '';
+            document.getElementById('mtUploadBtn').disabled = true;
+            return;
+        }
+        document.getElementById('mtUploadBtn').disabled = false;
+        document.getElementById('mtFileName').textContent = file.name;
     }
 
     async function mhFileSelected(input) {
@@ -1571,14 +1602,22 @@
 
     function collectGenParams() {
         const types = {};
-        if (document.getElementById('gen-choice').checked)
-            types['选择题'] = document.getElementById('gen-choice-n').value;
-        if (document.getElementById('gen-fill').checked)
-            types['填空题'] = document.getElementById('gen-fill-n').value;
-        if (document.getElementById('gen-short').checked)
-            types['简答题'] = document.getElementById('gen-short-n').value;
-        if (document.getElementById('gen-essay').checked)
-            types['论述题'] = document.getElementById('gen-essay-n').value;
+        const fields = [
+            { id: 'gen-choice', nId: 'gen-choice-n', label: '选择题' },
+            { id: 'gen-fill', nId: 'gen-fill-n', label: '填空题' },
+            { id: 'gen-short', nId: 'gen-short-n', label: '简答题' },
+            { id: 'gen-essay', nId: 'gen-essay-n', label: '论述题' },
+        ];
+        for (const f of fields) {
+            if (document.getElementById(f.id).checked) {
+                const val = parseInt(document.getElementById(f.nId).value);
+                if (isNaN(val) || val < 0) {
+                    showAlert(`${f.label}的数量必须为非负整数`, 'error');
+                    return null;
+                }
+                types[f.label] = val;
+            }
+        }
 
         const diffEl = document.querySelector('#gen-diff .diff-option.selected');
         return {
@@ -1587,6 +1626,15 @@
             extra_requirements: document.getElementById('gen-extra').value.trim(),
             title: document.getElementById('gen-title').value.trim(),
         };
+    }
+
+    function _validatePositiveInt(elemId, label) {
+        const val = parseInt(document.getElementById(elemId).value);
+        if (isNaN(val) || val < 0) {
+            showAlert(`${label}必须为非负整数`, 'error');
+            return null;
+        }
+        return val;
     }
 
     function collectMtParams() {
@@ -1603,17 +1651,39 @@
         if (selectedTypes.includes('note_names')) {
             const noteOn = document.querySelector('.mt-nn-sub[data-sub="note"]').classList.contains('selected');
             const enhOn = document.querySelector('.mt-nn-sub[data-sub="enh"]').classList.contains('selected');
-            params.note_names_forward_n = noteOn ? (parseInt(document.getElementById('mt-nn-forward').value) || 0) : 0;
-            params.note_names_reverse_n = noteOn ? (parseInt(document.getElementById('mt-nn-reverse').value) || 0) : 0;
-            params.note_names_enharmonic_forward_n = enhOn ? (parseInt(document.getElementById('mt-nn-enh-forward').value) || 0) : 0;
-            params.note_names_enharmonic_reverse_n = enhOn ? (parseInt(document.getElementById('mt-nn-enh-reverse').value) || 0) : 0;
+            if (noteOn) {
+                const fwd = _validatePositiveInt('mt-nn-forward', '音名题正向数量');
+                if (fwd === null) return null;
+                const rev = _validatePositiveInt('mt-nn-reverse', '音名题反向数量');
+                if (rev === null) return null;
+                params.note_names_forward_n = fwd;
+                params.note_names_reverse_n = rev;
+            } else {
+                params.note_names_forward_n = 0;
+                params.note_names_reverse_n = 0;
+            }
+            if (enhOn) {
+                const fwd = _validatePositiveInt('mt-nn-enh-forward', '等音题正向数量');
+                if (fwd === null) return null;
+                const rev = _validatePositiveInt('mt-nn-enh-reverse', '等音题反向数量');
+                if (rev === null) return null;
+                params.note_names_enharmonic_forward_n = fwd;
+                params.note_names_enharmonic_reverse_n = rev;
+            } else {
+                params.note_names_enharmonic_forward_n = 0;
+                params.note_names_enharmonic_reverse_n = 0;
+            }
             params.note_names_clefs = Array.from(document.querySelectorAll('.mt-nn-clef.selected')).map(c => c.dataset.clef);
             if (!params.note_names_clefs.length) params.note_names_clefs = ['treble'];
         }
         // 如果选了音值组合，附带写作/改错题数、拍号胶囊、节奏型胶囊
         if (selectedTypes.includes('rhythm')) {
-            params.rhythm_writing_n = parseInt(document.getElementById('mt-rhythm-writing-n').value) || 0;
-            params.rhythm_correction_n = parseInt(document.getElementById('mt-rhythm-correction-n').value) || 0;
+            const wn = _validatePositiveInt('mt-rhythm-writing-n', '音值组合写作题数量');
+            if (wn === null) return null;
+            const cn = _validatePositiveInt('mt-rhythm-correction-n', '音值组合改错题数量');
+            if (cn === null) return null;
+            params.rhythm_writing_n = wn;
+            params.rhythm_correction_n = cn;
             const selTs = Array.from(document.querySelectorAll('.mt-rhythm-ts.selected')).map(e => e.dataset.ts);
             if (selTs.length) params.rhythm_time_sigs = selTs;
             const selPat = Array.from(document.querySelectorAll('.mt-rhythm-pat.selected')).map(e => e.dataset.pat);
@@ -1621,22 +1691,40 @@
         }
         // 如果选了选择题，附带题数
         if (selectedTypes.includes('choice')) {
-            params.choice_single_n = parseInt(document.getElementById('mt-choice-single-n').value) || 5;
-            params.choice_multi_n = parseInt(document.getElementById('mt-choice-multi-n').value) || 5;
+            const sn = _validatePositiveInt('mt-choice-single-n', '单选题数量');
+            if (sn === null) return null;
+            const mn = _validatePositiveInt('mt-choice-multi-n', '多选题数量');
+            if (mn === null) return null;
+            params.choice_single_n = sn;
+            params.choice_multi_n = mn;
         }
         // 如果选了简谱互译，附带题数和小节数
         if (selectedTypes.includes('jianpu')) {
-            params.jianpu_n = parseInt(document.getElementById('mt-jianpu-n').value) || 5;
-            params.jianpu_bars = parseInt(document.getElementById('mt-jianpu-bars').value) || 4;
+            const jn = _validatePositiveInt('mt-jianpu-n', '简谱互译题数');
+            if (jn === null) return null;
+            const jb = _validatePositiveInt('mt-jianpu-bars', '简谱互译小节数');
+            if (jb === null) return null;
+            params.jianpu_n = jn || 5;
+            params.jianpu_bars = jb || 4;
         }
         return params;
     }
 
     function collectMhParams() {
+        const count = parseInt(document.getElementById('mh-count').value);
+        if (isNaN(count) || count < 0) {
+            showAlert('选题数量必须为非负整数', 'error');
+            return null;
+        }
+        const points = parseInt(document.getElementById('mh-points').value);
+        if (isNaN(points) || points < 1) {
+            showAlert('每题分值必须为正整数', 'error');
+            return null;
+        }
         return {
-            question_count: parseInt(document.getElementById('mh-count').value) || 0,
+            question_count: count,
             shuffle: document.getElementById('mh-shuffle').checked,
-            points_per_question: parseInt(document.getElementById('mh-points').value) || 2,
+            points_per_question: points,
             title: document.getElementById('mh-title').value.trim() || '音乐史选择题',
         };
     }
@@ -1644,6 +1732,10 @@
     // ============ 第 1 步：上传/提交 ============
 
     async function uploadFile() {
+        if (isProcessing) {
+            showAlert('正在处理中，请稍候...', 'error');
+            return;
+        }
         hideAlert();
 
         const form = new FormData();
@@ -1667,7 +1759,9 @@
             btn = document.getElementById('genUploadBtn');
             if (!file) { showAlert('请上传参考材料', 'error'); return; }
             form.append('file', file);
-            form.append('generation_params', JSON.stringify(collectGenParams()));
+            const genParams = collectGenParams();
+            if (genParams === null) return;
+            form.append('generation_params', JSON.stringify(genParams));
         } else if (currentMode === 'music_theory') {
             title = document.getElementById('mt-title').value.trim() || '乐理试卷';
             school = document.getElementById('mt-school').value.trim();
@@ -1675,6 +1769,7 @@
             file = document.getElementById('mtFileInput').files[0];
             btn = document.getElementById('mtUploadBtn');
             const mtParams = collectMtParams();
+            if (mtParams === null) return;
             if (!mtParams.selected_types.length) { showAlert('请至少选择一种题型', 'error'); return; }
             if (file) form.append('file', file);
             form.append('generation_params', JSON.stringify(mtParams));
@@ -1684,6 +1779,7 @@
             theme = modeThemes.music_history;
             btn = document.getElementById('mhUploadBtn');
             const mhParams = collectMhParams();
+            if (mhParams === null) return;
             if (window._mhCsvBlob) {
                 // 自定义上传模式
                 form.append('file', window._mhCsvBlob, 'combined.csv');
@@ -1701,6 +1797,7 @@
         form.append('theme', theme);
         form.append('model', document.getElementById('modelSelect').value || '');
 
+        isProcessing = true;
         btn.disabled = true;
         btn.textContent = currentMode === 'format' ? '上传中...' : '提交中...';
 
@@ -1713,11 +1810,13 @@
                 startAIParse();
             } else {
                 showAlert(data.detail || '提交失败', 'error');
+                isProcessing = false;
                 btn.disabled = false;
                 btn.textContent = currentMode === 'format' ? '上传并解析' : '开始出题';
             }
         } catch (e) {
             showAlert('网络错误，请重试', 'error');
+            isProcessing = false;
             btn.disabled = false;
             btn.textContent = currentMode === 'format' ? '上传并解析' : '开始出题';
         }
@@ -1726,6 +1825,10 @@
     // ============ 第 2 步：AI 流式解析 ============
 
     async function startAIParse() {
+        if (isProcessing && !currentTaskId) {
+            showAlert('正在处理中，请稍候...', 'error');
+            return;
+        }
         setStep(2);
         showPanel('panel2');
 
@@ -1754,8 +1857,15 @@
         let collected = '';
         let charCount = 0;
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+            controller.abort();
+        }, 300000); // 5 分钟超时
+
         try {
-            const res = await fetch(`/api/tasks/${currentTaskId}/parse`);
+            const res = await fetch(`/api/tasks/${currentTaskId}/parse`, {
+                signal: controller.signal,
+            });
             if (!res.ok) {
                 const err = await res.json();
                 throw new Error(err.detail || 'AI 请求失败');
@@ -1790,6 +1900,7 @@
                         parsePct.textContent = pct + '%';
                         parseMsg.textContent = `已接收 ${charCount} 字符...`;
                     } else if (event.type === 'done') {
+                        clearTimeout(timeoutId);
                         parseProgress.style.width = '100%';
                         parsePct.textContent = '100%';
                         parseMsg.textContent = '生成完成';
@@ -1798,6 +1909,7 @@
                         const cursorEl = streamBox.querySelector('.cursor');
                         if (cursorEl) cursorEl.remove();
 
+                        isProcessing = false;
                         setTimeout(() => {
                             document.getElementById('markdownEditor').value = event.markdown;
                             if (currentMode === 'music_history') {
@@ -1809,12 +1921,18 @@
                             }
                         }, 800);
                     } else if (event.type === 'error') {
+                        clearTimeout(timeoutId);
                         throw new Error(event.message);
                     }
                 }
             }
         } catch (e) {
-            showAlert('AI 生成失败: ' + e.message, 'error');
+            clearTimeout(timeoutId);
+            const msg = e.name === 'AbortError'
+                ? 'AI 处理超时（超过 5 分钟），请重试'
+                : 'AI 生成失败: ' + e.message;
+            showAlert(msg, 'error');
+            isProcessing = false;
             showPanel('panel1');
             setStep(1);
             resetButtons();
@@ -1824,12 +1942,17 @@
     // ============ 第 3 步：生成 PDF ============
 
     async function generatePDF() {
+        if (isProcessing) {
+            showAlert('正在处理中，请稍候...', 'error');
+            return;
+        }
         const md = document.getElementById('markdownEditor').value;
         if (!md.trim()) {
             showAlert('Markdown 内容不能为空', 'error');
             return;
         }
 
+        isProcessing = true;
         hideAlert();
         setStep(4);
         showPanel('panel3b');
@@ -1849,9 +1972,15 @@
         const form = new FormData();
         form.append('markdown', md);
 
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+            controller.abort();
+        }, 180000); // 3 分钟超时
+
         try {
             const res = await fetch(`/api/tasks/${currentTaskId}/generate-pdf`, {
                 method: 'POST', body: form,
+                signal: controller.signal,
             });
             if (!res.ok) {
                 const err = await res.json();
@@ -1881,6 +2010,7 @@
                         pdfMsg.textContent = event.msg;
                         pdfStatusText.textContent = event.msg;
                     } else if (event.type === 'done') {
+                        clearTimeout(timeoutId);
                         pdfProgress.style.width = '100%';
                         pdfPct.textContent = '100%';
                         pdfMsg.textContent = '生成完成';
@@ -1892,14 +2022,21 @@
                         document.getElementById('texLink').href = event.tex_url;
                         document.getElementById('zipLink').href = event.zip_url;
 
+                        isProcessing = false;
                         setTimeout(() => { showPanel('panel4'); }, 500);
                     } else if (event.type === 'error') {
+                        clearTimeout(timeoutId);
                         throw new Error(event.message);
                     }
                 }
             }
         } catch (e) {
-            showAlert('PDF 生成失败: ' + e.message, 'error');
+            clearTimeout(timeoutId);
+            const msg = e.name === 'AbortError'
+                ? 'PDF 生成超时（超过 3 分钟），请重试'
+                : 'PDF 生成失败: ' + e.message;
+            showAlert(msg, 'error');
+            isProcessing = false;
             showPanel('panel3');
             setStep(3);
         }
@@ -1908,6 +2045,7 @@
     // ============ 导航 ============
 
     function resetButtons() {
+        isProcessing = false;
         document.getElementById('fmtUploadBtn').disabled = false;
         document.getElementById('fmtUploadBtn').textContent = '上传并解析';
         document.getElementById('genUploadBtn').disabled = false;

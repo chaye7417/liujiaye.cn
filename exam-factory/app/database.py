@@ -1,20 +1,39 @@
 """数据库模块 - SQLite 异步操作。"""
 
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
 import aiosqlite
 from app.config import DATABASE_URL
 
 
 async def get_db() -> aiosqlite.Connection:
-    """获取数据库连接。"""
+    """获取数据库连接（供 FastAPI Depends 等场景使用）。"""
     db = await aiosqlite.connect(DATABASE_URL)
     db.row_factory = aiosqlite.Row
     return db
 
 
-async def init_db() -> None:
-    """初始化数据库表结构。"""
+@asynccontextmanager
+async def db_session() -> AsyncGenerator[aiosqlite.Connection, None]:
+    """异步上下文管理器，自动管理数据库连接的获取和关闭。
+
+    Usage::
+
+        async with db_session() as db:
+            cursor = await db.execute("SELECT ...")
+            ...
+    """
     db = await get_db()
     try:
+        yield db
+    finally:
+        await db.close()
+
+
+async def init_db() -> None:
+    """初始化数据库表结构。"""
+    async with db_session() as db:
         await db.executescript("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -96,5 +115,3 @@ async def init_db() -> None:
             await db.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
 
         await db.commit()
-    finally:
-        await db.close()

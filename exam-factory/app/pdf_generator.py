@@ -7,7 +7,8 @@ import shutil
 import stat
 from pathlib import Path
 
-from app.config import OUTPUT_DIR, LATEX_TEMPLATE_DIR, MD2LATEX_SCRIPT, FONT_SETTINGS_ILY, UPLOAD_DIR
+from app.config import OUTPUT_DIR, LATEX_TEMPLATE_DIR, MD2LATEX_SCRIPT, FONT_SETTINGS_ILY, UPLOAD_DIR, TaskMode
+from app.utils import strip_yaml_frontmatter
 
 # 可用的 LilyPond 音乐字体配置
 MUSIC_FONTS: dict[str, dict] = {
@@ -69,6 +70,74 @@ MUSIC_FONTS: dict[str, dict] = {
 }
 
 DEFAULT_MUSIC_FONT = "gonville"
+
+# LaTeX 特殊字符转义映射（用于用户输入的标题等，防止 LaTeX 注入）
+_LATEX_SPECIAL_CHARS: dict[str, str] = {
+    "\\": r"\textbackslash{}",
+    "&": r"\&",
+    "%": r"\%",
+    "$": r"\$",
+    "#": r"\#",
+    "_": r"\_",
+    "{": r"\{",
+    "}": r"\}",
+    "~": r"\textasciitilde{}",
+    "^": r"\textasciicircum{}",
+}
+
+
+def _escape_latex_title(text: str) -> str:
+    """转义用户输入文本中的 LaTeX 特殊字符，防止 LaTeX 注入攻击。
+
+    用于 _compile_music_history 等直接将用户输入写入 LaTeX 模板的场景。
+    注意：_compile_single 路径经过 md2latex.py 的 escape_latex() 处理，不需要此函数。
+
+    Args:
+        text: 用户输入的原始文本（如试卷标题）
+
+    Returns:
+        转义后的安全 LaTeX 文本
+    """
+    # 反斜杠必须最先替换，否则后续替换产生的反斜杠会被二次转义
+    result = text.replace("\\", _LATEX_SPECIAL_CHARS["\\"])
+    for char, escaped in _LATEX_SPECIAL_CHARS.items():
+        if char == "\\":
+            continue
+        result = result.replace(char, escaped)
+    return result
+
+
+# 常见 LaTeX 错误模式 → 中文友好提示
+_LATEX_ERROR_PATTERNS: list[tuple[str, str]] = [
+    ("Undefined control sequence", "内容中包含无法识别的命令"),
+    (r"Missing \$ inserted", "内容中包含需要转义的数学符号"),
+    ("File .* not found", "缺少必要的字体或宏包文件"),
+    ("Emergency stop", "编译异常终止，请检查内容格式"),
+    ("Too many unprocessed floats", "页面中浮动元素过多，请减少图片或谱例数量"),
+    ("Dimension too large", "内容尺寸超出页面限制"),
+]
+
+
+def _parse_latex_error(log_content: str) -> str:
+    """解析 LaTeX 编译日志，返回中文友好错误提示。
+
+    扫描日志中的常见错误模式，匹配后返回对应的中文说明。
+    若无法识别任何已知模式，返回通用提示。
+
+    Args:
+        log_content: XeLaTeX 编译输出的日志内容
+
+    Returns:
+        中文友好错误提示字符串
+    """
+    matched_hints: list[str] = []
+    for pattern, hint in _LATEX_ERROR_PATTERNS:
+        if re.search(pattern, log_content):
+            matched_hints.append(hint)
+
+    if matched_hints:
+        return "可能的原因：" + "；".join(matched_hints)
+    return "编译失败，请检查内容中是否包含特殊字符"
 
 
 def _generate_font_settings_ily(music_font: str = DEFAULT_MUSIC_FONT) -> str:
@@ -216,7 +285,8 @@ async def _compile_with_lilypond(
     out_pdf = lilypond_out / "main.pdf"
     if not out_pdf.exists():
         log_content = stdout.decode(errors="replace")
-        raise RuntimeError(f"XeLaTeX 编译失败（LilyPond 模式）:\n{log_content[-2000:]}")
+        hint = _parse_latex_error(log_content)
+        raise RuntimeError(f"XeLaTeX 编译失败（LilyPond 模式）- {hint}\n{log_content[-2000:]}")
 
     # 复制 PDF 回工作目录
     final_pdf = work_dir / "main.pdf"
@@ -224,32 +294,18 @@ async def _compile_with_lilypond(
     return final_pdf
 
 
-async def _compile_music_history(
-    task_id: int,
-    title: str,
-    theme: str,
-    show_answer: bool,
-    variant: str,
-    shuffle: bool = True,
-) -> Path:
-    """使用旧模板编译音乐史选择题 PDF。
-
-    旧模板通过 datatool 直接读取 CSV，自动编号、随机打乱选项、
-    记录答案到 .answers 文件，排版更专业。
+def _prepare_mh_workdir(task_id: int, variant: str) -> Path:
+    """准备音乐史编译的工作目录：创建目录、复制模板和 CSV。
 
     Args:
         task_id: 任务 ID
-        title: 试卷标题
-        theme: 主题色（HTML hex，不含 #）
-        show_answer: 是否为答案卷
         variant: 'exam' 或 'answer'
-        shuffle: 是否随机打乱选项
 
     Returns:
-        生成的 PDF 路径
+        工作目录路径
 
     Raises:
-        RuntimeError: 编译失败
+        RuntimeError: CSV 文件不存在
     """
     mh_template_dir = LATEX_TEMPLATE_DIR / "music_history"
     work_dir = OUTPUT_DIR / str(task_id) / variant
@@ -268,130 +324,211 @@ async def _compile_music_history(
     else:
         raise RuntimeError("题库 CSV 文件不存在，请重新提交")
 
+    return work_dir
+
+
+async def _compile_mh_exam(
+    work_dir: Path, title: str, theme: str, shuffle: bool,
+) -> Path:
+    """编译音乐史试题卷。
+
+    修改 question_paper.tex 中的配置变量，运行 XeLaTeX 两遍，
+    输出 main.pdf。
+
+    Args:
+        work_dir: 工作目录（已含模板和 CSV）
+        title: 试卷标题
+        theme: 主题色（HTML hex，不含 #）
+        shuffle: 是否随机打乱选项
+
+    Returns:
+        生成的 PDF 路径
+
+    Raises:
+        RuntimeError: 编译失败
+    """
+    tex_path = work_dir / "question_paper.tex"
+    tex_content = tex_path.read_text(encoding="utf-8")
+
+    # 替换配置变量
+    tex_content = tex_content.replace(
+        r"\newcommand{\mycsvfile}{temp_随机选择题.csv}",
+        r"\newcommand{\mycsvfile}{quiz_data.csv}",
+    )
+    safe_title = _escape_latex_title(title)
+    tex_content = tex_content.replace(
+        r"\newcommand{\mytitle}{选择题试卷}",
+        rf"\newcommand{{\mytitle}}{{{safe_title}}}",
+    )
+    tex_content = tex_content.replace(
+        r"\definecolor{mycolor}{HTML}{4e9b86}",
+        rf"\definecolor{{mycolor}}{{HTML}}{{{theme}}}",
+    )
+    # 关闭答案页面（单独生成）、保留写入答案文件
+    tex_content = tex_content.replace(
+        r"\setboolean{showdaan}{true}",
+        r"\setboolean{showdaan}{false}",
+    )
+    # 打乱选项控制
+    if not shuffle:
+        tex_content = tex_content.replace(
+            r"\setboolean{shuffleoptions}{true}",
+            r"\setboolean{shuffleoptions}{false}",
+        )
+    # 关闭水印、题源标签、难度辣椒
+    tex_content = tex_content.replace(
+        r"\setboolean{showwatermark}{true}",
+        r"\setboolean{showwatermark}{false}",
+    )
+    tex_content = tex_content.replace(
+        r"\setboolean{showtiyuan}{true}",
+        r"\setboolean{showtiyuan}{false}",
+    )
+    tex_content = tex_content.replace(
+        r"\setboolean{shownandu}{true}",
+        r"\setboolean{shownandu}{false}",
+    )
+
+    tex_path.write_text(tex_content, encoding="utf-8")
+
+    # XeLaTeX 编译两遍（页码引用需要）
+    main_tex = tex_path
+    for _ in range(2):
+        proc = await asyncio.create_subprocess_exec(
+            "xelatex",
+            "-interaction=nonstopmode",
+            "-output-directory", str(work_dir),
+            str(main_tex),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(work_dir),
+        )
+        stdout, stderr = await proc.communicate()
+
+    pdf_path = work_dir / "question_paper.pdf"
+    if not pdf_path.exists():
+        log_content = stdout.decode(errors="replace")
+        hint = _parse_latex_error(log_content)
+        raise RuntimeError(f"试题卷编译失败 - {hint}\n{log_content[-2000:]}")
+
+    # 重命名为 main.pdf（下载端点期望的文件名）
+    final_pdf = work_dir / "main.pdf"
+    shutil.copy2(pdf_path, final_pdf)
+    return final_pdf
+
+
+async def _compile_mh_answer(
+    work_dir: Path, task_id: int, title: str, theme: str,
+) -> Path:
+    """编译音乐史答案卷。
+
+    从 exam 目录复制 .answers 文件，修改 answer_sheet.tex 中的
+    配置变量，运行 XeLaTeX 两遍，输出 main.pdf。
+
+    Args:
+        work_dir: 工作目录（已含模板和 CSV）
+        task_id: 任务 ID（用于定位 exam 目录的 .answers 文件）
+        title: 试卷标题
+        theme: 主题色（HTML hex，不含 #）
+
+    Returns:
+        生成的 PDF 路径
+
+    Raises:
+        RuntimeError: 答案文件不存在或编译失败
+    """
+    # 需要先从 exam 目录复制 .answers 文件
+    exam_dir = OUTPUT_DIR / str(task_id) / "exam"
+    answers_file = exam_dir / "question_paper.answers"
+    if not answers_file.exists():
+        raise RuntimeError("答案文件不存在，请先生成试题卷")
+
+    shutil.copy2(answers_file, work_dir / "question_paper.answers")
+
+    tex_path = work_dir / "answer_sheet.tex"
+    tex_content = tex_path.read_text(encoding="utf-8")
+
+    # 替换配置变量
+    safe_title = _escape_latex_title(title)
+    tex_content = tex_content.replace(
+        r"\newcommand{\mytitle}{选择题试卷}",
+        rf"\newcommand{{\mytitle}}{{{safe_title}}}",
+    )
+    tex_content = tex_content.replace(
+        r"\definecolor{mycolor}{HTML}{4e9b86}",
+        rf"\definecolor{{mycolor}}{{HTML}}{{{theme}}}",
+    )
+    tex_content = tex_content.replace(
+        r"\newcommand{\myanswersfile}{选择题排版模板.answers}",
+        r"\newcommand{\myanswersfile}{question_paper.answers}",
+    )
+    # 关闭水印
+    tex_content = tex_content.replace(
+        r"\setboolean{showwatermark}{true}",
+        r"\setboolean{showwatermark}{false}",
+    )
+
+    tex_path.write_text(tex_content, encoding="utf-8")
+
+    main_tex = tex_path
+    for _ in range(2):
+        proc = await asyncio.create_subprocess_exec(
+            "xelatex",
+            "-interaction=nonstopmode",
+            "-output-directory", str(work_dir),
+            str(main_tex),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(work_dir),
+        )
+        stdout, stderr = await proc.communicate()
+
+    pdf_path = work_dir / "answer_sheet.pdf"
+    if not pdf_path.exists():
+        log_content = stdout.decode(errors="replace")
+        hint = _parse_latex_error(log_content)
+        raise RuntimeError(f"答案卷编译失败 - {hint}\n{log_content[-2000:]}")
+
+    final_pdf = work_dir / "main.pdf"
+    shutil.copy2(pdf_path, final_pdf)
+    return final_pdf
+
+
+async def _compile_music_history(
+    task_id: int,
+    title: str,
+    theme: str,
+    show_answer: bool,
+    variant: str,
+    shuffle: bool = True,
+) -> Path:
+    """使用旧模板编译音乐史选择题 PDF。
+
+    旧模板通过 datatool 直接读取 CSV，自动编号、随机打乱选项、
+    记录答案到 .answers 文件，排版更专业。
+
+    编排函数：准备工作目录后，根据 show_answer 分派到试题卷或答案卷编译。
+
+    Args:
+        task_id: 任务 ID
+        title: 试卷标题
+        theme: 主题色（HTML hex，不含 #）
+        show_answer: 是否为答案卷
+        variant: 'exam' 或 'answer'
+        shuffle: 是否随机打乱选项
+
+    Returns:
+        生成的 PDF 路径
+
+    Raises:
+        RuntimeError: 编译失败
+    """
+    work_dir = _prepare_mh_workdir(task_id, variant)
+
     if not show_answer:
-        # === 编译试题卷 ===
-        tex_path = work_dir / "question_paper.tex"
-        tex_content = tex_path.read_text(encoding="utf-8")
-
-        # 替换配置变量
-        tex_content = tex_content.replace(
-            r"\newcommand{\mycsvfile}{temp_随机选择题.csv}",
-            r"\newcommand{\mycsvfile}{quiz_data.csv}",
-        )
-        tex_content = tex_content.replace(
-            r"\newcommand{\mytitle}{选择题试卷}",
-            rf"\newcommand{{\mytitle}}{{{title}}}",
-        )
-        tex_content = tex_content.replace(
-            r"\definecolor{mycolor}{HTML}{4e9b86}",
-            rf"\definecolor{{mycolor}}{{HTML}}{{{theme}}}",
-        )
-        # 关闭答案页面（单独生成）、保留写入答案文件
-        tex_content = tex_content.replace(
-            r"\setboolean{showdaan}{true}",
-            r"\setboolean{showdaan}{false}",
-        )
-        # 打乱选项控制
-        if not shuffle:
-            tex_content = tex_content.replace(
-                r"\setboolean{shuffleoptions}{true}",
-                r"\setboolean{shuffleoptions}{false}",
-            )
-        # 关闭水印、题源标签、难度辣椒
-        tex_content = tex_content.replace(
-            r"\setboolean{showwatermark}{true}",
-            r"\setboolean{showwatermark}{false}",
-        )
-        tex_content = tex_content.replace(
-            r"\setboolean{showtiyuan}{true}",
-            r"\setboolean{showtiyuan}{false}",
-        )
-        tex_content = tex_content.replace(
-            r"\setboolean{shownandu}{true}",
-            r"\setboolean{shownandu}{false}",
-        )
-
-        tex_path.write_text(tex_content, encoding="utf-8")
-
-        # XeLaTeX 编译两遍（页码引用需要）
-        main_tex = tex_path
-        for _ in range(2):
-            proc = await asyncio.create_subprocess_exec(
-                "xelatex",
-                "-interaction=nonstopmode",
-                "-output-directory", str(work_dir),
-                str(main_tex),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=str(work_dir),
-            )
-            stdout, stderr = await proc.communicate()
-
-        pdf_path = work_dir / "question_paper.pdf"
-        if not pdf_path.exists():
-            log_content = stdout.decode(errors="replace")
-            raise RuntimeError(f"试题卷编译失败:\n{log_content[-2000:]}")
-
-        # 重命名为 main.pdf（下载端点期望的文件名）
-        final_pdf = work_dir / "main.pdf"
-        shutil.copy2(pdf_path, final_pdf)
-        return final_pdf
-
+        return await _compile_mh_exam(work_dir, title, theme, shuffle)
     else:
-        # === 编译答案卷 ===
-        # 需要先从 exam 目录复制 .answers 文件
-        exam_dir = OUTPUT_DIR / str(task_id) / "exam"
-        answers_file = exam_dir / "question_paper.answers"
-        if not answers_file.exists():
-            raise RuntimeError("答案文件不存在，请先生成试题卷")
-
-        shutil.copy2(answers_file, work_dir / "question_paper.answers")
-
-        tex_path = work_dir / "answer_sheet.tex"
-        tex_content = tex_path.read_text(encoding="utf-8")
-
-        # 替换配置变量
-        tex_content = tex_content.replace(
-            r"\newcommand{\mytitle}{选择题试卷}",
-            rf"\newcommand{{\mytitle}}{{{title}}}",
-        )
-        tex_content = tex_content.replace(
-            r"\definecolor{mycolor}{HTML}{4e9b86}",
-            rf"\definecolor{{mycolor}}{{HTML}}{{{theme}}}",
-        )
-        tex_content = tex_content.replace(
-            r"\newcommand{\myanswersfile}{选择题排版模板.answers}",
-            r"\newcommand{\myanswersfile}{question_paper.answers}",
-        )
-        # 关闭水印
-        tex_content = tex_content.replace(
-            r"\setboolean{showwatermark}{true}",
-            r"\setboolean{showwatermark}{false}",
-        )
-
-        tex_path.write_text(tex_content, encoding="utf-8")
-
-        main_tex = tex_path
-        for _ in range(2):
-            proc = await asyncio.create_subprocess_exec(
-                "xelatex",
-                "-interaction=nonstopmode",
-                "-output-directory", str(work_dir),
-                str(main_tex),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=str(work_dir),
-            )
-            stdout, stderr = await proc.communicate()
-
-        pdf_path = work_dir / "answer_sheet.pdf"
-        if not pdf_path.exists():
-            log_content = stdout.decode(errors="replace")
-            raise RuntimeError(f"答案卷编译失败:\n{log_content[-2000:]}")
-
-        final_pdf = work_dir / "main.pdf"
-        shutil.copy2(pdf_path, final_pdf)
-        return final_pdf
+        return await _compile_mh_answer(work_dir, task_id, title, theme)
 
 
 async def _preprocess_jianpu(
@@ -535,7 +672,7 @@ async def _compile_single(
     theme: str,
     show_answer: bool,
     variant: str,
-    mode: str = "format",
+    mode: str = TaskMode.FORMAT,
     music_font: str = DEFAULT_MUSIC_FONT,
 ) -> Path:
     """编译单个 PDF 变体（试题卷或答案卷）。
@@ -563,9 +700,7 @@ async def _compile_single(
     content_dir.mkdir(exist_ok=True)
 
     # 去掉 AI 返回的 YAML frontmatter，用用户元数据替换
-    markdown_body = re.sub(
-        r'^---\s*\n.*?\n---\s*\n', '', markdown_content, count=1, flags=re.DOTALL
-    )
+    markdown_body = strip_yaml_frontmatter(markdown_content)
 
     # 预处理 jianpu 代码块（转为 .ly 文件 + [LILYPONDFILE:...] 标记）
     markdown_body = await _preprocess_jianpu(markdown_body, work_dir, music_font)
@@ -668,7 +803,8 @@ async def _compile_single(
         pdf_path = work_dir / "main.pdf"
         if not pdf_path.exists():
             log_content = stdout.decode(errors="replace")
-            raise RuntimeError(f"XeLaTeX 编译失败:\n{log_content[-2000:]}")
+            hint = _parse_latex_error(log_content)
+            raise RuntimeError(f"XeLaTeX 编译失败 - {hint}\n{log_content[-2000:]}")
 
         return pdf_path
 
@@ -679,7 +815,7 @@ async def generate_both_pdfs(
     title: str,
     school: str = "",
     theme: str = "4e9b86",
-    mode: str = "format",
+    mode: str = TaskMode.FORMAT,
     music_font: str = DEFAULT_MUSIC_FONT,
 ) -> tuple[Path, Path]:
     """生成试题卷和答案卷。

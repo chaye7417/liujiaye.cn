@@ -78,3 +78,48 @@ FONT_SETTINGS_ILY = LATEX_TEMPLATE_DIR / "font-settings.ily"
 # 管理员配置
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+
+
+# ============================================================
+# 业务常量
+# ============================================================
+
+
+class TaskStatus:
+    """任务状态常量。"""
+
+    PENDING = "pending"
+    DRAFT = "draft"
+    DONE = "done"
+    FAILED = "failed"
+
+
+class TaskMode:
+    """任务模式常量。"""
+
+    FORMAT = "format"
+    GENERATE = "generate"
+    MUSIC_THEORY = "music_theory"
+    MUSIC_HISTORY = "music_history"
+
+    ALL = {FORMAT, GENERATE, MUSIC_THEORY, MUSIC_HISTORY}
+
+    LABELS: dict[str, str] = {
+        FORMAT: "排版",
+        GENERATE: "出题",
+        MUSIC_THEORY: "乐理",
+        MUSIC_HISTORY: "音乐史",
+    }
+
+
+class UserStatus:
+    """用户状态常量。"""
+
+    ACTIVE = "active"
+    DISABLED = "disabled"
+
+
+class UsageAction:
+    """使用日志 action 常量。"""
+
+    GENERATE = "generate"

@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Form, HTTPException, Request, Depends
 
 from app.auth import verify_token, hash_password
-from app.database import get_db
+from app.database import db_session
 from app.profile.avatars import PRESET_AVATARS, get_avatar_by_id
 
 router = APIRouter(prefix="/api/profile", tags=["profile"])
@@ -73,8 +73,7 @@ async def api_setup(
     avatar_url = f"preset:{avatar_id}"
     password_hashed = hash_password(password)
 
-    db = await get_db()
-    try:
+    async with db_session() as db:
         cursor = await db.execute(
             "SELECT id FROM users WHERE nickname = ? AND id != ?",
             (nickname, user_id),
@@ -87,8 +86,6 @@ async def api_setup(
             (nickname, avatar_url, password_hashed, user_id),
         )
         await db.commit()
-    finally:
-        await db.close()
 
     return {"message": "资料设置成功"}
 
@@ -105,8 +102,7 @@ async def api_get_profile(user: dict = Depends(require_login)) -> dict:
     """
     user_id = int(user["sub"])
 
-    db = await get_db()
-    try:
+    async with db_session() as db:
         # 确保 profile_completed 列存在
         cursor_pragma = await db.execute("PRAGMA table_info(users)")
         columns = {row[1] for row in await cursor_pragma.fetchall()}
@@ -122,8 +118,6 @@ async def api_get_profile(user: dict = Depends(require_login)) -> dict:
             (user_id,),
         )
         row = await cursor.fetchone()
-    finally:
-        await db.close()
 
     if not row:
         raise HTTPException(status_code=404, detail="用户不存在")
@@ -167,14 +161,11 @@ async def api_update_profile(
     user_id = int(user["sub"])
     avatar_url = f"preset:{avatar_id}"
 
-    db = await get_db()
-    try:
+    async with db_session() as db:
         await db.execute(
             "UPDATE users SET nickname = ?, avatar_url = ? WHERE id = ?",
             (nickname, avatar_url, user_id),
         )
         await db.commit()
-    finally:
-        await db.close()
 
     return {"message": "资料更新成功"}

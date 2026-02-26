@@ -7,7 +7,7 @@ import re
 from typing import AsyncGenerator, Optional
 
 import httpx
-from app.config import AI_MODELS, DEFAULT_MODEL
+from app.config import AI_MODELS, DEFAULT_MODEL, TaskMode
 from app.modes import (
     FORMAT_PROMPT,
     GENERATE_PROMPT,
@@ -23,9 +23,9 @@ MAX_INPUT_CHARS = 15000
 
 # mode → system prompt 映射
 _MODE_PROMPTS = {
-    "format": FORMAT_PROMPT,
-    "generate": GENERATE_PROMPT,
-    "music_theory": MUSIC_THEORY_PROMPT,
+    TaskMode.FORMAT: FORMAT_PROMPT,
+    TaskMode.GENERATE: GENERATE_PROMPT,
+    TaskMode.MUSIC_THEORY: MUSIC_THEORY_PROMPT,
 }
 
 
@@ -38,6 +38,41 @@ def _clean_markdown(text: str) -> str:
 
 # 导出给 main.py 使用
 clean_markdown = _clean_markdown
+
+
+def _smart_truncate(text: str, max_chars: int) -> str:
+    """在段落或换行边界处智能截断文本，避免切断题目中间。
+
+    截断策略（按优先级）：
+    1. 在 max_chars 位置向前搜索最近的段落边界（\\n\\n），
+       如果找到且位置 >= 总长度的 70%，在该处截断。
+    2. 退而求其次在最近的换行符（\\n）处截断（同样要求 >= 70%）。
+    3. 都找不到时，在 max_chars 处硬截断。
+
+    Args:
+        text: 原始文本
+        max_chars: 最大字符数上限
+
+    Returns:
+        截断后的文本，末尾附带截断提示
+    """
+    if len(text) <= max_chars:
+        return text
+    min_keep = int(len(text) * 0.7)
+    suffix = "\n\n[... 内容过长已截断 ...]"
+
+    # 策略 1：在段落边界（\n\n）处截断
+    cut_pos = text.rfind("\n\n", min_keep, max_chars)
+    if cut_pos != -1:
+        return text[:cut_pos] + suffix
+
+    # 策略 2：在换行符（\n）处截断
+    cut_pos = text.rfind("\n", min_keep, max_chars)
+    if cut_pos != -1:
+        return text[:cut_pos] + suffix
+
+    # 策略 3：硬截断
+    return text[:max_chars] + suffix
 
 
 def _build_user_content(
@@ -55,12 +90,12 @@ def _build_user_content(
     Returns:
         构建好的 user content 字符串
     """
-    if mode == "generate":
+    if mode == TaskMode.GENERATE:
         return build_generate_user_content(
             file_content or "",
             generation_params or {},
         )
-    elif mode == "music_theory":
+    elif mode == TaskMode.MUSIC_THEORY:
         return build_music_theory_user_content(
             generation_params or {},
             file_content,
@@ -86,7 +121,7 @@ def _get_model_config(model_key: Optional[str] = None) -> dict:
 
 async def stream_ai_chunks(
     file_content: Optional[str] = None,
-    mode: str = "format",
+    mode: str = TaskMode.FORMAT,
     generation_params: Optional[dict] = None,
     model_key: Optional[str] = None,
     override_user_content: Optional[str] = None,
@@ -105,7 +140,7 @@ async def stream_ai_chunks(
     """
     if file_content and len(file_content) > MAX_INPUT_CHARS:
         logger.warning("文本过长 (%d)，截断至 %d", len(file_content), MAX_INPUT_CHARS)
-        file_content = file_content[:MAX_INPUT_CHARS] + "\n\n[... 内容过长已截断 ...]"
+        file_content = _smart_truncate(file_content, MAX_INPUT_CHARS)
 
     cfg = _get_model_config(model_key)
     provider = cfg["provider"]
@@ -117,7 +152,7 @@ async def stream_ai_chunks(
     user_content = override_user_content or _build_user_content(mode, file_content, generation_params)
 
     # 出题模式需要更多 token（DeepSeek 上限 8192）
-    max_tokens = 8192 if mode in ("generate", "music_theory") else 8000
+    max_tokens = 8192 if mode in (TaskMode.GENERATE, TaskMode.MUSIC_THEORY) else 8000
 
     if provider == "openai":
         url = f"{api_base}/v1/chat/completions"
@@ -270,7 +305,7 @@ async def extract_exam_info(text: str, model_key: Optional[str] = None) -> dict:
 
 async def parse_to_markdown(
     file_content: str,
-    mode: str = "format",
+    mode: str = TaskMode.FORMAT,
     generation_params: Optional[dict] = None,
     model_key: Optional[str] = None,
 ) -> str:

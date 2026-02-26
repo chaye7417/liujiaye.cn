@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.config import TEMPLATE_DIR
-from app.database import get_db
+from app.database import db_session
 from app.auth import verify_token
 
 router = APIRouter(tags=["pages"])
@@ -35,14 +35,11 @@ async def page_workspace(request: Request):
         return RedirectResponse("/login", status_code=302)
     payload = verify_token(token)
     user_id = int(payload["sub"])
-    db = await get_db()
-    try:
+    async with db_session() as db:
         cursor = await db.execute(
             "SELECT profile_completed FROM users WHERE id = ?", (user_id,)
         )
         row = await cursor.fetchone()
-    finally:
-        await db.close()
     if not row or not row["profile_completed"]:
         return RedirectResponse("/profile/setup", status_code=302)
     return templates.TemplateResponse("workspace.html", {"request": request})
@@ -56,14 +53,11 @@ async def page_profile_setup(request: Request):
         return RedirectResponse("/login", status_code=302)
     payload = verify_token(token)
     user_id = int(payload["sub"])
-    db = await get_db()
-    try:
+    async with db_session() as db:
         cursor = await db.execute(
             "SELECT profile_completed FROM users WHERE id = ?", (user_id,)
         )
         row = await cursor.fetchone()
-    finally:
-        await db.close()
     if row and row["profile_completed"]:
         return RedirectResponse("/workspace", status_code=302)
     return templates.TemplateResponse("profile_setup.html", {"request": request})

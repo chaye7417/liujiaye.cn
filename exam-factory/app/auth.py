@@ -15,7 +15,7 @@ from app.config import (
     JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRE_HOURS,
     SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS,
 )
-from app.database import get_db
+from app.database import db_session
 
 
 def generate_code() -> str:
@@ -94,21 +94,17 @@ async def send_verify_code(email: str, code: str) -> bool:
 
 async def save_code(email: str, code: str) -> None:
     """保存验证码到数据库。"""
-    db = await get_db()
-    try:
+    async with db_session() as db:
         await db.execute(
             "INSERT INTO verify_codes (email, code) VALUES (?, ?)",
             (email, code),
         )
         await db.commit()
-    finally:
-        await db.close()
 
 
 async def check_code(email: str, code: str) -> bool:
     """检查验证码是否有效（10 分钟内未使用）。"""
-    db = await get_db()
-    try:
+    async with db_session() as db:
         cutoff = (datetime.now(timezone.utc) - timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
         cursor = await db.execute(
             """SELECT id FROM verify_codes
@@ -126,8 +122,6 @@ async def check_code(email: str, code: str) -> bool:
             await db.commit()
             return True
         return False
-    finally:
-        await db.close()
 
 
 def hash_password(password: str) -> str:
@@ -171,8 +165,7 @@ async def login_by_password(nickname: str, password: str) -> Optional[dict]:
     Returns:
         用户信息字典，验证失败返回 None
     """
-    db = await get_db()
-    try:
+    async with db_session() as db:
         cursor = await db.execute(
             "SELECT id, email, nickname, password_hash FROM users WHERE nickname = ?",
             (nickname,),
@@ -183,8 +176,6 @@ async def login_by_password(nickname: str, password: str) -> Optional[dict]:
         if not verify_password(password, row[3]):
             return None
         return {"id": row[0], "email": row[1], "nickname": row[2]}
-    finally:
-        await db.close()
 
 
 async def get_or_create_user(email: str) -> dict:
@@ -196,8 +187,7 @@ async def get_or_create_user(email: str) -> dict:
     Returns:
         包含 id, email, nickname 的字典
     """
-    db = await get_db()
-    try:
+    async with db_session() as db:
         cursor = await db.execute(
             "SELECT id, email, nickname FROM users WHERE email = ?", (email,)
         )
@@ -213,5 +203,3 @@ async def get_or_create_user(email: str) -> dict:
         )
         await db.commit()
         return {"id": cursor.lastrowid, "email": email, "nickname": nickname}
-    finally:
-        await db.close()

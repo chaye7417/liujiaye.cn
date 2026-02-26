@@ -7,8 +7,8 @@ from urllib.parse import quote
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse, Response
 
-from app.config import OUTPUT_DIR
-from app.database import get_db
+from app.config import OUTPUT_DIR, TaskMode
+from app.database import db_session
 from app.routers.auth import get_current_user
 
 router = APIRouter(tags=["download"])
@@ -30,14 +30,11 @@ async def api_download(
 ):
     """下载 PDF（type=exam 或 answer）。"""
     user_id = int(user["sub"])
-    db = await get_db()
-    try:
+    async with db_session() as db:
         cursor = await db.execute(
             "SELECT title FROM tasks WHERE id = ? AND user_id = ?", (task_id, user_id),
         )
         task = await cursor.fetchone()
-    finally:
-        await db.close()
 
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
@@ -60,23 +57,20 @@ async def api_download_tex(
 ):
     """下载单个 LaTeX 源文件（.tex）。"""
     user_id = int(user["sub"])
-    db = await get_db()
-    try:
+    async with db_session() as db:
         cursor = await db.execute(
             "SELECT title, mode FROM tasks WHERE id = ? AND user_id = ?", (task_id, user_id),
         )
         task = await cursor.fetchone()
-    finally:
-        await db.close()
 
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
 
     variant = "answer" if type == "answer" else "exam"
     work_dir = OUTPUT_DIR / str(task_id) / variant
-    task_mode = task["mode"] or "format"
+    task_mode = task["mode"] or TaskMode.FORMAT
 
-    if task_mode == "music_history":
+    if task_mode == TaskMode.MUSIC_HISTORY:
         tex_name = "answer_sheet.tex" if variant == "answer" else "question_paper.tex"
         tex_path = work_dir / tex_name
     else:
@@ -99,14 +93,11 @@ async def api_download_latex_zip(
 ):
     """下载完整 LaTeX 工程压缩包（含模板、样式、资源）。"""
     user_id = int(user["sub"])
-    db = await get_db()
-    try:
+    async with db_session() as db:
         cursor = await db.execute(
             "SELECT title, mode FROM tasks WHERE id = ? AND user_id = ?", (task_id, user_id),
         )
         task = await cursor.fetchone()
-    finally:
-        await db.close()
 
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")

@@ -1,5 +1,6 @@
 """任务相关路由 - 上传、AI 解析、PDF 生成、历史查询。"""
 
+import asyncio
 import json
 import logging
 import traceback
@@ -13,8 +14,9 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from app.config import (
     UPLOAD_DIR, OUTPUT_DIR, MAX_FILE_SIZE_MB,
     AI_MODELS, DEFAULT_MODEL, QUIZ_BANK_DIR,
+    TaskStatus, TaskMode, UsageAction,
 )
-from app.database import get_db
+from app.database import db_session
 from app.file_parser import parse_file
 from app.ai_service import stream_ai_chunks, clean_markdown, extract_exam_info
 from app.pdf_generator import MUSIC_FONTS, DEFAULT_MUSIC_FONT
@@ -25,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["tasks"])
 
-VALID_MODES = {"format", "generate", "music_theory", "music_history"}
+VALID_MODES = TaskMode.ALL
 
 
 # ============================================================
@@ -108,7 +110,7 @@ async def api_upload(
     title: str = Form(""),
     school: str = Form(""),
     theme: str = Form("4e9b86"),
-    mode: str = Form("format"),
+    mode: str = Form(TaskMode.FORMAT),
     generation_params: str = Form(""),
     model: str = Form(""),
     user: dict = Depends(get_current_user),
@@ -120,7 +122,7 @@ async def api_upload(
     if mode not in VALID_MODES:
         raise HTTPException(status_code=400, detail=f"无效模式: {mode}")
 
-    if mode in ("format", "generate") and not file:
+    if mode in (TaskMode.FORMAT, TaskMode.GENERATE) and not file:
         raise HTTPException(status_code=400, detail="请上传文件")
 
     parsed_gen_params = None
@@ -134,14 +136,20 @@ async def api_upload(
     original_filename = ""
 
     # 音乐史模式：从内置题库读取
-    if mode == "music_history" and not file:
+    if mode == TaskMode.MUSIC_HISTORY and not file:
         selected = parsed_gen_params.get("selected_topics", []) if parsed_gen_params else []
         if not selected:
             raise HTTPException(status_code=400, detail="请至少选择一个专题")
         all_lines: list[str] = []
         header_line = ""
+        quiz_bank_resolved = QUIZ_BANK_DIR.resolve()
         for topic_path in selected:
-            csv_path = QUIZ_BANK_DIR / topic_path
+            csv_path = (QUIZ_BANK_DIR / topic_path).resolve()
+            if not str(csv_path).startswith(str(quiz_bank_resolved) + "/"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"非法的题库路径: {topic_path}",
+                )
             if not csv_path.exists() or not csv_path.suffix == ".csv":
                 continue
             csv_text = csv_path.read_text(encoding="utf-8")
@@ -190,17 +198,14 @@ async def api_upload(
     if model_key not in AI_MODELS:
         model_key = DEFAULT_MODEL
 
-    db = await get_db()
-    try:
+    async with db_session() as db:
         cursor = await db.execute(
             "INSERT INTO tasks (user_id, title, school, theme, mode, generation_params, original_filename, model, status) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')",
-            (user_id, title, school, theme, mode, generation_params or None, original_filename, model_key),
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (user_id, title, school, theme, mode, generation_params or None, original_filename, model_key, TaskStatus.PENDING),
         )
         await db.commit()
         task_id = cursor.lastrowid
-    finally:
-        await db.close()
 
     if text:
         raw_path = UPLOAD_DIR / f"{task_id}_raw.txt"
@@ -214,20 +219,17 @@ async def api_parse_stream(task_id: int, user: dict = Depends(get_current_user))
     """SSE 流式 AI 解析，支持三种模式。"""
     user_id = int(user["sub"])
 
-    db = await get_db()
-    try:
+    async with db_session() as db:
         cursor = await db.execute(
             "SELECT mode, generation_params, model FROM tasks WHERE id = ? AND user_id = ?",
             (task_id, user_id),
         )
         task = await cursor.fetchone()
-    finally:
-        await db.close()
 
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
 
-    task_mode = task["mode"] or "format"
+    task_mode = task["mode"] or TaskMode.FORMAT
     task_model = task["model"] or DEFAULT_MODEL
     gen_params = None
     if task["generation_params"]:
@@ -240,13 +242,13 @@ async def api_parse_stream(task_id: int, user: dict = Depends(get_current_user))
     text = None
     if raw_path.exists():
         text = raw_path.read_text(encoding="utf-8")
-    elif task_mode in ("format", "generate"):
+    elif task_mode in (TaskMode.FORMAT, TaskMode.GENERATE):
         raise HTTPException(status_code=404, detail="原始文本不存在，请重新上传")
 
     async def generate():
         collected: list[str] = []
         try:
-            if task_mode == "music_history":
+            if task_mode == TaskMode.MUSIC_HISTORY:
                 from app.modes.music_history import (
                     parse_csv_questions, select_questions, shuffle_options,
                     format_questions_markdown, format_questions_latex_csv,
@@ -271,7 +273,7 @@ async def api_parse_stream(task_id: int, user: dict = Depends(get_current_user))
                 full_md = format_questions_markdown(selected, points, title)
 
                 yield sse({"type": "chunk", "text": full_md})
-            elif task_mode == "music_theory":
+            elif task_mode == TaskMode.MUSIC_THEORY:
                 from app.modes.music_theory import build_user_content as _build_mt
                 user_content = _build_mt(gen_params or {}, text)
 
@@ -304,18 +306,15 @@ async def api_parse_stream(task_id: int, user: dict = Depends(get_current_user))
                     yield sse({"type": "chunk", "text": chunk})
                 full_md = clean_markdown("".join(collected))
 
-            db2 = await get_db()
-            try:
+            async with db_session() as db2:
                 await db2.execute(
-                    "UPDATE tasks SET markdown_content = ?, status = 'draft' WHERE id = ? AND user_id = ?",
-                    (full_md, task_id, user_id),
+                    "UPDATE tasks SET markdown_content = ?, status = ? WHERE id = ? AND user_id = ?",
+                    (full_md, TaskStatus.DRAFT, task_id, user_id),
                 )
                 await db2.commit()
-            finally:
-                await db2.close()
 
             raw_path.unlink(missing_ok=True)
-            await log_usage(user_id, "generate")
+            await log_usage(user_id, UsageAction.GENERATE)
 
             yield sse({"type": "done", "markdown": full_md})
 
@@ -338,15 +337,12 @@ async def api_update_markdown(
 ):
     """更新 Markdown 内容。"""
     user_id = int(user["sub"])
-    db = await get_db()
-    try:
+    async with db_session() as db:
         await db.execute(
             "UPDATE tasks SET markdown_content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?",
             (markdown, task_id, user_id),
         )
         await db.commit()
-    finally:
-        await db.close()
     return {"message": "已保存"}
 
 
@@ -359,14 +355,11 @@ async def api_generate_pdf(
     """生成试题卷 + 答案卷，通过 SSE 返回进度。"""
     user_id = int(user["sub"])
 
-    db = await get_db()
-    try:
+    async with db_session() as db:
         cursor = await db.execute(
             "SELECT * FROM tasks WHERE id = ? AND user_id = ?", (task_id, user_id),
         )
         task = await cursor.fetchone()
-    finally:
-        await db.close()
 
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
@@ -374,7 +367,7 @@ async def api_generate_pdf(
     title = task["title"]
     school = task["school"] or ""
     theme = task["theme"] or "4e9b86"
-    task_mode = task["mode"] or "format"
+    task_mode = task["mode"] or TaskMode.FORMAT
 
     gen_params = None
     if task["generation_params"]:
@@ -387,19 +380,16 @@ async def api_generate_pdf(
     async def generate():
         try:
             yield sse({"type": "progress", "pct": 5, "msg": "保存编辑内容..."})
-            db2 = await get_db()
-            try:
+            async with db_session() as db2:
                 await db2.execute(
                     "UPDATE tasks SET markdown_content = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                     (markdown, task_id),
                 )
                 await db2.commit()
-            finally:
-                await db2.close()
 
             yield sse({"type": "progress", "pct": 10, "msg": "正在生成试题卷..."})
 
-            if task_mode == "music_history":
+            if task_mode == TaskMode.MUSIC_HISTORY:
                 from app.pdf_generator import _compile_music_history
                 do_shuffle = gen_params.get("shuffle", True) if gen_params else True
 
@@ -408,19 +398,18 @@ async def api_generate_pdf(
                 await _compile_music_history(task_id, title, theme, True, "answer", do_shuffle)
             else:
                 from app.pdf_generator import _compile_single
-                await _compile_single(task_id, markdown, title, school, theme, False, "exam", task_mode, music_font)
-                yield sse({"type": "progress", "pct": 55, "msg": "正在生成答案卷..."})
-                await _compile_single(task_id, markdown, title, school, theme, True, "answer", task_mode, music_font)
+                yield sse({"type": "progress", "pct": 15, "msg": "正在并行生成试题卷和答案卷..."})
+                await asyncio.gather(
+                    _compile_single(task_id, markdown, title, school, theme, False, "exam", task_mode, music_font),
+                    _compile_single(task_id, markdown, title, school, theme, True, "answer", task_mode, music_font),
+                )
 
-            db3 = await get_db()
-            try:
+            async with db_session() as db3:
                 await db3.execute(
-                    "UPDATE tasks SET status = 'done', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (task_id,),
+                    "UPDATE tasks SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (TaskStatus.DONE, task_id),
                 )
                 await db3.commit()
-            finally:
-                await db3.close()
 
             yield sse({
                 "type": "done",
@@ -456,8 +445,7 @@ async def api_tasks(
     limit = 20
     offset = (page - 1) * limit
 
-    db = await get_db()
-    try:
+    async with db_session() as db:
         count_sql = "SELECT COUNT(*) FROM tasks WHERE user_id = ?"
         count_params: list = [user_id]
         if mode:
@@ -478,13 +466,8 @@ async def api_tasks(
 
         cursor = await db.execute(list_sql, list_params)
         rows = await cursor.fetchall()
-    finally:
-        await db.close()
 
-    MODE_LABELS = {
-        "format": "排版", "generate": "出题",
-        "music_theory": "乐理", "music_history": "音乐史",
-    }
+    MODE_LABELS = TaskMode.LABELS
 
     items = []
     for r in rows:
@@ -509,8 +492,7 @@ async def api_tasks(
 async def api_user_stats(user: dict = Depends(get_current_user)):
     """获取当前用户的生成统计。"""
     user_id = int(user["sub"])
-    db = await get_db()
-    try:
+    async with db_session() as db:
         cursor = await db.execute(
             "SELECT COUNT(*) FROM tasks WHERE user_id = ?", (user_id,)
         )
@@ -528,8 +510,6 @@ async def api_user_stats(user: dict = Depends(get_current_user)):
             (user_id,),
         )
         by_mode = {r["mode"]: r["cnt"] for r in await cursor.fetchall()}
-    finally:
-        await db.close()
 
     return {"total": total, "month_count": month_count, "by_mode": by_mode}
 
@@ -538,15 +518,12 @@ async def api_user_stats(user: dict = Depends(get_current_user)):
 async def api_me(user: dict = Depends(get_current_user)):
     """获取当前用户信息。"""
     user_id = int(user["sub"])
-    db = await get_db()
-    try:
+    async with db_session() as db:
         cursor = await db.execute(
             "SELECT id, email, nickname, avatar_url, login_method FROM users WHERE id = ?",
             (user_id,),
         )
         row = await cursor.fetchone()
-    finally:
-        await db.close()
     if not row:
         raise HTTPException(status_code=404, detail="用户不存在")
     return {

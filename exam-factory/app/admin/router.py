@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from app.config import TEMPLATE_DIR
-from app.database import get_db
+from app.config import TEMPLATE_DIR, UserStatus
+from app.database import db_session
 from app.admin.auth import (
     verify_admin_login,
     create_admin_token,
@@ -81,6 +81,7 @@ async def api_admin_login(
         key="admin_token",
         value=token,
         httponly=True,
+        secure=True,
         max_age=43200,
         samesite="lax",
     )
@@ -109,8 +110,7 @@ async def api_admin_stats(
     Returns:
         包含用户数、任务数、活跃数等统计信息
     """
-    db = await get_db()
-    try:
+    async with db_session() as db:
         cursor = await db.execute("SELECT COUNT(*) FROM users")
         total_users = (await cursor.fetchone())[0]
 
@@ -140,8 +140,6 @@ async def api_admin_stats(
             "total_tasks": total_tasks,
             "today_active": today_active,
         })
-    finally:
-        await db.close()
 
 
 # ============================================================
@@ -166,8 +164,7 @@ async def api_admin_users(
     Returns:
         包含用户列表、总数、分页信息的 JSON
     """
-    db = await get_db()
-    try:
+    async with db_session() as db:
         offset = (page - 1) * per_page
         where_clause = ""
         params: list = []
@@ -185,7 +182,7 @@ async def api_admin_users(
         # 分页数据
         cursor = await db.execute(
             f"SELECT id, email, nickname, login_method, created_at, "
-            f"COALESCE(status, 'active') as status "
+            f"COALESCE(status, '{UserStatus.ACTIVE}') as status "
             f"FROM users {where_clause} "
             f"ORDER BY id DESC LIMIT ? OFFSET ?",
             params + [per_page, offset],
@@ -209,8 +206,6 @@ async def api_admin_users(
             "page": page,
             "per_page": per_page,
         })
-    finally:
-        await db.close()
 
 
 @router.put("/api/admin/users/{user_id}/status")
@@ -228,21 +223,18 @@ async def api_admin_update_user_status(
     Returns:
         操作结果
     """
-    if status not in ("active", "disabled"):
+    if status not in (UserStatus.ACTIVE, UserStatus.DISABLED):
         return JSONResponse(
             status_code=400,
             content={"detail": "状态只能是 active 或 disabled"},
         )
-    db = await get_db()
-    try:
+    async with db_session() as db:
         await db.execute(
             "UPDATE users SET status = ? WHERE id = ?",
             (status, user_id),
         )
         await db.commit()
         return JSONResponse(content={"message": "状态已更新"})
-    finally:
-        await db.close()
 
 
 @router.delete("/api/admin/users/{user_id}")
@@ -258,15 +250,12 @@ async def api_admin_delete_user(
     Returns:
         操作结果
     """
-    db = await get_db()
-    try:
+    async with db_session() as db:
         await db.execute("DELETE FROM usage_log WHERE user_id = ?", (user_id,))
         await db.execute("DELETE FROM tasks WHERE user_id = ?", (user_id,))
         await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
         await db.commit()
         return JSONResponse(content={"message": "用户已删除"})
-    finally:
-        await db.close()
 
 
 # ============================================================
@@ -295,8 +284,7 @@ async def api_admin_tasks(
     Returns:
         包含任务列表和总数的 JSON
     """
-    db = await get_db()
-    try:
+    async with db_session() as db:
         offset = (page - 1) * per_page
         conditions: list[str] = []
         params: list = []
@@ -348,8 +336,6 @@ async def api_admin_tasks(
             "page": page,
             "per_page": per_page,
         })
-    finally:
-        await db.close()
 
 
 # ============================================================
@@ -366,8 +352,7 @@ async def api_admin_get_settings(
     Returns:
         key-value 形式的配置字典
     """
-    db = await get_db()
-    try:
+    async with db_session() as db:
         # 确保 settings 表存在
         await db.execute(
             "CREATE TABLE IF NOT EXISTS settings "
@@ -379,8 +364,6 @@ async def api_admin_get_settings(
         rows = await cursor.fetchall()
         settings = {row[0]: row[1] for row in rows}
         return JSONResponse(content=settings)
-    finally:
-        await db.close()
 
 
 @router.put("/api/admin/settings")
@@ -395,8 +378,7 @@ async def api_admin_update_settings(
     Returns:
         操作结果
     """
-    db = await get_db()
-    try:
+    async with db_session() as db:
         # 确保 settings 表存在
         await db.execute(
             "CREATE TABLE IF NOT EXISTS settings "
@@ -411,5 +393,3 @@ async def api_admin_update_settings(
             )
         await db.commit()
         return JSONResponse(content={"message": "配置已保存"})
-    finally:
-        await db.close()
