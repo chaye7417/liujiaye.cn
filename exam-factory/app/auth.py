@@ -128,21 +128,31 @@ async def check_code(email: str, code: str) -> bool:
         await db.close()
 
 
-async def get_or_create_user(email: str) -> int:
-    """获取或创建用户，返回用户 ID。"""
+async def get_or_create_user(email: str) -> dict:
+    """获取或创建用户，返回用户信息字典。
+
+    Args:
+        email: 用户邮箱
+
+    Returns:
+        包含 id, email, nickname 的字典
+    """
     db = await get_db()
     try:
         cursor = await db.execute(
-            "SELECT id FROM users WHERE email = ?", (email,)
+            "SELECT id, email, nickname FROM users WHERE email = ?", (email,)
         )
         row = await cursor.fetchone()
         if row:
-            return row[0]
+            return {"id": row[0], "email": row[1], "nickname": row[2]}
 
+        # 从邮箱前缀提取昵称
+        nickname = email.split("@")[0]
         cursor = await db.execute(
-            "INSERT INTO users (email) VALUES (?)", (email,)
+            "INSERT INTO users (email, nickname, login_method) VALUES (?, ?, 'email')",
+            (email, nickname),
         )
         await db.commit()
-        return cursor.lastrowid
+        return {"id": cursor.lastrowid, "email": email, "nickname": nickname}
     finally:
         await db.close()

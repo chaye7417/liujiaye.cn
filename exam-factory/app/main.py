@@ -11,7 +11,10 @@ from typing import Optional
 from urllib.parse import quote
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Request
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, Response
+from fastapi.responses import (
+    FileResponse, HTMLResponse, JSONResponse, RedirectResponse,
+    StreamingResponse, Response,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -55,14 +58,13 @@ async def startup():
 # ============================================================
 
 async def get_current_user(request: Request) -> dict:
-    """从请求中获取当前用户。"""
-    # TODO: 邮箱验证上线后移除此临时放行
+    """从请求中获取当前用户，未登录抛出 401。"""
     token = request.cookies.get("token")
     if not token:
-        return {"sub": "1", "email": "guest@test.com"}
+        raise HTTPException(status_code=401, detail="未登录")
     payload = verify_token(token)
     if not payload:
-        return {"sub": "1", "email": "guest@test.com"}
+        raise HTTPException(status_code=401, detail="登录已过期")
     return payload
 
 
@@ -80,13 +82,12 @@ async def api_send_code(email: str = Form(...)):
 @app.post("/api/auth/login")
 async def api_login(email: str = Form(...), code: str = Form(...)):
     """验证码登录。"""
-    from fastapi.responses import JSONResponse
     valid = await check_code(email, code)
     if not valid:
         raise HTTPException(status_code=400, detail="验证码错误或已过期")
-    user_id = await get_or_create_user(email)
-    token = create_token(user_id, email)
-    response = JSONResponse({"message": "登录成功", "email": email})
+    user = await get_or_create_user(email)
+    token = create_token(user["id"], email)
+    response = JSONResponse({"message": "登录成功", "email": email, "nickname": user["nickname"]})
     response.set_cookie(key="token", value=token, httponly=True, max_age=86400, samesite="lax")
     return response
 
@@ -94,7 +95,6 @@ async def api_login(email: str = Form(...), code: str = Form(...)):
 @app.post("/api/auth/logout")
 async def api_logout():
     """退出登录。"""
-    from fastapi.responses import JSONResponse
     response = JSONResponse({"message": "已退出"})
     response.delete_cookie("token")
     return response
@@ -727,7 +727,25 @@ async def api_download_latex_zip(
 @app.get("/api/me")
 async def api_me(user: dict = Depends(get_current_user)):
     """获取当前用户信息。"""
-    return {"user_id": user["sub"], "email": user["email"]}
+    user_id = int(user["sub"])
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT id, email, nickname, avatar_url, login_method FROM users WHERE id = ?",
+            (user_id,),
+        )
+        row = await cursor.fetchone()
+    finally:
+        await db.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    return {
+        "user_id": row["id"],
+        "email": row["email"],
+        "nickname": row["nickname"],
+        "avatar_url": row["avatar_url"],
+        "login_method": row["login_method"],
+    }
 
 
 # ============================================================
@@ -741,9 +759,17 @@ async def page_index(request: Request):
 
 @app.get("/login", response_class=HTMLResponse)
 async def page_login(request: Request):
+    """登录页：已登录用户重定向到工作台。"""
+    token = request.cookies.get("token")
+    if token and verify_token(token):
+        return RedirectResponse("/workspace", status_code=302)
     return templates.TemplateResponse("login.html", {"request": request})
 
 
 @app.get("/workspace", response_class=HTMLResponse)
 async def page_workspace(request: Request):
+    """工作台：未登录用户重定向到登录页。"""
+    token = request.cookies.get("token")
+    if not token or not verify_token(token):
+        return RedirectResponse("/login", status_code=302)
     return templates.TemplateResponse("workspace.html", {"request": request})

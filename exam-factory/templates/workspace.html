@@ -1077,12 +1077,23 @@
 
     // ============ 初始化 ============
 
+    // 全局 fetch 拦截：401 自动跳转登录页
+    const _origFetch = window.fetch;
+    window.fetch = async function(...args) {
+        const res = await _origFetch.apply(this, args);
+        if (res.status === 401) {
+            window.location.href = '/login';
+            return res;
+        }
+        return res;
+    };
+
     (async () => {
         try {
             const res = await fetch('/api/me');
             if (res.ok) {
                 const data = await res.json();
-                document.getElementById('userEmail').textContent = data.email;
+                document.getElementById('userEmail').textContent = data.nickname || data.email || '';
             }
         } catch (e) {}
         // 加载可用模型列表
@@ -1930,7 +1941,7 @@
 
     async function logout() {
         await fetch('/api/auth/logout', { method: 'POST' });
-        window.location.href = '/';
+        window.location.href = '/login';
     }
 </script>
 {% endblock %}

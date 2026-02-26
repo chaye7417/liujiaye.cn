@@ -18,7 +18,11 @@ async def init_db() -> None:
         await db.executescript("""
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                email TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE,
+                nickname TEXT,
+                avatar_url TEXT,
+                wechat_openid TEXT UNIQUE,
+                login_method TEXT DEFAULT 'email',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -65,10 +69,18 @@ async def init_db() -> None:
         if "model" not in columns:
             await db.execute("ALTER TABLE tasks ADD COLUMN model TEXT")
 
-        # 创建默认 guest 用户（临时测试用）
-        await db.execute(
-            "INSERT OR IGNORE INTO users (id, email) VALUES (1, 'guest@test.com')"
-        )
+        # 迁移：为已有的 users 表添加新列
+        cursor_u = await db.execute("PRAGMA table_info(users)")
+        user_columns = {row[1] for row in await cursor_u.fetchall()}
+        if "nickname" not in user_columns:
+            await db.execute("ALTER TABLE users ADD COLUMN nickname TEXT")
+        if "avatar_url" not in user_columns:
+            await db.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT")
+        if "wechat_openid" not in user_columns:
+            await db.execute("ALTER TABLE users ADD COLUMN wechat_openid TEXT UNIQUE")
+        if "login_method" not in user_columns:
+            await db.execute("ALTER TABLE users ADD COLUMN login_method TEXT DEFAULT 'email'")
+
         await db.commit()
     finally:
         await db.close()
