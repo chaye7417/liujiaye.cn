@@ -1990,6 +1990,28 @@
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
             let buffer = '';
+            let simulatedPct = 0;
+            let simTimer = null;
+
+            // 模拟进度：从当前百分比平滑递增到 90%，让用户感知编译在进行
+            function startSimulatedProgress(fromPct) {
+                stopSimulatedProgress();
+                simulatedPct = fromPct;
+                simTimer = setInterval(() => {
+                    if (simulatedPct >= 90) { stopSimulatedProgress(); return; }
+                    // 越接近 90% 越慢，模拟真实感
+                    const remaining = 90 - simulatedPct;
+                    const step = Math.max(0.3, remaining * 0.03);
+                    simulatedPct = Math.min(90, simulatedPct + step);
+                    const display = Math.round(simulatedPct);
+                    pdfProgress.style.width = display + '%';
+                    pdfPct.textContent = display + '%';
+                }, 500);
+            }
+
+            function stopSimulatedProgress() {
+                if (simTimer) { clearInterval(simTimer); simTimer = null; }
+            }
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -2005,11 +2027,16 @@
                     try { event = JSON.parse(line.slice(6)); } catch (e) { continue; }
 
                     if (event.type === 'progress') {
+                        stopSimulatedProgress();
+                        simulatedPct = event.pct;
                         pdfProgress.style.width = event.pct + '%';
                         pdfPct.textContent = event.pct + '%';
                         pdfMsg.textContent = event.msg;
                         pdfStatusText.textContent = event.msg;
+                        // 收到编译阶段的进度后启动模拟递增
+                        if (event.pct < 90) startSimulatedProgress(event.pct);
                     } else if (event.type === 'done') {
+                        stopSimulatedProgress();
                         clearTimeout(timeoutId);
                         pdfProgress.style.width = '100%';
                         pdfPct.textContent = '100%';
@@ -2025,6 +2052,7 @@
                         isProcessing = false;
                         setTimeout(() => { showPanel('panel4'); }, 500);
                     } else if (event.type === 'error') {
+                        stopSimulatedProgress();
                         clearTimeout(timeoutId);
                         throw new Error(event.message);
                     }
