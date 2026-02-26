@@ -77,7 +77,7 @@ async def init_db() -> None:
         if "avatar_url" not in user_columns:
             await db.execute("ALTER TABLE users ADD COLUMN avatar_url TEXT")
         if "wechat_openid" not in user_columns:
-            await db.execute("ALTER TABLE users ADD COLUMN wechat_openid TEXT UNIQUE")
+            await db.execute("ALTER TABLE users ADD COLUMN wechat_openid TEXT")
         if "login_method" not in user_columns:
             await db.execute("ALTER TABLE users ADD COLUMN login_method TEXT DEFAULT 'email'")
 
