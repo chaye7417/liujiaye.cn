@@ -107,13 +107,13 @@ async def check_code(email: str, code: str) -> bool:
     """检查验证码是否有效（10 分钟内未使用）。"""
     db = await get_db()
     try:
-        cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
+        cutoff = (datetime.now(timezone.utc) - timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
         cursor = await db.execute(
             """SELECT id FROM verify_codes
                WHERE email = ? AND code = ? AND used = 0
                AND created_at > ?
                ORDER BY created_at DESC LIMIT 1""",
-            (email, code, cutoff.isoformat()),
+            (email, code, cutoff),
         )
         row = await cursor.fetchone()
         if row:
