@@ -67,30 +67,31 @@ def _build_pool(
 # 24 调定义 (key_id, jianpu_key, ly_key_cmd, letter, acc, octave, is_minor)
 # ---------------------------------------------------------------------------
 _KEY_DEFS: list[tuple[str, str, str, str, str, int, bool]] = [
+    # 高音谱号统一八度 4，低音谱号由 _bass_octave() 计算
     ("C",   "1=C",  r"\key c \major",   "c", "",   4, False),
     ("bD",  "1=bD", r"\key des \major", "d", "es", 4, False),
     ("D",   "1=D",  r"\key d \major",   "d", "",   4, False),
     ("bE",  "1=bE", r"\key ees \major", "e", "es", 4, False),
     ("E",   "1=E",  r"\key e \major",   "e", "",   4, False),
-    ("F",   "1=F",  r"\key f \major",   "f", "",   3, False),
-    ("bG",  "1=bG", r"\key ges \major", "g", "es", 3, False),
-    ("G",   "1=G",  r"\key g \major",   "g", "",   3, False),
-    ("bA",  "1=bA", r"\key aes \major", "a", "es", 3, False),
-    ("A",   "1=A",  r"\key a \major",   "a", "",   3, False),
-    ("bB",  "1=bB", r"\key bes \major", "b", "es", 3, False),
-    ("B",   "1=B",  r"\key b \major",   "b", "",   3, False),
-    ("am",  "6=A",  r"\key a \minor",   "a", "",   3, True),
+    ("F",   "1=F",  r"\key f \major",   "f", "",   4, False),
+    ("bG",  "1=bG", r"\key ges \major", "g", "es", 4, False),
+    ("G",   "1=G",  r"\key g \major",   "g", "",   4, False),
+    ("bA",  "1=bA", r"\key aes \major", "a", "es", 4, False),
+    ("A",   "1=A",  r"\key a \major",   "a", "",   4, False),
+    ("bB",  "1=bB", r"\key bes \major", "b", "es", 4, False),
+    ("B",   "1=B",  r"\key b \major",   "b", "",   4, False),
+    ("am",  "6=A",  r"\key a \minor",   "a", "",   4, True),
     ("dm",  "6=D",  r"\key d \minor",   "d", "",   4, True),
-    ("gm",  "6=G",  r"\key g \minor",   "g", "",   3, True),
+    ("gm",  "6=G",  r"\key g \minor",   "g", "",   4, True),
     ("cm",  "6=C",  r"\key c \minor",   "c", "",   4, True),
-    ("fm",  "6=F",  r"\key f \minor",   "f", "",   3, True),
-    ("bbm", "6=bB", r"\key bes \minor", "b", "es", 3, True),
+    ("fm",  "6=F",  r"\key f \minor",   "f", "",   4, True),
+    ("bbm", "6=bB", r"\key bes \minor", "b", "es", 4, True),
     ("bem", "6=bE", r"\key ees \minor", "e", "es", 4, True),
     ("em",  "6=E",  r"\key e \minor",   "e", "",   4, True),
-    ("bm",  "6=B",  r"\key b \minor",   "b", "",   3, True),
-    ("#fm", "6=#F", r"\key fis \minor", "f", "is", 3, True),
+    ("bm",  "6=B",  r"\key b \minor",   "b", "",   4, True),
+    ("#fm", "6=#F", r"\key fis \minor", "f", "is", 4, True),
     ("#cm", "6=#C", r"\key cis \minor", "c", "is", 4, True),
-    ("#gm", "6=#G", r"\key gis \minor", "g", "is", 3, True),
+    ("#gm", "6=#G", r"\key gis \minor", "g", "is", 4, True),
 ]
 
 # 构建运行时查找表
@@ -118,13 +119,18 @@ _TONIC = 3
 _POOL_SIZE = 11
 
 
-def _get_pool(key: str, octave_offset: int = 0) -> list[tuple[str, str]]:
-    """获取音符池，可选移八度（-1 = 低八度/低音谱号）。"""
-    if octave_offset == 0:
+def _bass_octave(letter: str) -> int:
+    """低音谱号的主音八度: c/d/e/f → 3, g/a/b → 2。"""
+    return 3 if letter in ("c", "d", "e", "f") else 2
+
+
+def _get_pool(key: str, clef: str = "treble") -> list[tuple[str, str]]:
+    """获取音符池（高音谱号用预计算，低音谱号重新计算八度）。"""
+    if clef == "treble":
         return _NP[key]
-    _, _, _, let, acc, base_oct, is_minor = _KEY_DEF_MAP[key]
+    _, _, _, let, acc, _, is_minor = _KEY_DEF_MAP[key]
     scale = _compute_scale(
-        let, acc, base_oct + octave_offset,
+        let, acc, _bass_octave(let),
         _MINOR_INTERVALS if is_minor else _MAJOR_INTERVALS,
     )
     return _build_pool(scale, is_minor)
@@ -353,30 +359,32 @@ def generate_jianpu(
         key = key_pool[i]
         ts = random.choice(avail_ts)
         use_bass = random.random() < bass_prob
-        pool = _get_pool(key, -1 if use_bass else 0)
         clef = "bass" if use_bass else "treble"
+        pool = _get_pool(key, clef)
         melody = _gen_melody(n_bars, ts, difficulty)
 
         if i < n_jp2staff:
-            # 简谱 → 五线谱
+            # 简谱 → 五线谱：答案只给五线谱
             clef_hint = "（低音谱号）" if use_bass else ""
             jp_q = _to_jianpu(melody, key, ts, pool, with_staff=False)
-            jp_a = _to_jianpu(melody, key, ts, pool, with_staff=True, clef=clef)
+            ly_a = _to_lilypond(melody, key, ts, pool, clef)
             parts.append(
                 f"## [2分]\n"
                 f"将下列简谱译为五线谱{clef_hint}：\n"
+                f"> 仅试题:\n"
                 f"```jianpu\n{jp_q}\n```\n"
                 f"> 五线谱: 1\n"
                 f"> 答案:\n"
-                f"```jianpu\n{jp_a}\n```\n"
+                f"```lilypond\n{ly_a}\n```\n"
             )
         else:
-            # 五线谱 → 简谱
+            # 五线谱 → 简谱：答案只给简谱
             ly_q = _to_lilypond(melody, key, ts, pool, clef)
-            jp_a = _to_jianpu(melody, key, ts, pool, with_staff=True, clef=clef)
+            jp_a = _to_jianpu(melody, key, ts, pool, with_staff=False)
             parts.append(
                 f"## [2分]\n"
                 f"将下列五线谱译为简谱（{_JIANPU_KEY[key]}）：\n"
+                f"> 仅试题:\n"
                 f"```lilypond\n{ly_q}\n```\n"
                 f"> 行数: 1\n"
                 f"> 答案:\n"

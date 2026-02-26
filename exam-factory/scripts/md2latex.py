@@ -194,6 +194,7 @@ def parse_single_question(content: str, points: float) -> dict:
         'question_only_lilypond_blocks': [],
         'answer_lilypond_blocks': [],
         'lilypondfile_refs': [],
+        'question_only_lilypondfile_refs': [],
         'answer_lilypondfile_refs': [],
     }
 
@@ -310,6 +311,9 @@ def parse_single_question(content: str, points: float) -> dict:
             ref = lyfile_match.group(1)
             if after_answer:
                 question['answer_lilypondfile_refs'].append(ref)
+            elif question_only:
+                question['question_only_lilypondfile_refs'].append(ref)
+                question_only = False
             else:
                 question['lilypondfile_refs'].append(ref)
             continue
@@ -562,6 +566,12 @@ def generate_question_latex(q: dict) -> list[str]:
         lines.append(r'  \include "font-settings.ily"')
         lines.append(f'  {code}')
         lines.append(r'  \end{lilypond}')
+        lines.append(r'  \fi')
+
+    # 仅试题 jianpu lilypondfile（答案模式隐藏）
+    for ref in q.get('question_only_lilypondfile_refs', []):
+        lines.append(r'  \ifshowanswer\else')
+        lines.append(r'  \lilypondfile[staffsize=20]{%s}' % ref)
         lines.append(r'  \fi')
 
     # 选择题选项

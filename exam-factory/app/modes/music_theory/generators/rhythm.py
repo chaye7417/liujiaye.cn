@@ -42,7 +42,11 @@ def _evt_to_lily(evt: _Evt) -> str:
     """将单个事件转为 LilyPond 音符（不含连线）。"""
     if isinstance(evt, tuple):
         return evt[1]
-    return f"c'{_TICK_TO_LILY[evt]}"
+    if evt in _TICK_TO_LILY:
+        return f"c'{_TICK_TO_LILY[evt]}"
+    # 非标准 tick（如 54 = 附点二分+附点四分）拆成连线
+    parts = _decompose_tick(evt)
+    return "~ ".join(f"c'{_TICK_TO_LILY[t]}" for t in parts)
 
 
 # ---------------------------------------------------------------------------

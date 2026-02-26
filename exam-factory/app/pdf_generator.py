@@ -394,7 +394,9 @@ async def _compile_music_history(
         return final_pdf
 
 
-async def _preprocess_jianpu(markdown: str, work_dir: Path) -> str:
+async def _preprocess_jianpu(
+    markdown: str, work_dir: Path, music_font: str = DEFAULT_MUSIC_FONT,
+) -> str:
     """预处理 Markdown 中的 jianpu 代码块：转为 .ly 文件供 lilypond-book 编译。
 
     检测 ```jianpu ... ``` 代码块，通过 jianpu-ly 转换为独立的 LilyPond
@@ -445,8 +447,22 @@ async def _preprocess_jianpu(markdown: str, work_dir: Path) -> str:
                 ly_content = re.sub(
                     r"(\\key\s)", rf"\\clef {clef} \1", ly_content, count=1,
                 )
-        # 注入字体设置，使 jianpu 谱例与全局音乐字体一致
-        ly_content = '\\include "font-settings.ily"\n' + ly_content
+        # 替换 jianpu-ly 自带的字体定义，注入用户选择的音乐字体
+        font_cfg = MUSIC_FONTS.get(music_font, MUSIC_FONTS[DEFAULT_MUSIC_FONT])
+        ly_content = re.sub(
+            r'#\(define fonts\s*\n\s*\(set-global-fonts\n(?:\s+.*\n)*?\s*\)\)',
+            (
+                "#(define fonts\n"
+                "    (set-global-fonts\n"
+                f'      #:music "{font_cfg["music"]}"\n'
+                f'      #:brace "{font_cfg["brace"]}"\n'
+                '      #:roman "Source Serif Pro,Source Han Serif SC,Times New Roman,Arial Unicode MS"\n'
+                "      #:factor (/ staff-height pt 20)\n"
+                "    ))"
+            ),
+            ly_content,
+            count=1,
+        )
         ly_file = work_dir / f"{name}.ly"
         ly_file.write_text(ly_content, encoding="utf-8")
 
@@ -552,7 +568,7 @@ async def _compile_single(
     )
 
     # 预处理 jianpu 代码块（转为 .ly 文件 + [LILYPONDFILE:...] 标记）
-    markdown_body = await _preprocess_jianpu(markdown_body, work_dir)
+    markdown_body = await _preprocess_jianpu(markdown_body, work_dir, music_font)
 
     md_with_meta = f'---\ntitle: "{title}"\nschool: "{school}"\ntheme: {theme}\n---\n\n{markdown_body}\n'
 
