@@ -24,6 +24,7 @@ async def init_db() -> None:
                 wechat_openid TEXT UNIQUE,
                 login_method TEXT DEFAULT 'email',
                 profile_completed INTEGER DEFAULT 0,
+                password_hash TEXT,
                 status TEXT DEFAULT 'active',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
@@ -91,6 +92,8 @@ async def init_db() -> None:
             await db.execute("ALTER TABLE users ADD COLUMN profile_completed INTEGER DEFAULT 0")
         if "status" not in user_columns:
             await db.execute("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'")
+        if "password_hash" not in user_columns:
+            await db.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
 
         await db.commit()
     finally:

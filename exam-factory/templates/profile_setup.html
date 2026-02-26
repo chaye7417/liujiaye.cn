@@ -176,6 +176,16 @@
             <input type="text" id="nickname" placeholder="2-16 个字符" maxlength="16">
         </div>
 
+        <div class="form-group">
+            <label for="password">设置密码</label>
+            <input type="password" id="password" placeholder="至少 6 个字符">
+        </div>
+
+        <div class="form-group">
+            <label for="passwordConfirm">确认密码</label>
+            <input type="password" id="passwordConfirm" placeholder="再次输入密码">
+        </div>
+
         <button class="btn-enter" id="submitBtn" onclick="submitProfile()">
             进入工作台
         </button>
@@ -228,6 +238,8 @@
 
     async function submitProfile() {
         const nickname = document.getElementById('nickname').value.trim();
+        const password = document.getElementById('password').value;
+        const passwordConfirm = document.getElementById('passwordConfirm').value;
 
         if (!nickname) {
             showAlert('请输入用户名', 'error');
@@ -241,6 +253,14 @@
             showAlert('请选择一个头像', 'error');
             return;
         }
+        if (!password || password.length < 6) {
+            showAlert('密码至少 6 个字符', 'error');
+            return;
+        }
+        if (password !== passwordConfirm) {
+            showAlert('两次输入的密码不一致', 'error');
+            return;
+        }
 
         const btn = document.getElementById('submitBtn');
         btn.disabled = true;
@@ -250,6 +270,7 @@
             const form = new FormData();
             form.append('nickname', nickname);
             form.append('avatar_id', selectedAvatarId);
+            form.append('password', password);
 
             const res = await fetch('/api/profile/setup', {
                 method: 'POST',

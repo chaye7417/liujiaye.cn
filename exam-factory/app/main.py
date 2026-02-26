@@ -25,7 +25,7 @@ from app.config import (
 from app.database import init_db, get_db
 from app.auth import (
     generate_code, send_verify_code, save_code, check_code,
-    get_or_create_user, create_token, verify_token,
+    get_or_create_user, create_token, verify_token, login_by_password,
 )
 from app.file_parser import parse_file
 from app.ai_service import stream_ai_chunks, clean_markdown, extract_exam_info
@@ -93,6 +93,18 @@ async def api_login(email: str = Form(...), code: str = Form(...)):
     user = await get_or_create_user(email)
     token = create_token(user["id"], email)
     response = JSONResponse({"message": "登录成功", "email": email, "nickname": user["nickname"]})
+    response.set_cookie(key="token", value=token, httponly=True, max_age=86400, samesite="lax")
+    return response
+
+
+@app.post("/api/auth/login-password")
+async def api_login_password(nickname: str = Form(...), password: str = Form(...)):
+    """用户名 + 密码登录。"""
+    user = await login_by_password(nickname, password)
+    if not user:
+        raise HTTPException(status_code=400, detail="用户名或密码错误")
+    token = create_token(user["id"], user["email"])
+    response = JSONResponse({"message": "登录成功", "email": user["email"], "nickname": user["nickname"]})
     response.set_cookie(key="token", value=token, httponly=True, max_age=86400, samesite="lax")
     return response
 

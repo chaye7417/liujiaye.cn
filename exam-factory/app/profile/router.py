@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Form, HTTPException, Request, Depends
 
-from app.auth import verify_token
+from app.auth import verify_token, hash_password
 from app.database import get_db
 from app.profile.avatars import PRESET_AVATARS, get_avatar_by_id
 
@@ -40,13 +40,15 @@ async def api_avatars() -> list[dict]:
 async def api_setup(
     nickname: str = Form(...),
     avatar_id: int = Form(...),
+    password: str = Form(...),
     user: dict = Depends(require_login),
 ) -> dict:
-    """首次设置用户名和头像。
+    """首次设置用户名、头像和密码。
 
     Args:
         nickname: 用户名（2-16 字符）
         avatar_id: 预设头像 ID
+        password: 登录密码（6 位以上）
         user: 当前登录用户 payload
 
     Returns:
@@ -57,27 +59,32 @@ async def api_setup(
     if len(nickname) < 2 or len(nickname) > 16:
         raise HTTPException(status_code=400, detail="用户名需要 2-16 个字符")
 
+    # 验证密码长度
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="密码至少 6 个字符")
+
     # 验证头像 ID
     avatar = get_avatar_by_id(avatar_id)
     if not avatar:
         raise HTTPException(status_code=400, detail="无效的头像 ID")
 
+    # 检查用户名是否已被占用
     user_id = int(user["sub"])
     avatar_url = f"preset:{avatar_id}"
+    password_hashed = hash_password(password)
 
     db = await get_db()
     try:
-        # 确保 profile_completed 列存在
-        cursor = await db.execute("PRAGMA table_info(users)")
-        columns = {row[1] for row in await cursor.fetchall()}
-        if "profile_completed" not in columns:
-            await db.execute(
-                "ALTER TABLE users ADD COLUMN profile_completed INTEGER DEFAULT 0"
-            )
+        cursor = await db.execute(
+            "SELECT id FROM users WHERE nickname = ? AND id != ?",
+            (nickname, user_id),
+        )
+        if await cursor.fetchone():
+            raise HTTPException(status_code=400, detail="用户名已被占用")
 
         await db.execute(
-            "UPDATE users SET nickname = ?, avatar_url = ?, profile_completed = 1 WHERE id = ?",
-            (nickname, avatar_url, user_id),
+            "UPDATE users SET nickname = ?, avatar_url = ?, password_hash = ?, profile_completed = 1 WHERE id = ?",
+            (nickname, avatar_url, password_hashed, user_id),
         )
         await db.commit()
     finally:

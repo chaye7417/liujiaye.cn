@@ -1,5 +1,7 @@
-"""认证模块 - 邮箱验证码登录。"""
+"""认证模块 - 邮箱验证码登录 + 用户名密码登录。"""
 
+import hashlib
+import os
 import random
 import string
 from datetime import datetime, timedelta, timezone
@@ -124,6 +126,63 @@ async def check_code(email: str, code: str) -> bool:
             await db.commit()
             return True
         return False
+    finally:
+        await db.close()
+
+
+def hash_password(password: str) -> str:
+    """使用 PBKDF2 哈希密码。
+
+    Args:
+        password: 明文密码
+
+    Returns:
+        salt:hash 格式的哈希字符串
+    """
+    salt = os.urandom(16).hex()
+    h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000).hex()
+    return f"{salt}:{h}"
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    """验证密码是否正确。
+
+    Args:
+        password: 明文密码
+        password_hash: 存储的 salt:hash 字符串
+
+    Returns:
+        密码是否匹配
+    """
+    try:
+        salt, h = password_hash.split(":", 1)
+        return hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000).hex() == h
+    except Exception:
+        return False
+
+
+async def login_by_password(nickname: str, password: str) -> Optional[dict]:
+    """用户名 + 密码登录。
+
+    Args:
+        nickname: 用户名
+        password: 明文密码
+
+    Returns:
+        用户信息字典，验证失败返回 None
+    """
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "SELECT id, email, nickname, password_hash FROM users WHERE nickname = ?",
+            (nickname,),
+        )
+        row = await cursor.fetchone()
+        if not row or not row[3]:
+            return None
+        if not verify_password(password, row[3]):
+            return None
+        return {"id": row[0], "email": row[1], "nickname": row[2]}
     finally:
         await db.close()
 
