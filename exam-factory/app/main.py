@@ -741,6 +741,100 @@ async def api_download_latex_zip(
     )
 
 
+@app.get("/api/tasks")
+async def api_tasks(
+    page: int = 1,
+    mode: Optional[str] = None,
+    user: dict = Depends(get_current_user),
+):
+    """获取当前用户的任务历史列表。"""
+    user_id = int(user["sub"])
+    limit = 20
+    offset = (page - 1) * limit
+
+    db = await get_db()
+    try:
+        # 总数
+        count_sql = "SELECT COUNT(*) FROM tasks WHERE user_id = ?"
+        count_params: list = [user_id]
+        if mode:
+            count_sql += " AND mode = ?"
+            count_params.append(mode)
+        cursor = await db.execute(count_sql, count_params)
+        total = (await cursor.fetchone())[0]
+
+        # 列表
+        list_sql = (
+            "SELECT id, title, mode, status, created_at FROM tasks WHERE user_id = ?"
+        )
+        list_params: list = [user_id]
+        if mode:
+            list_sql += " AND mode = ?"
+            list_params.append(mode)
+        list_sql += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+        list_params.extend([limit, offset])
+
+        cursor = await db.execute(list_sql, list_params)
+        rows = await cursor.fetchall()
+    finally:
+        await db.close()
+
+    MODE_LABELS = {
+        "format": "排版", "generate": "出题",
+        "music_theory": "乐理", "music_history": "音乐史",
+    }
+
+    items = []
+    for r in rows:
+        task_id = r["id"]
+        has_exam = (OUTPUT_DIR / str(task_id) / "exam" / "main.pdf").exists()
+        has_answer = (OUTPUT_DIR / str(task_id) / "answer" / "main.pdf").exists()
+        items.append({
+            "id": task_id,
+            "title": r["title"] or "未命名",
+            "mode": r["mode"],
+            "mode_label": MODE_LABELS.get(r["mode"], r["mode"]),
+            "status": r["status"],
+            "created_at": r["created_at"],
+            "has_exam_pdf": has_exam,
+            "has_answer_pdf": has_answer,
+        })
+
+    return {"total": total, "page": page, "items": items}
+
+
+@app.get("/api/user/stats")
+async def api_user_stats(user: dict = Depends(get_current_user)):
+    """获取当前用户的生成统计。"""
+    user_id = int(user["sub"])
+    db = await get_db()
+    try:
+        # 总数
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM tasks WHERE user_id = ?", (user_id,)
+        )
+        total = (await cursor.fetchone())[0]
+
+        # 本月
+        month_start = datetime.now(timezone.utc).strftime("%Y-%m-01")
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM tasks WHERE user_id = ? AND created_at >= ?",
+            (user_id, month_start),
+        )
+        month_count = (await cursor.fetchone())[0]
+
+        # 按模式统计
+        cursor = await db.execute(
+            "SELECT mode, COUNT(*) as cnt FROM tasks WHERE user_id = ? GROUP BY mode",
+            (user_id,),
+        )
+        by_mode = {r["mode"]: r["cnt"] for r in await cursor.fetchall()}
+    finally:
+        await db.close()
+
+    return {"total": total, "month_count": month_count, "by_mode": by_mode}
+
+
 @app.get("/api/me")
 async def api_me(user: dict = Depends(get_current_user)):
     """获取当前用户信息。"""

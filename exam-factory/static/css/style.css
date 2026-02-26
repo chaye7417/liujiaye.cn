@@ -512,6 +512,216 @@ body {
     color: var(--text-muted);
 }
 
+/* 历史记录侧边栏 */
+.history-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: none;
+    border: 1px solid var(--border);
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-muted);
+    transition: all 0.2s;
+}
+
+.history-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.history-badge {
+    background: var(--primary);
+    color: white;
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+}
+
+.sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.3);
+    z-index: 200;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s;
+}
+
+.sidebar-overlay.open {
+    opacity: 1;
+    visibility: visible;
+}
+
+.history-sidebar {
+    position: fixed;
+    top: 0;
+    right: -380px;
+    width: 380px;
+    height: 100vh;
+    background: white;
+    z-index: 201;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    transition: right 0.3s ease;
+}
+
+.history-sidebar.open {
+    right: 0;
+}
+
+.sidebar-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.sidebar-header h3 {
+    font-size: 17px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.sidebar-close {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 4px;
+    line-height: 1;
+}
+
+.sidebar-close:hover {
+    color: var(--text);
+}
+
+.sidebar-stats {
+    padding: 12px 24px;
+    background: var(--primary-light);
+    font-size: 13px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 16px;
+}
+
+.sidebar-stats strong {
+    color: var(--primary);
+}
+
+.sidebar-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+}
+
+.sidebar-item {
+    padding: 12px 24px;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background 0.15s;
+}
+
+.sidebar-item:hover {
+    background: var(--bg);
+}
+
+.sidebar-item-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.sidebar-item-title {
+    font-size: 14px;
+    font-weight: 500;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sidebar-mode-tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--primary-light);
+    color: var(--primary);
+    white-space: nowrap;
+}
+
+.sidebar-item-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.sidebar-item-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.sidebar-dl-btn {
+    font-size: 11px;
+    padding: 2px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: white;
+    color: var(--text-muted);
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s;
+}
+
+.sidebar-dl-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.sidebar-status-pending {
+    color: var(--text-muted);
+}
+
+.sidebar-status-done {
+    color: var(--success);
+}
+
+.sidebar-load-more {
+    padding: 12px 24px;
+    text-align: center;
+}
+
+.sidebar-load-more button {
+    background: none;
+    border: 1px solid var(--border);
+    padding: 6px 20px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.sidebar-load-more button:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.sidebar-empty {
+    padding: 48px 24px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
 /* 响应式 */
 @media (max-width: 768px) {
     .container { padding: 16px; }
@@ -521,4 +731,5 @@ body {
     .features { grid-template-columns: 1fr; }
     .login-card { width: 90%; padding: 24px; }
     .steps { flex-wrap: wrap; }
+    .history-sidebar { width: 100%; right: -100%; }
 }

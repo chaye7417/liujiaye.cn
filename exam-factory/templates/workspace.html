@@ -451,6 +451,9 @@
     <a href="/" class="logo">试卷工厂</a>
     <div class="user-info">
         <span id="userEmail"></span>
+        <button class="history-btn" onclick="openHistory()">
+            历史记录 <span class="history-badge" id="historyBadge">0</span>
+        </button>
         <button class="btn-logout" onclick="logout()">退出</button>
     </div>
 </nav>
@@ -1064,6 +1067,19 @@
             <button class="btn btn-secondary" onclick="goBack()">制作新试卷</button>
         </div>
     </div>
+</div>
+<!-- 历史记录侧边栏 -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeHistory()"></div>
+<div class="history-sidebar" id="historySidebar">
+    <div class="sidebar-header">
+        <h3>历史记录</h3>
+        <button class="sidebar-close" onclick="closeHistory()">&times;</button>
+    </div>
+    <div class="sidebar-stats" id="sidebarStats">
+        <span>已生成 <strong id="statTotal">0</strong> 份试卷</span>
+        <span>本月 <strong id="statMonth">0</strong> 份</span>
+    </div>
+    <div class="sidebar-list" id="sidebarList"></div>
 </div>
 {% endblock %}
 
@@ -1943,5 +1959,114 @@
         await fetch('/api/auth/logout', { method: 'POST' });
         window.location.href = '/login';
     }
+
+    // ============ 历史记录侧边栏 ============
+
+    let historyPage = 1;
+    let historyTotal = 0;
+    let historyLoaded = false;
+
+    async function loadHistoryStats() {
+        try {
+            const res = await fetch('/api/user/stats');
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('historyBadge').textContent = data.total;
+                document.getElementById('statTotal').textContent = data.total;
+                document.getElementById('statMonth').textContent = data.month_count;
+            }
+        } catch (e) {}
+    }
+
+    // 页面加载时获取统计
+    loadHistoryStats();
+
+    async function loadHistoryList(page) {
+        const list = document.getElementById('sidebarList');
+        if (page === 1) list.innerHTML = '<div class="sidebar-empty">加载中...</div>';
+
+        try {
+            const res = await fetch(`/api/tasks?page=${page}`);
+            if (!res.ok) return;
+            const data = await res.json();
+            historyTotal = data.total;
+            historyPage = page;
+
+            if (page === 1) list.innerHTML = '';
+
+            if (data.items.length === 0 && page === 1) {
+                list.innerHTML = '<div class="sidebar-empty">还没有生成记录</div>';
+                return;
+            }
+
+            data.items.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'sidebar-item';
+
+                const date = new Date(item.created_at + 'Z');
+                const dateStr = `${date.getMonth()+1}月${date.getDate()}日 ${date.getHours().toString().padStart(2,'0')}:${date.getMinutes().toString().padStart(2,'0')}`;
+
+                let actions = '';
+                if (item.has_exam_pdf) {
+                    actions += `<a class="sidebar-dl-btn" href="/api/tasks/${item.id}/download?type=exam" target="_blank">试题卷</a>`;
+                }
+                if (item.has_answer_pdf) {
+                    actions += `<a class="sidebar-dl-btn" href="/api/tasks/${item.id}/download?type=answer" target="_blank">答案卷</a>`;
+                }
+
+                const statusClass = item.status === 'done' ? 'sidebar-status-done' : 'sidebar-status-pending';
+                const statusText = item.status === 'done' ? '已完成' : (item.status === 'draft' ? '草稿' : '进行中');
+
+                div.innerHTML = `
+                    <div class="sidebar-item-header">
+                        <span class="sidebar-item-title">${item.title}</span>
+                        <span class="sidebar-mode-tag">${item.mode_label}</span>
+                    </div>
+                    <div class="sidebar-item-meta">
+                        <span>${dateStr} · <span class="${statusClass}">${statusText}</span></span>
+                        <div class="sidebar-item-actions">${actions}</div>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+
+            // 加载更多按钮
+            const existingMore = list.querySelector('.sidebar-load-more');
+            if (existingMore) existingMore.remove();
+
+            if (historyPage * 20 < historyTotal) {
+                const moreDiv = document.createElement('div');
+                moreDiv.className = 'sidebar-load-more';
+                moreDiv.innerHTML = `<button onclick="loadHistoryList(${page + 1})">加载更多</button>`;
+                list.appendChild(moreDiv);
+            }
+        } catch (e) {
+            if (page === 1) list.innerHTML = '<div class="sidebar-empty">加载失败</div>';
+        }
+    }
+
+    function openHistory() {
+        document.getElementById('sidebarOverlay').classList.add('open');
+        document.getElementById('historySidebar').classList.add('open');
+        if (!historyLoaded) {
+            historyLoaded = true;
+            loadHistoryList(1);
+        }
+    }
+
+    function closeHistory() {
+        document.getElementById('sidebarOverlay').classList.remove('open');
+        document.getElementById('historySidebar').classList.remove('open');
+    }
+
+    // PDF 生成完成后刷新历史数据
+    const _origShowPanel = showPanel;
+    showPanel = function(id) {
+        _origShowPanel(id);
+        if (id === 'panel4') {
+            historyLoaded = false;
+            loadHistoryStats();
+        }
+    };
 </script>
 {% endblock %}
