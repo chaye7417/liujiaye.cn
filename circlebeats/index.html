@@ -19,15 +19,7 @@
     <!-- ABC记谱法库 -->
     <script src="https://cdn.jsdelivr.net/npm/abcjs@6.2.2/dist/abcjs-basic-min.js"></script>
     
-    <!-- Three.js 导入映射 -->
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.164.0/build/three.module.js",
-            "three/examples/jsm/": "https://unpkg.com/three@0.164.0/examples/jsm/"
-        }
-    }
-    </script>
+    <!-- Three.js now resolved by Vite from node_modules -->
     
     <!-- Colyseus客户端库（本地版本，解决404问题） -->
     <!-- <script src="lib/colyseus.js"></script>
@@ -36,7 +28,7 @@
 
      <script src="https://unpkg.com/colyseus.js@0.15.12/dist/colyseus.js"></script>
     <!-- 合成器参数同步模块 -->
-    <script src="synthParamsSync.js?v=20240522"></script>
+    <script src="synthParamsSync.js"></script>
     
     <!-- 添加缓存刷新脚本 -->
     <script>
@@ -1241,28 +1233,27 @@
     </div>
     
     <!-- 先加载节拍器，最后加载 Three.js 场景 -->
-    <script src="audio-sequencer.js?v=20240522"></script>
+    <script src="audio-sequencer.js"></script>
 
     <!-- Colyseus调试工具 -->
     <script src="debug-colyseus.js"></script>
 
     <!-- 添加预设模式管理器脚本，确保在Sketch.js之前加载 -->
-    <script src="PresetPatterns.js?v=20240522"></script>
+    <script src="PresetPatterns.js"></script>
     <!-- 插槽同步补丁 - 修复audio-sequencer.js和Sketch.js之间的插槽选择同步问题 -->
-    <script src="slot-sync-patch.js?v=20240522"></script>
-    <script src="Sketch.js?v=20240522"></script>
-    <script type="module" src="integration.js?v=20240522"></script>
+    <script src="slot-sync-patch.js"></script>
+    <script src="Sketch.js"></script>
     
     <!-- ABC记谱法相关组件 -->
-    <script src="ABCEditor.js?v=20240522"></script>
-    <script src="CircleToABC.js?v=20240522"></script>
+    <script src="ABCEditor.js"></script>
+    <script src="CircleToABC.js"></script>
     
-    <!-- 使用 JavaScript 模块导入 Three.js 场景 -->
-    <script type="module" src="three-scene.js?v=20240522"></script>
+    <!-- three-scene.js and integration.js are now imported via src/main.js -->
+    <script type="module" src="/src/main.js"></script>
 
-    <script src="partySyncColyseus.js?v=20240522"></script>
+    <script src="partySyncColyseus.js"></script>
     <!-- 步进圆环总览视图 -->
-    <script src="CircleOverview.js?v=20240522"></script>
+    <script src="CircleOverview.js"></script>
     
     <!-- 确保Colyseus对话框能正确绘制的辅助脚本 -->
     <script>
@@ -1315,25 +1306,25 @@
     </script>
     
     <!-- 模式导入导出功能 -->
-    <script src="PatternImportExport.js?v=20240522"></script>
+    <script src="PatternImportExport.js"></script>
     
     <!-- 合成器预设管理功能 -->
-    <script src="SynthPresetManager.js?v=20240522"></script>
+    <script src="SynthPresetManager.js"></script>
 
     <!-- 修复合成器参数实时同步问题 -->
-    <script src="fix-synth-sync.js?v=20240522"></script>
+    <script src="fix-synth-sync.js"></script>
 
     <!-- 修复FREQ参数同步问题 -->
-    <script src="fix-freq-sync.js?v=20240522"></script>
+    <script src="fix-freq-sync.js"></script>
 
     <!-- 合成器参数同步测试工具 -->
-    <script src="test-synth-sync.js?v=20240522"></script>
+    <script src="test-synth-sync.js"></script>
 
     <!-- 音乐可视化器 -->
-    <script src="MusicVisualizer.js?v=20240522"></script>
+    <script src="MusicVisualizer.js"></script>
 
     <!-- AI图像生成器 -->
-    <script src="AIImageGenerator.js?v=20240522"></script>
+    <script src="AIImageGenerator.js"></script>
 
     <script>
         // 创建DOM观察器，确保lil-gui控制面板始终可以点击
@@ -2320,12 +2311,12 @@
     
     <!-- Live2D库和小猫聊天功能 -->
     <script src="https://unpkg.com/live2d-widget@3.0.4/lib/L2Dwidget.min.js"></script>
-    <script src="cat-chat.js?v=20240522"></script>
+    <script src="cat-chat.js"></script>
     
     <!-- 语言管理器 -->
-    <script src="language-manager.js?v=20240522"></script>
+    <script src="language-manager.js"></script>
     
     <!-- 小猫AI图像生成器 -->
-    <script src="cat-ai-image-generator.js?v=20240522"></script>
+    <script src="cat-ai-image-generator.js"></script>
 </body>
 </html> 
