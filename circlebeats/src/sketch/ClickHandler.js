@@ -6,6 +6,9 @@
 
 // 修改mouseClicked函数
 function mouseClicked() {
+  // metronome 异步初始化，未就绪前跳过
+  if (typeof metronome === 'undefined' || !metronome) return false;
+
   // 检查用户是否有权限点击交互
   if (window.isUserAllowedToClick && !window.isUserAllowedToClick(mouseX, mouseY)) {
     if (window.colyseusConnected && window.colyseusSlotStates && window.colyseusSlotStates.mySlot === -1) {

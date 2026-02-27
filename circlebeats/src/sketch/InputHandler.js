@@ -6,6 +6,9 @@
 
 // 添加鼠标事件处理函数
 function mouseMoved() {
+  // metronome 异步初始化，未就绪前跳过
+  if (typeof metronome === 'undefined' || !metronome) return false;
+
   // 检查用户是否有权限点击交互
   if (window.isUserAllowedToClick && !window.isUserAllowedToClick(mouseX, mouseY)) {
     // 如果没有权限，将鼠标指针设置为禁止样式
@@ -163,6 +166,9 @@ function mouseOut() {
 
 // 鼠标按下处理
 function mousePressed() {
+  // metronome 异步初始化，未就绪前跳过
+  if (typeof metronome === 'undefined' || !metronome) return false;
+
   // 如果合成器UI可见，处理ADSR节点拖拽
   if (metronome.synthUI && metronome.synthUI.visible) {
     if (metronome.handleSynthMousePressed(mouseX, mouseY)) return true;
@@ -225,6 +231,9 @@ function mousePressed() {
 
 // 鼠标拖动处理
 function mouseDragged() {
+  // metronome 异步初始化，未就绪前跳过
+  if (typeof metronome === 'undefined' || !metronome) return false;
+
   // 如果合成器UI可见，处理ADSR节点拖拽
   if (metronome.synthUI && metronome.synthUI.visible) {
     if (metronome.handleSynthMouseDragged(mouseX, mouseY)) return true;
@@ -451,6 +460,9 @@ function _updateMergeMarkers(stepIndex, newDuration) {
 
 // 鼠标松开处理
 function mouseReleased() {
+  // metronome 异步初始化，未就绪前跳过
+  if (typeof metronome === 'undefined' || !metronome) return false;
+
   // 如果合成器UI可见，处理ADSR节点拖拽
   if (metronome.synthUI && metronome.synthUI.visible) {
     metronome.handleSynthMouseReleased();

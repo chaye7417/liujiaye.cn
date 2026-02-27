@@ -7,33 +7,7 @@
     <meta http-equiv="Permissions-Policy" content="accelerometer=*, gyroscope=*">
     <!-- 添加缓存控制元标签 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <!-- 临时诊断：捕获所有JS错误并显示 -->
-    <script>
-    window.__errors = [];
-    window.addEventListener('error', function(e) {
-      window.__errors.push(e.message + ' @ ' + (e.filename||'').split('/').pop() + ':' + e.lineno);
-    });
-    window.addEventListener('unhandledrejection', function(e) {
-      window.__errors.push('Promise: ' + (e.reason && e.reason.message || e.reason));
-    });
-    window.addEventListener('load', function() {
-      setTimeout(function() {
-        if (window.__errors.length > 0) {
-          var d = document.createElement('div');
-          d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:red;color:white;padding:10px;font:12px monospace;max-height:40vh;overflow:auto;white-space:pre-wrap;';
-          d.textContent = 'JS ERRORS (' + window.__errors.length + '):\n' + window.__errors.join('\n');
-          document.body.appendChild(d);
-        }
-        console.log('[DIAG] AudioSequencer:', typeof AudioSequencer);
-        console.log('[DIAG] window.AudioSequencer:', typeof window.AudioSequencer);
-        console.log('[DIAG] metronome:', typeof metronome);
-        console.log('[DIAG] rhythmVisible:', window.rhythmVisible);
-        console.log('[DIAG] showColyseusDialog:', typeof window.showColyseusDialog);
-        console.log('[DIAG] _showColyseusDialog:', typeof window._showColyseusDialog);
-        console.log('[DIAG] connectToColyseus:', typeof window.connectToColyseus);
-      }, 2000);
-    });
-    </script>
+    <!-- 诊断脚本已移除 -->
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Interactive Rhythm Circle with 3D Background</title>
@@ -62,8 +36,7 @@
 
 
      <script src="https://unpkg.com/colyseus.js@0.15.12/dist/colyseus.js"></script>
-    <!-- 合成器参数同步模块 -->
-    <script src="synthParamsSync.js"></script>
+    <!-- 合成器参数同步模块（已迁移到 src/network/ParamsSync.js，此处不再需要） -->
     
     <!-- 添加缓存刷新脚本 -->
     <script>

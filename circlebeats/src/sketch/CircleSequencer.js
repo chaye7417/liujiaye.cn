@@ -27,38 +27,94 @@ function setup() {
   scaleFactor = 1;
   diameter = fixedSize * 0.8;
 
-  // initialize metronome
-  metronome = new AudioSequencer(60, 100, 100);
-
-  // 监听metronome-beat事件，用于与Tone.js Transport同步
-  window.addEventListener('metronome-beat', function(e) {
-    if (typeof metronome !== 'undefined') {
-      const beatData = e.detail;
-      redraw();
+  // AudioSequencer 通过 ES module 加载，可能还未就绪
+  // 使用轮询等待机制确保兼容
+  function initMetronome() {
+    if (typeof window.AudioSequencer === 'undefined') {
+      console.log('[CircleBeats] 等待 AudioSequencer 加载...');
+      setTimeout(initMetronome, 50);
+      return;
     }
-  });
 
-  // 确保音频上下文已解锁并准备好
-  if (typeof userStartAudio === 'function') {
-    userStartAudio().then(() => {
-    }).catch(err => {
+    // initialize metronome
+    metronome = new AudioSequencer(60, 100, 100);
+
+    // 监听metronome-beat事件，用于与Tone.js Transport同步
+    window.addEventListener('metronome-beat', function(e) {
+      if (typeof metronome !== 'undefined') {
+        const beatData = e.detail;
+        redraw();
+      }
     });
+
+    // 确保音频上下文已解锁并准备好
+    if (typeof userStartAudio === 'function') {
+      userStartAudio().then(() => {
+      }).catch(err => {
+      });
+    }
+
+    // 设置初始分辨率
+    metronome.setResolution("1/16");
+
+    // 为所有预设插槽设置初始音高为C4
+    if (metronome.baseNotes) {
+      for (let i = 0; i < 8; i++) {
+        metronome.baseNotes[i] = 'C4';
+      }
+    } else {
+      metronome.baseNotes = ['C4', 'C4', 'C4', 'C4', 'C4', 'C4', 'C4', 'C4'];
+    }
+
+    // 应用初始BPM到运镜速度的映射
+    setTimeout(() => {
+      updateBPM(metronome.bpm);
+
+      if (typeof window.setCameraAutoModeFromStepper === 'function') {
+        window.setCameraAutoModeFromStepper(metronome.isPlaying);
+      }
+    }, 1000);
+
+    // 在setup末尾添加，确保初始数据传递
+    setTimeout(() => {
+      try {
+        if (nodes.length > 0) {
+          const circleData = {
+            nodes: nodes,
+            currentPreset: ui.currentPattern,
+            stepCount: ui.stepCount,
+            resolution: ui.resolution.value,
+            baseNote: metronome.baseNotes[ui.currentPattern] || 'C4'
+          };
+
+          const event = new CustomEvent('circle-data-change', {
+            detail: circleData
+          });
+          window.dispatchEvent(event);
+        }
+      } catch (err) {
+        console.error("初始化数据传递时出错:", err);
+      }
+
+      setTimeout(() => {
+        try {
+          if (window.circleOverview && typeof window.circleOverview.refresh === 'function') {
+            window.circleOverview.refresh();
+          }
+        } catch (err) {
+          console.error("初始化总览视图数据时出错:", err);
+        }
+      }, 1500);
+    }, 2000);
+
+    console.log('[CircleBeats] AudioSequencer 已初始化');
   }
 
-  // 设置初始分辨率
-  metronome.setResolution("1/16");
+  // 启动异步初始化
+  initMetronome();
 
   // 设置当前预设为第一个预设插槽
   ui.currentPattern = 0;
-
-  // 为所有预设插槽设置初始音高为C4
-  if (metronome.baseNotes) {
-    for (let i = 0; i < 8; i++) {
-      metronome.baseNotes[i] = 'C4';
-    }
-  } else {
-    metronome.baseNotes = ['C4', 'C4', 'C4', 'C4', 'C4', 'C4', 'C4', 'C4'];
-  }
 
   // 初始化音高控制相关数据
   ui.pitchControl.octaves = [1, 2, 3, 4, 5, 6, 7];
@@ -112,48 +168,6 @@ function setup() {
 
   // 初始化UI位置
   updateUIPositions();
-
-  // 应用初始BPM到运镜速度的映射
-  setTimeout(() => {
-    updateBPM(metronome.bpm);
-
-    if (typeof window.setCameraAutoModeFromStepper === 'function') {
-      window.setCameraAutoModeFromStepper(metronome.isPlaying);
-    }
-  }, 1000);
-
-  // 在setup末尾添加，确保初始数据传递
-  setTimeout(() => {
-    try {
-      if (nodes.length > 0) {
-        const circleData = {
-          nodes: nodes,
-          currentPreset: ui.currentPattern,
-          stepCount: ui.stepCount,
-          resolution: ui.resolution.value,
-          baseNote: metronome.baseNotes[ui.currentPattern] || 'C4'
-        };
-
-        const event = new CustomEvent('circle-data-change', {
-          detail: circleData
-        });
-        window.dispatchEvent(event);
-
-      }
-    } catch (err) {
-      console.error("初始化数据传递时出错:", err);
-    }
-
-    setTimeout(() => {
-      try {
-        if (window.circleOverview && typeof window.circleOverview.refresh === 'function') {
-          window.circleOverview.refresh();
-        }
-      } catch (err) {
-        console.error("初始化总览视图数据时出错:", err);
-      }
-    }, 1500);
-  }, 2000);
 
   // 注册mouseOut事件处理
   canvas.mouseOut(mouseOut);
@@ -286,6 +300,12 @@ function windowResized() {
 }
 
 function draw() {
+  // metronome 异步初始化，未就绪前跳过绘制
+  if (typeof metronome === 'undefined' || !metronome) {
+    clear();
+    return;
+  }
+
   // 如果步进器设置为不可见，且画布透明度为0，则完全跳过绘制
   if (!window.rhythmVisible && window.p5CanvasOpacity === 0 && !metronome.synthUI.visible) {
     return;

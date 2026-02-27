@@ -20,6 +20,7 @@ document.write('<script src="src/sketch/SketchConstants.js?v=' + _sketchVersion 
 document.write('<script src="src/sketch/SketchUtils.js?v=' + _sketchVersion + '"><\/script>');
 document.write('<script src="src/sketch/SynthUIRenderer.js?v=' + _sketchVersion + '"><\/script>');
 document.write('<script src="src/sketch/InputHandler.js?v=' + _sketchVersion + '"><\/script>');
+document.write('<script src="src/sketch/ClickHandler.js?v=' + _sketchVersion + '"><\/script>');
 document.write('<script src="src/sketch/CircleSequencer.js?v=' + _sketchVersion + '"><\/script>');
 
 // 使用partySyncColyseus.js中定义的showSlotSelectionDialog函数
