@@ -32,9 +32,12 @@ import {
 } from './ParamsSync.js';
 
 import {
-  showColyseusDialog, createConnectionDialog,
+  showColyseusDialog, createConnectionDialog
+} from './ColyseusDialogs.js';
+
+import {
   showNotification, showCustomMessage
-} from './ColyseusUI.js';
+} from './ColyseusNotifications.js';
 
 // ---- 创建节流后的同步函数 ----
 const throttledSyncSynthParams = throttle((slotIndex, params) => {

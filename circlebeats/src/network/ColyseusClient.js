@@ -15,8 +15,12 @@ import {
   showConnectionProgress, hideConnectionProgress, showConnectionSuccess,
   showConnectionError, createConnectionStatus, updateConnectionStatus,
   showNotification, showCustomMessage, showUserJoinedNotification,
-  updateRoomNameDisplay, showColyseusDialog, createConnectionDialog
-} from './ColyseusUI.js';
+  updateRoomNameDisplay
+} from './ColyseusNotifications.js';
+
+import {
+  showColyseusDialog, createConnectionDialog
+} from './ColyseusDialogs.js';
 
 import {
   updateSlotsFromState, processInitialSlots, handleServerStateUpdate,

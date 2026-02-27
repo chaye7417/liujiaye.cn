@@ -9,7 +9,7 @@ import {
   setDialogVisible
 } from './NetworkState.js';
 import { syncAllSynthParamsToServer, syncPresetToServer } from './ParamsSync.js';
-import { showCustomMessage } from './ColyseusUI.js';
+import { showCustomMessage } from './ColyseusNotifications.js';
 
 // ---- 状态同步到PresetManager ----
 
