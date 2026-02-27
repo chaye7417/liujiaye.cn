@@ -8,6 +8,9 @@
 if (typeof window.p5CanvasOpacity === 'undefined') {
   window.p5CanvasOpacity = 1.0;
 }
+if (typeof window.rhythmVisible === 'undefined') {
+  window.rhythmVisible = true;
+}
 
 // 步进器可见性控制
 if (typeof window.rhythmVisible === 'undefined') {

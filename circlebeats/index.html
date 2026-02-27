@@ -1256,9 +1256,13 @@
     <script src="ABCEditor.js"></script>
     <script src="CircleToABC.js"></script>
     
-    <!-- three-scene.js and integration.js are now imported via src/main.js -->
+    <!-- Three.js 3D场景（module，通过 importmap 解析 three） -->
     <script type="module" src="src/main.js"></script>
 
+    <!-- 整合脚本 - 协调 Three.js 和 p5.js 交互（必须为普通 script，设置全局变量） -->
+    <script src="integration.js"></script>
+
+    <!-- 网络协作模块 -->
     <script type="module" src="partySyncColyseus.js"></script>
     <!-- 步进圆环总览视图 -->
     <script src="CircleOverview.js"></script>

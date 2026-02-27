@@ -21,7 +21,8 @@ window.circleBeatsEventBus = eventBus;
 // resolved via importmap in index.html.
 import '../three-scene.js';
 
-// integration.js coordinates Three.js and p5.js interaction
-import '../integration.js';
+// integration.js is loaded as a separate <script> tag in index.html
+// to ensure window.rhythmVisible and window.p5CanvasOpacity are set
+// even if module loading has issues.
 
 console.log('[CircleBeats] Module entry point loaded');
