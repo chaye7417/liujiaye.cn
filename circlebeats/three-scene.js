@@ -1638,17 +1638,32 @@ function stopRendering() {
 
 }
 
+// 帧率控制参数
+const targetFPS = 30;
+const frameInterval = 1000 / targetFPS;
+let lastFrameTime = 0;
+
+// 环境反射更新控制
+let lastEnvUpdateTime = 0;
+const ENV_UPDATE_INTERVAL = 5; // 秒
+
 // animate
-function animate() {
+function animate(currentTime) {
     if (!isRendering) return;
-    
+
     requestAnimationFrame(animate);
-    
+
+    // 帧率控制：30FPS
+    const delta = currentTime - lastFrameTime;
+    if (delta < frameInterval) return;
+    lastFrameTime = currentTime - (delta % frameInterval);
+
     const time = clock.getElapsedTime();
-    
-    // 每隔一段时间更新一次场景环境反射
-    if (Math.floor(time * 2) % 10 === 0) {
+
+    // 每5秒最多更新一次场景环境反射
+    if (time - lastEnvUpdateTime > ENV_UPDATE_INTERVAL) {
         updateSceneEnvironment();
+        lastEnvUpdateTime = time;
     }
     
     // 处理所有活跃小球的闪烁效果，统一使用一种闪烁逻辑
@@ -2483,7 +2498,7 @@ function setCameraAutoModeFromStepper(isPlaying) {
 window.setCameraAutoModeFromStepper = setCameraAutoModeFromStepper;
 
 // 添加场景显示/隐藏控制功能
-let sceneVisible = false; // 默认场景隐藏
+let sceneVisible = true; // 默认场景显示
 
 // 隐藏场景的函数
 function hideScene() {
@@ -2550,5 +2565,5 @@ if (typeof ResizeObserver !== 'undefined') {
     }
 }
 
-// 初始化时隐藏场景并停止渲染
-hideScene();
+// 初始化时显示场景并启动渲染
+showScene();

@@ -354,8 +354,9 @@ class AudioSequencer {
         // 获取当前选中的合成器插槽
         const currentSlot = this.synthUI.currentSlot;
         
-        // 确保合成器对象存在
-        if (this.presetSounds && this.presetSounds[currentSlot]) {
+        // 确保合成器对象存在（懒加载：首次使用时创建）
+        const synth = this.getOrCreateSynth(currentSlot);
+        if (synth) {
           // 应用八度偏移调整音符
           let adjustedNote;
           if (this.octaveOffset !== 0) {
@@ -364,16 +365,16 @@ class AudioSequencer {
           } else {
             adjustedNote = noteName;
           }
-          
+
           // 更新最后演奏的音符
           this.keyboardPlayState.lastPlayedNote = adjustedNote;
-          
+
           // 尝试启动音频上下文（如果尚未启动）
           if (Tone.context.state !== 'running') {
             Tone.start().then(() => {
 
               // 上下文启动后立即播放音符
-              this.presetSounds[currentSlot].triggerAttack(adjustedNote, Tone.now());
+              synth.triggerAttack(adjustedNote, Tone.now());
               this.keyboardPlayState.isPlaying = true;
             }).catch(e => {
               console.warn("键盘触发启动音频上下文失败:", e);
@@ -383,16 +384,16 @@ class AudioSequencer {
             // 如果已经有音符演奏中，不需要重新触发attack，只需要设置频率
             if (this.keyboardPlayState.isPlaying) {
               // 使用setNote方法而不是triggerAttack，避免包络重新触发
-              if (typeof this.presetSounds[currentSlot].setNote === 'function') {
-                this.presetSounds[currentSlot].setNote(adjustedNote, Tone.now());
+              if (typeof synth.setNote === 'function') {
+                synth.setNote(adjustedNote, Tone.now());
               } else {
                 // 如果没有setNote方法，则先释放再重新触发
-                this.presetSounds[currentSlot].triggerRelease("+0.01");
-                this.presetSounds[currentSlot].triggerAttack(adjustedNote, "+0.02");
+                synth.triggerRelease("+0.01");
+                synth.triggerAttack(adjustedNote, "+0.02");
               }
             } else {
               // 第一次触发音符
-              this.presetSounds[currentSlot].triggerAttack(adjustedNote, Tone.now());
+              synth.triggerAttack(adjustedNote, Tone.now());
               this.keyboardPlayState.isPlaying = true;
             }
             
@@ -427,8 +428,9 @@ class AudioSequencer {
         // 获取当前选中的合成器插槽
         const currentSlot = this.synthUI.currentSlot;
         
-        // 确保合成器对象存在
-        if (this.presetSounds && this.presetSounds[currentSlot]) {
+        // 确保合成器对象存在（释放时不需要懒创建）
+        const synth = this.presetSounds[currentSlot];
+        if (synth) {
           // 应用与播放时相同的八度偏移
           let adjustedNote;
           if (this.octaveOffset !== 0) {
@@ -437,13 +439,13 @@ class AudioSequencer {
           } else {
             adjustedNote = noteName;
           }
-          
+
           // 重置演奏状态
           this.keyboardPlayState.isPlaying = false;
           this.keyboardPlayState.lastPlayedNote = null;
-          
+
           // 释放音符
-          this.presetSounds[currentSlot].triggerRelease(Tone.now());
+          synth.triggerRelease(Tone.now());
 
           
           // 熄灭小球 - 调用Three.js场景中的函数将球体设为非激活状态
@@ -1901,9 +1903,10 @@ class AudioSequencer {
           window.synthPresetManager.setWaveform(currentSlot, newWaveform);
         }
         
-        // 更新合成器波形
-        if (this.presetSounds && this.presetSounds[currentSlot]) {
-          this.presetSounds[currentSlot].oscillator.type = newWaveform;
+        // 更新合成器波形（懒加载）
+        const synth = this.getOrCreateSynth(currentSlot);
+        if (synth) {
+          synth.oscillator.type = newWaveform;
         }
         return true;
       }
@@ -2021,18 +2024,20 @@ class AudioSequencer {
           // 切换当前插槽的滑音开关状态
           this.synthUI.portamento.enabled[currentSlot] = !this.synthUI.portamento.enabled[currentSlot];
           
-          // 更新合成器
-          if (this.presetSounds && this.presetSounds[currentSlot]) {
-            // 如果启用滑音，设置保存的值，否则设置为0（禁用滑音）
-            const portamentoTime = this.synthUI.portamento.enabled[currentSlot] ? 
-              this.synthParams[currentSlot].portamento : 0;
-              
-            this.presetSounds[currentSlot].portamento = portamentoTime;
+          // 更新合成器（懒加载）
+          {
+            const synth = this.getOrCreateSynth(currentSlot);
+            if (synth) {
+              // 如果启用滑音，设置保存的值，否则设置为0（禁用滑音）
+              const portamentoTime = this.synthUI.portamento.enabled[currentSlot] ?
+                this.synthParams[currentSlot].portamento : 0;
 
+              synth.portamento = portamentoTime;
+            }
           }
-          
+
           return true;
-        } 
+        }
         // 处理滑音时间调整按钮
         else if (this.synthUI.portamento.enabled[currentSlot]) {
           if (this.synthUI.portamento.hovering === 'minus') {
@@ -2041,28 +2046,32 @@ class AudioSequencer {
             // 限制最小值为0.01秒
             newValue = Math.max(0.01, newValue);
             this.synthParams[currentSlot].portamento = newValue;
-            
-            // 更新合成器
-            if (this.presetSounds && this.presetSounds[currentSlot]) {
-              this.presetSounds[currentSlot].portamento = newValue;
 
+            // 更新合成器（懒加载）
+            {
+              const synth = this.getOrCreateSynth(currentSlot);
+              if (synth) {
+                synth.portamento = newValue;
+              }
             }
-            
+
             return true;
-          } 
+          }
           else if (this.synthUI.portamento.hovering === 'plus') {
             // 增加滑音时间
             let newValue = this.synthParams[currentSlot].portamento + 0.01;
             // 限制最大值为0.3秒
             newValue = Math.min(0.3, newValue);
             this.synthParams[currentSlot].portamento = newValue;
-            
-            // 更新合成器
-            if (this.presetSounds && this.presetSounds[currentSlot]) {
-              this.presetSounds[currentSlot].portamento = newValue;
 
+            // 更新合成器（懒加载）
+            {
+              const synth = this.getOrCreateSynth(currentSlot);
+              if (synth) {
+                synth.portamento = newValue;
+              }
             }
-            
+
             return true;
           }
         }
@@ -2294,27 +2303,14 @@ class AudioSequencer {
         // 创建主音量控制
         this.masterVolume = new Tone.Volume(-6).toDestination(); // 设置适中的音量
         
-        // 为各个预设创建独立的音效合成器
-        this.presetSounds = [];
-        this.delayEffects = []; // 新增存储delay效果的数组
-        this.reverbEffects = []; // 新增存储reverb效果的数组
-        
-        // 创建8个独立的合成器，使用选定的波形和滤波器
-        for (let i = 0; i < 8; i++) {
-          // 获取参数 - 优先从SynthPresetManager获取
-          let waveform, envParams, filterParams, delayParams, reverbParams;
-          let portamentoEnabled, portamentoTime;
-          
-          if (window.synthPresetManager) {
-            // 从SynthPresetManager获取参数
-            waveform = window.synthPresetManager.presetWaveforms[i];
-            envParams = window.synthPresetManager.presetEnvelopeParams[i];
-            filterParams = window.synthPresetManager.presetFilterParams[i];
-            delayParams = window.synthPresetManager.presetDelayParams[i];
-            reverbParams = window.synthPresetManager.presetReverbParams[i];
-            portamentoEnabled = window.synthPresetManager.presetPortamentoEnabled[i];
-            portamentoTime = window.synthPresetManager.presetPortamentoTime[i];
-            
+        // 为各个预设创建独立的音效合成器（懒加载：首次使用时才创建）
+        this.presetSounds = Array(8).fill(null);
+        this.delayEffects = Array(8).fill(null);
+        this.reverbEffects = Array(8).fill(null);
+
+        // 同步SynthPresetManager的效果启用状态（不创建合成器实例）
+        if (window.synthPresetManager) {
+          for (let i = 0; i < 8; i++) {
             // 同步效果启用状态
             if (!this.synthUI.delay) {
               this.synthUI.delay = { enabled: Array(8).fill(false) };
@@ -2322,96 +2318,11 @@ class AudioSequencer {
             if (!this.synthUI.reverb) {
               this.synthUI.reverb = { enabled: Array(8).fill(false) };
             }
-            
+
             // 从SynthPresetManager同步效果启用状态
             this.synthUI.delay.enabled[i] = window.synthPresetManager.presetDelayEnabled[i];
             this.synthUI.reverb.enabled[i] = window.synthPresetManager.presetReverbEnabled[i];
-          } else {
-            // 回退到合成器本地参数
-            const params = this.synthParams[i];
-            waveform = this.synthUI.selectedWaveforms[i];
-            envParams = {
-              attack: params.attack,
-              decay: params.decay,
-              sustain: params.sustain,
-              release: params.release
-            };
-            filterParams = {
-              type: params.filterType,
-              frequency: params.filterFreq,
-              Q: params.filterQ
-            };
-            delayParams = {
-              time: params.delayTime,
-              feedback: params.delayFeedback,
-              mix: params.delayWet
-            };
-            reverbParams = {
-              decay: params.reverbDecay,
-              mix: params.reverbWet
-            };
-            portamentoEnabled = this.synthUI.portamento.enabled[i];
-            portamentoTime = params.portamento;
           }
-          
-          // 创建PingPongDelay效果，实现左右声道交替的延迟效果
-          const delay = new Tone.PingPongDelay({
-            delayTime: this.calculateDelayTime(delayParams.time),
-            feedback: delayParams.feedback,
-            wet: this.synthUI.delay.enabled[i] ? delayParams.mix : 0,
-            maxDelay: 2 // 允许最大2秒的延迟，支持低BPM情况
-          });
-          
-          // 保存delay效果
-          this.delayEffects.push(delay);
-          
-          // 创建Reverb效果
-          const reverb = new Tone.Reverb({
-            decay: reverbParams.decay,
-            wet: this.synthUI.reverb.enabled[i] ? reverbParams.mix : 0,
-            preDelay: 0.01 // 预延迟，增加空间感
-          });
-          
-          // 将reverb效果预先生成，避免生成时造成音频卡顿
-          reverb.generate();
-          
-          // 保存reverb效果
-          this.reverbEffects.push(reverb);
-          
-          // 创建MonoSynth代替基本的Synth，增加滤波器功能
-          const synth = new Tone.MonoSynth({
-            oscillator: {
-              type: waveform
-            },
-            envelope: {
-              attack: envParams.attack,
-              decay: envParams.decay,
-              sustain: envParams.sustain,
-              release: envParams.release
-            },
-            filter: {
-              type: filterParams.type,
-              frequency: filterParams.frequency,
-              Q: filterParams.Q
-            },
-            filterEnvelope: {
-              attack: envParams.filterAttack || 0.01,
-              decay: envParams.filterDecay || 0.1,
-              sustain: envParams.filterSustain || 1.0,
-              release: envParams.filterRelease || 0.1,
-              baseFrequency: filterParams.frequency,
-              octaves: filterParams.envAmount || 2,
-              exponent: 2 // 非线性曲线，更自然的滤波器变化
-            },
-            portamento: portamentoEnabled ? portamentoTime : 0,
-            volume: -10 // 默认音量
-          }).connect(delay);
-          
-          // 设置连接链: synth -> delay -> reverb -> master
-          delay.connect(reverb);
-          reverb.connect(this.masterVolume);
-          
-          this.presetSounds.push(synth);
         }
         
         // 初始化Tone.js正常完成
@@ -2430,7 +2341,122 @@ class AudioSequencer {
         this.createDummySounds();
       }
     }
-    
+
+    // 懒加载合成器：首次访问时创建MonoSynth及其效果链
+    getOrCreateSynth(slotIndex) {
+      // 如果合成器已存在，直接返回
+      if (this.presetSounds[slotIndex]) {
+        return this.presetSounds[slotIndex];
+      }
+
+      // 确保Tone.js和主音量可用
+      if (typeof Tone === 'undefined' || !this.masterVolume) {
+        return null;
+      }
+
+      const i = slotIndex;
+
+      // 获取参数 - 优先从SynthPresetManager获取
+      let waveform, envParams, filterParams, delayParams, reverbParams;
+      let portamentoEnabled, portamentoTime;
+
+      if (window.synthPresetManager) {
+        // 从SynthPresetManager获取参数
+        waveform = window.synthPresetManager.presetWaveforms[i];
+        envParams = window.synthPresetManager.presetEnvelopeParams[i];
+        filterParams = window.synthPresetManager.presetFilterParams[i];
+        delayParams = window.synthPresetManager.presetDelayParams[i];
+        reverbParams = window.synthPresetManager.presetReverbParams[i];
+        portamentoEnabled = window.synthPresetManager.presetPortamentoEnabled[i];
+        portamentoTime = window.synthPresetManager.presetPortamentoTime[i];
+      } else {
+        // 回退到合成器本地参数
+        const params = this.synthParams[i];
+        waveform = this.synthUI.selectedWaveforms[i];
+        envParams = {
+          attack: params.attack,
+          decay: params.decay,
+          sustain: params.sustain,
+          release: params.release
+        };
+        filterParams = {
+          type: params.filterType,
+          frequency: params.filterFreq,
+          Q: params.filterQ
+        };
+        delayParams = {
+          time: params.delayTime,
+          feedback: params.delayFeedback,
+          mix: params.delayWet
+        };
+        reverbParams = {
+          decay: params.reverbDecay,
+          mix: params.reverbWet
+        };
+        portamentoEnabled = this.synthUI.portamento.enabled[i];
+        portamentoTime = params.portamento;
+      }
+
+      // 创建PingPongDelay效果，实现左右声道交替的延迟效果
+      const delay = new Tone.PingPongDelay({
+        delayTime: this.calculateDelayTime(delayParams.time),
+        feedback: delayParams.feedback,
+        wet: this.synthUI.delay.enabled[i] ? delayParams.mix : 0,
+        maxDelay: 2 // 允许最大2秒的延迟，支持低BPM情况
+      });
+
+      this.delayEffects[i] = delay;
+
+      // 创建Reverb效果
+      const reverb = new Tone.Reverb({
+        decay: reverbParams.decay,
+        wet: this.synthUI.reverb.enabled[i] ? reverbParams.mix : 0,
+        preDelay: 0.01 // 预延迟，增加空间感
+      });
+
+      // 将reverb效果预先生成，避免生成时造成音频卡顿
+      reverb.generate();
+
+      this.reverbEffects[i] = reverb;
+
+      // 创建MonoSynth代替基本的Synth，增加滤波器功能
+      const synth = new Tone.MonoSynth({
+        oscillator: {
+          type: waveform
+        },
+        envelope: {
+          attack: envParams.attack,
+          decay: envParams.decay,
+          sustain: envParams.sustain,
+          release: envParams.release
+        },
+        filter: {
+          type: filterParams.type,
+          frequency: filterParams.frequency,
+          Q: filterParams.Q
+        },
+        filterEnvelope: {
+          attack: envParams.filterAttack || 0.01,
+          decay: envParams.filterDecay || 0.1,
+          sustain: envParams.filterSustain || 1.0,
+          release: envParams.filterRelease || 0.1,
+          baseFrequency: filterParams.frequency,
+          octaves: filterParams.envAmount || 2,
+          exponent: 2 // 非线性曲线，更自然的滤波器变化
+        },
+        portamento: portamentoEnabled ? portamentoTime : 0,
+        volume: -10 // 默认音量
+      }).connect(delay);
+
+      // 设置连接链: synth -> delay -> reverb -> master
+      delay.connect(reverb);
+      reverb.connect(this.masterVolume);
+
+      this.presetSounds[i] = synth;
+
+      return synth;
+    }
+
     // 设置Transport循环，使用Tone.js的时间线系统
     setupTransportLoop() {
       // 首先确保Tone.js可用
@@ -2709,28 +2735,28 @@ class AudioSequencer {
                 const subdivisionDuration = 60 / this.bpm / (this.subdivision / 4);
                 const noteDuration = subdivisionDuration * duration;
                 
-                // 获取合成器
-                const synth = this.presetSounds[synthIndex];
-                
+                // 获取合成器（懒加载）
+                const synth = this.getOrCreateSynth(synthIndex);
+
                 // 更新：确保音符在时值结束时强制释放，即使包络尚未完成
                 const now = Tone.now();
                 const playTime = time > 0 ? time : now;
-                
+
                 // 设置滑音时间（如果需要）
                 if (needsPortamento && synth && typeof synth.portamento !== 'undefined') {
                   // 保存原始的滑音设置，稍后恢复
                   const originalPortamento = synth.portamento;
-                  
+
                   // 设置新的滑音时间 - 使用当前插槽的滑音时间设置
                   const portamentoTime = this.synthParams[synthIndex].portamento;
                   synth.portamento = portamentoTime;
-                  
+
                   // 使用triggerAttack，不释放前一个音符
                   synth.triggerAttack(actualNote, playTime);
-                  
+
                   // 计算下一个音符的时间
                   const nextNoteTime = playTime + subdivisionDuration;
-                  
+
                   // 在下一个音符即将到来之前恢复原始滑音设置
                   // 提前一点点恢复，确保设置已经生效
                   Tone.Transport.scheduleOnce(() => {
@@ -2814,8 +2840,8 @@ class AudioSequencer {
                 const subdivisionDuration = 60 / this.bpm / (this.subdivision / 4);
                 const noteDuration = subdivisionDuration * duration;
                 
-                // 使用对应预设的Tone合成器
-                const synth = this.presetSounds[presetIndex];
+                // 使用对应预设的Tone合成器（懒加载）
+                const synth = this.getOrCreateSynth(presetIndex);
                 
                 // 更新：确保音符在时值结束时强制释放，即使包络尚未完成
                 const now = Tone.now();
@@ -3116,19 +3142,20 @@ class AudioSequencer {
       
       try {
         if (this.presetSounds && this.presetSounds.length > 0) {
-          // 使用第一个合成器播放一个短暂的中音C
+          // 使用前两个合成器播放测试音符（懒加载：仅创建需要的合成器）
 
-          
-          // 循环播放所有预设的声音，确保用户能听到反馈
+          // 循环播放前两个预设的声音，确保用户能听到反馈
           for (let i = 0; i < Math.min(this.presetSounds.length, 2); i++) {
             // 设置一个较短的延迟，确保合成器已准备好
             setTimeout(() => {
               // 第一个合成器播放C4，第二个播放E4，形成和谐的音色
               const note = i === 0 ? "C4" : "E4";
               try {
-                // 明确指定当前时间，确保立即播放
-                this.presetSounds[i].triggerAttackRelease(note, 0.2, Tone.now() + i * 0.1);
-
+                const synth = this.getOrCreateSynth(i);
+                if (synth) {
+                  // 明确指定当前时间，确保立即播放
+                  synth.triggerAttackRelease(note, 0.2, Tone.now() + i * 0.1);
+                }
               } catch (innerErr) {
                 console.warn(`播放测试音符 ${note} 失败:`, innerErr);
               }
@@ -3569,9 +3596,12 @@ class AudioSequencer {
           // 更新当前插槽的类型选择
           this.synthUI.filter.selectedType[currentSlot] = params.filterType;
           
-          // 如果有合成器，立即更新滤波器类型
-          if (this.presetSounds && this.presetSounds[currentSlot]) {
-            this.presetSounds[currentSlot].filter.type = params.filterType;
+          // 如果有合成器，立即更新滤波器类型（懒加载）
+          {
+            const synth = this.getOrCreateSynth(currentSlot);
+            if (synth) {
+              synth.filter.type = params.filterType;
+            }
           }
           
 
@@ -3604,9 +3634,12 @@ class AudioSequencer {
           // 设置新的包络深度值
           params.filterEnvAmount = envAmounts[nextIndex];
           
-          // 如果有合成器，立即更新滤波器包络深度
-          if (this.presetSounds && this.presetSounds[currentSlot]) {
-            this.presetSounds[currentSlot].filterEnvelope.octaves = params.filterEnvAmount;
+          // 如果有合成器，立即更新滤波器包络深度（懒加载）
+          {
+            const synth = this.getOrCreateSynth(currentSlot);
+            if (synth) {
+              synth.filterEnvelope.octaves = params.filterEnvAmount;
+            }
           }
           
 
@@ -3932,34 +3965,37 @@ class AudioSequencer {
         }
       }
       
-      // 实时同步到合成器
-      if (this.presetSounds && this.presetSounds[currentSlot]) {
-        // 创建要更新的参数对象
-        const updateParams = {};
-        
-        // 根据当前页面添加不同的参数
-        if (isFilterEnv) {
-          // 更新滤波器包络
-          updateParams.filterEnvelope = {
-            attack: params.filterAttack,
-            decay: params.filterDecay,
-            sustain: params.filterSustain,
-            release: params.filterRelease,
-            baseFrequency: params.filterFreq,
-            octaves: params.filterEnvAmount  // 添加包络深度参数更新
-          };
-        } else {
-          // 更新放大器包络
-          updateParams.envelope = {
-            attack: params.attack,
-            decay: params.decay,
-            sustain: params.sustain,
-            release: params.release
-          };
+      // 实时同步到合成器（懒加载）
+      {
+        const synth = this.getOrCreateSynth(currentSlot);
+        if (synth) {
+          // 创建要更新的参数对象
+          const updateParams = {};
+
+          // 根据当前页面添加不同的参数
+          if (isFilterEnv) {
+            // 更新滤波器包络
+            updateParams.filterEnvelope = {
+              attack: params.filterAttack,
+              decay: params.filterDecay,
+              sustain: params.filterSustain,
+              release: params.filterRelease,
+              baseFrequency: params.filterFreq,
+              octaves: params.filterEnvAmount  // 添加包络深度参数更新
+            };
+          } else {
+            // 更新放大器包络
+            updateParams.envelope = {
+              attack: params.attack,
+              decay: params.decay,
+              sustain: params.sustain,
+              release: params.release
+            };
+          }
+
+          // 设置合成器参数
+          synth.set(updateParams);
         }
-        
-        // 设置合成器参数
-        this.presetSounds[currentSlot].set(updateParams);
       }
       
       return true;
@@ -4094,32 +4130,32 @@ class AudioSequencer {
         params.filterQ = constrain(newQ, 0.1, 20);
       }
       
-      // 实时更新合成器参数
-      if (this.presetSounds && this.presetSounds[currentSlot]) {
-        // 创建更新对象
-        const updateParams = {
-          filter: {
-            frequency: params.filterFreq,
-            Q: params.filterQ
-          }
-        };
-        
-        // 同时更新滤波器包络的基础频率，确保频率控制正常工作
-        if (this.presetSounds[currentSlot].filterEnvelope) {
-          updateParams.filterEnvelope = {
-            baseFrequency: params.filterFreq
+      // 实时更新合成器参数（懒加载）
+      {
+        const synth = this.getOrCreateSynth(currentSlot);
+        if (synth) {
+          // 创建更新对象
+          const updateParams = {
+            filter: {
+              frequency: params.filterFreq,
+              Q: params.filterQ
+            }
           };
-        }
-        
-        // 立即应用更新
-        this.presetSounds[currentSlot].set(updateParams);
-            
-            // 输出调试信息
 
+          // 同时更新滤波器包络的基础频率，确保频率控制正常工作
+          if (synth.filterEnvelope) {
+            updateParams.filterEnvelope = {
+              baseFrequency: params.filterFreq
+            };
           }
-          
-          return true;
+
+          // 立即应用更新
+          synth.set(updateParams);
         }
+      }
+
+      return true;
+    }
     
     handleSynthMouseReleased() {
       const currentSlot = this.synthUI.currentSlot;

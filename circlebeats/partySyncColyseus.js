@@ -6,6 +6,26 @@
 // 全局调试开关，默认关闭
 window.debugColyseus = false;
 
+// 通用节流函数：确保高频调用（如拖拽ADSR/滤波器）不会在每次mousemove时都发送WebSocket消息
+// 在delay时间内最多执行一次，且保证最后一次调用一定会被执行（trailing call）
+function throttle(fn, delay) {
+  let lastCall = 0;
+  let timer = null;
+  return function(...args) {
+    const now = Date.now();
+    if (now - lastCall >= delay) {
+      lastCall = now;
+      fn.apply(this, args);
+    } else if (!timer) {
+      timer = setTimeout(() => {
+        lastCall = Date.now();
+        timer = null;
+        fn.apply(this, args);
+      }, delay - (now - lastCall));
+    }
+  };
+}
+
 // 添加一个全局变量，用于追踪在总览模式中是否存在拖拽操作
 window.isDraggingInOverview = false;
 
@@ -47,26 +67,43 @@ let colyseusDialogVisible = false;
 // 设置上面添加的最大重试次数变量
 let maxConnectionRetries = 3; // 最大重试次数
 
+// 创建节流后的同步函数，避免拖拽时每次mousemove都发送WebSocket消息
+const throttledSyncSynthParams = throttle((slotIndex, params) => {
+  syncSynthParamsToServer(slotIndex, params);
+}, 100); // 合成器参数：100ms节流
+
+const throttledSyncAllSynthParams = throttle(() => {
+  syncAllSynthParamsToServer();
+}, 100); // 全量合成器参数：100ms节流
+
+const throttledSyncBpm = throttle((bpm) => {
+  syncBpmToServer(bpm);
+}, 200); // BPM同步：200ms节流
+
+const throttledSyncBaseNote = throttle((slotIndex, baseNote) => {
+  syncBaseNoteToServer(slotIndex, baseNote);
+}, 100); // 八度信息：100ms节流
+
 // 在页面加载时初始化
 window.addEventListener('load', () => {
-  // 监听合成器参数变化以便同步
+  // 监听合成器参数变化以便同步（节流100ms，防止拖拽ADSR/滤波器时高频发送）
   window.addEventListener('synth-params-changed', (event) => {
     if (event.detail && colyseusConnected && colyseusSlotStates.mySlot !== -1) {
-      syncSynthParamsToServer(colyseusSlotStates.mySlot, event.detail);
+      throttledSyncSynthParams(colyseusSlotStates.mySlot, event.detail);
     }
   });
-  
-  // 监听合成器参数全量变化
+
+  // 监听合成器参数全量变化（节流100ms）
   window.addEventListener('synth-all-params-changed', (event) => {
     if (colyseusConnected && colyseusSlotStates.mySlot !== -1) {
-      syncAllSynthParamsToServer();
+      throttledSyncAllSynthParams();
     }
   });
-  
-  // 监听BPM变化
+
+  // 监听BPM变化（节流200ms）
   window.addEventListener('bpm-changed', (event) => {
     if (event.detail && colyseusConnected && colyseusSlotStates.mySlot !== -1) {
-      syncBpmToServer(event.detail.bpm);
+      throttledSyncBpm(event.detail.bpm);
     }
   });
   
@@ -1425,25 +1462,18 @@ function updateBpmFromState(bpm) {
   colyseusSlotStates.data.bpm = bpm;
 }
 
-// 同步BPM到服务器
+// 同步BPM到服务器（节流由外层throttledSyncBpm控制，此处只做发送逻辑）
 function syncBpmToServer(bpm) {
   if (!colyseusConnected || colyseusSlotStates.mySlot === -1) return;
-  
+
   // 确保BPM在有效范围内
   if (typeof bpm !== 'number' || bpm < 30 || bpm > 300) return;
-  
-  // 添加节流控制，防止频繁发送BPM更新
-  const now = Date.now();
-  if (!window.lastBpmSync || now - window.lastBpmSync > 500) { // 最小间隔500ms
-    window.lastBpmSync = now;
-    
-    // 检查是否有实际变化，只有BPM实际改变时才发送
-    if (colyseusSlotStates.data.bpm !== bpm) {
-      if (colyseusRoom) {
-        colyseusRoom.send("updateBpm", { bpm });
 
-        colyseusSlotStates.data.bpm = bpm; // 更新本地缓存
-      }
+  // 检查是否有实际变化，只有BPM实际改变时才发送
+  if (colyseusSlotStates.data.bpm !== bpm) {
+    if (colyseusRoom) {
+      colyseusRoom.send("updateBpm", { bpm });
+      colyseusSlotStates.data.bpm = bpm; // 更新本地缓存
     }
   }
 }
@@ -1877,13 +1907,13 @@ window.addEventListener('circle-data-change', (event) => {
   }, 300);
 });
 
-// 监听BPM变化事件
+// 监听BPM变化事件（使用节流，200ms）
 window.addEventListener('bpm-change', (event) => {
   if (!event.detail || !event.detail.bpm) return;
-  
+
   // 如果是当前用户控制的插槽，同步BPM到服务器
   if (colyseusConnected && colyseusSlotStates.mySlot !== -1) {
-    syncBpmToServer(event.detail.bpm);
+    throttledSyncBpm(event.detail.bpm);
   }
 });
 
@@ -3404,8 +3434,8 @@ function processInitialBaseNotes(baseNotes) {
   }
 }
 
-// 将八度信息同步函数暴露到全局作用域
-window.syncBaseNoteToServer = syncBaseNoteToServer;
+// 将八度信息同步函数暴露到全局作用域（使用节流版本，100ms）
+window.syncBaseNoteToServer = throttledSyncBaseNote;
 
 // 将插槽状态暴露给全局作用域，以便其他文件可以访问
 window.colyseusSlotStates = colyseusSlotStates;

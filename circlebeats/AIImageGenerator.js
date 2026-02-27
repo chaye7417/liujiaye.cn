@@ -5,10 +5,9 @@
 
 class AIImageGenerator {
     constructor() {
-        this.apiKey = 'sk-yDcJGj25FOBtIgGmXlTHegh69jeIN0DnIxXW1seImdA3cqRb';
-        this.apiEndpoint = 'https://api.stability.ai/v2beta/stable-image/control/sketch';
-        this.videoApiEndpoint = 'https://api.stability.ai/v2beta/image-to-video';
-        this.videoResultEndpoint = 'https://api.stability.ai/v2beta/image-to-video/result';
+        this.apiEndpoint = '/api/stability/sketch';
+        this.videoApiEndpoint = '/api/stability/image-to-video';
+        this.videoResultEndpoint = '/api/stability/image-to-video/result';
         this.isGenerating = false;
         this.isGeneratingVideo = false;
         this.generatedImages = [];
@@ -536,10 +535,7 @@ class AIImageGenerator {
             const response = await fetch(this.apiEndpoint, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
-                    'Accept': 'image/*',
-                    'stability-client-id': 'music-visualizer-app',
-                    'stability-client-version': '1.0.0'
+                    'Accept': 'image/*'
                 },
                 body: formData
             });
@@ -783,11 +779,6 @@ class AIImageGenerator {
             // 发送视频生成请求
             const response = await fetch(this.videoApiEndpoint, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
-                    'stability-client-id': 'music-visualizer-app',
-                    'stability-client-version': '1.0.0'
-                },
                 body: formData
             });
             
@@ -859,10 +850,7 @@ class AIImageGenerator {
                 const response = await fetch(`${this.videoResultEndpoint}/${generationId}`, {
                     method: 'GET',
                     headers: {
-                        'Authorization': `Bearer ${this.apiKey}`,
-                        'Accept': 'video/*',
-                        'stability-client-id': 'music-visualizer-app',
-                        'stability-client-version': '1.0.0'
+                        'Accept': 'video/*'
                     }
                 });
                 

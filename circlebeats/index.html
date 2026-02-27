@@ -34,7 +34,7 @@
      -->
 
 
-     <script src="https://unpkg.com/colyseus.js/dist/colyseus.js"></script>
+     <script src="https://unpkg.com/colyseus.js@0.15.12/dist/colyseus.js"></script>
     <!-- 合成器参数同步模块 -->
     <script src="synthParamsSync.js?v=20240522"></script>
     
@@ -620,27 +620,14 @@
             align-items: flex-start; /* 修改为左对齐 */
             pointer-events: auto; /* 内部容器接收事件 */
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3); /* 减小阴影 */
-            opacity: 0; /* 初始设置为隐藏 */
+            opacity: 0.6; /* 默认半透明可见 */
             transition: opacity 0.3s ease; /* 添加渐变效果 */
-            visibility: hidden; /* 初始完全隐藏 */
+            visibility: visible; /* 默认可见 */
         }
         
-        /* 悬停区域 - 一个小的热区，用于触发按钮显示 */
-        #hover-zone {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 40px;
-            height: 40px;
-            z-index: 9998;
-            pointer-events: auto;
-        }
-        
-        /* 当悬停在热区或控制容器上时显示控制按钮 */
-        #hover-zone:hover ~ #controls-panel #controls-container,
+        /* 悬停时控制按钮完全不透明 */
         #controls-container:hover {
             opacity: 1;
-            visibility: visible;
         }
         
         /* 调整按钮样式，使其在纵向排列时填满容器宽度 */
@@ -1112,7 +1099,23 @@
             box-shadow: none !important;
         }
         
-        /* 小猫模型容器 - 调整到右侧可视化器内 */
+        /* Live2D容器在猫聊天区域内时，强制使用绝对定位替代 fixed */
+        #cat-live2d-container .live2d-widget-container {
+            position: absolute !important;
+            right: 0px !important;
+            bottom: 50px !important;
+            left: auto !important;
+            top: auto !important;
+            width: 240px !important;
+            height: 300px !important;
+            pointer-events: none !important;
+            background: transparent !important;
+        }
+        #cat-live2d-container .live2d-widget-container canvas {
+            background: transparent !important;
+            width: 100% !important;
+            height: 100% !important;
+        }
     </style>
 </head>
 <body class="hide-visualizer hide-overview">
@@ -1126,14 +1129,11 @@
     <!-- p5.js 渲染容器 (中间层) -->
     <div id="p5-container" class="renderer-container"></div>
     
-    <!-- 悬停检测区域 -->
-    <div id="hover-zone"></div>
-    
     <!-- 控制面板 (顶层) -->
     <div id="controls-panel">
         <div id="controls-container">
                 <button id="toggle-rhythm-button" class="control-button" data-i18n="controls.hideRhythm">Hide Rhythm</button>
-                <button id="toggle-scene-button" class="control-button" data-i18n="controls.show3DScene">Show 3D Scene</button>
+                <button id="toggle-scene-button" class="control-button" data-i18n="controls.hide3DScene">Hide 3D Scene</button>
                 <button id="colyseus-connect-button" class="control-button" data-i18n="controls.networkCollaboration">联网协作</button>
                     <button id="toggle-visualizer-button" class="control-button" data-i18n="controls.visualizer">🎵 可视化器</button>
                     <button id="toggle-overview-button" class="control-button" data-i18n="controls.overview">📊 总览</button>
@@ -1392,9 +1392,6 @@
         // 在页面加载后启动GUI观察器
         window.addEventListener('load', () => {
             setupGuiObserver();
-            
-            // 设置控制按钮的悬停行为
-            setupControlsHoverBehavior();
             
             // 添加圆圈数据变化监听，更新ABC记谱法
             window.addEventListener('circle-data-change', (event) => {
@@ -2319,56 +2316,6 @@
             console.log('📱 响应式检测已初始化');
         }
         
-        // 设置控制按钮的悬停行为
-        function setupControlsHoverBehavior() {
-            const hoverZone = document.getElementById('hover-zone');
-            const controlsContainer = document.getElementById('controls-container');
-            
-            if (!hoverZone || !controlsContainer) return;
-            
-            // 添加鼠标移动到热区的事件处理
-            hoverZone.addEventListener('mouseenter', () => {
-                controlsContainer.style.opacity = '1';
-                controlsContainer.style.visibility = 'visible';
-            });
-            
-            // 添加鼠标移动到控制容器的事件处理
-            controlsContainer.addEventListener('mouseenter', () => {
-                controlsContainer.style.opacity = '1';
-                controlsContainer.style.visibility = 'visible';
-            });
-            
-            // 添加鼠标离开热区的事件处理
-            hoverZone.addEventListener('mouseleave', (event) => {
-                // 检查鼠标是否移动到了控制容器上
-                if (!isMouseOverElement(event, controlsContainer)) {
-                    controlsContainer.style.opacity = '0';
-                    controlsContainer.style.visibility = 'hidden';
-                }
-            });
-            
-            // 添加鼠标离开控制容器的事件处理
-            controlsContainer.addEventListener('mouseleave', (event) => {
-                // 检查鼠标是否移动到了热区上
-                if (!isMouseOverElement(event, hoverZone)) {
-                    controlsContainer.style.opacity = '0';
-                    controlsContainer.style.visibility = 'hidden';
-                }
-            });
-            
-            // 辅助函数：检查鼠标是否在指定元素上
-            function isMouseOverElement(event, element) {
-                const rect = element.getBoundingClientRect();
-                return (
-                    event.clientX >= rect.left &&
-                    event.clientX <= rect.right &&
-                    event.clientY >= rect.top &&
-                    event.clientY <= rect.bottom
-                );
-            }
-            
-
-        }
     </script>
     
     <!-- Live2D库和小猫聊天功能 -->

@@ -1,18 +1,26 @@
 let currentModel = null;
 let typingInterval = null;
+let live2dInitialized = false;
+let live2dPanelObserver = null;
 
 // ChatGPT API 配置
 const OPENAI_API_KEY = "";  // TODO: 配置 API Key
 
-// 初始化 Live2D 小猫 - 适配到可视化器面板内
+// 初始化 Live2D 小猫 - 延迟到可视化器面板打开时才加载
 function initLive2D() {
-    // 等待目标容器存在
-    const targetContainer = document.getElementById('cat-live2d-container');
-    if (!targetContainer) {
-        console.log('🐱 等待小猫容器加载...');
-        setTimeout(initLive2D, 500);
+    if (live2dInitialized) {
+        console.log('🐱 Live2D 已初始化，跳过');
         return;
     }
+
+    const targetContainer = document.getElementById('cat-live2d-container');
+    if (!targetContainer) {
+        console.log('🐱 找不到小猫容器，跳过初始化');
+        return;
+    }
+
+    live2dInitialized = true;
+    console.log('🐱 可视化器面板已打开，开始加载 Live2D...');
 
     L2Dwidget.init({
         model: {
@@ -22,9 +30,9 @@ function initLive2D() {
             superSample: 1,
             width: 240,
             height: 240,
-            position: "fixed",
-            hOffset: 180,
-            vOffset: 480
+            position: "relative",
+            hOffset: 0,
+            vOffset: 0
         },
         mobile: {
             show: true,
@@ -39,72 +47,133 @@ function initLive2D() {
         tagMode: false
     });
 
-    // 等待Live2D加载完成后移动到指定容器
+    // 等待 Live2D 加载完成后移动到目标容器
     setTimeout(() => {
-        try {
-            const live2dCanvas = document.querySelector('#L2dCanvas');
-            const live2dContainer = document.querySelector('.live2d-widget-container');
-            
-            if (live2dCanvas && live2dContainer && targetContainer) {
-                // 移动整个Live2D容器到目标位置
-                targetContainer.appendChild(live2dContainer);
-                
-                // 调整容器样式以适应面板
-                live2dContainer.style.position = 'absolute';
-                live2dContainer.style.right = '0px';
-                live2dContainer.style.bottom = '50px'; // 与CSS一致，往上移动更多
-                live2dContainer.style.width = '240px'; // 改为240px，300%大小
-                live2dContainer.style.height = '300px'; // 改为300px，300%大小
-                live2dContainer.style.pointerEvents = 'none';
-                live2dContainer.style.background = 'transparent';
-                live2dContainer.style.border = 'none !important';
-                live2dContainer.style.outline = 'none !important';
-                live2dContainer.style.boxShadow = 'none !important';
-                
-                // 调整canvas样式，也去掉边框
-                live2dCanvas.style.background = 'transparent';
-                live2dCanvas.style.width = '100%';
-                live2dCanvas.style.height = '100%';
-                live2dCanvas.style.border = 'none !important';
-                live2dCanvas.style.outline = 'none !important';
-                live2dCanvas.style.boxShadow = 'none !important';
-                
-                // 使用定时器持续确保样式不被覆盖
-                const ensureStyles = () => {
-                    if (live2dContainer) {
-                        live2dContainer.style.border = 'none !important';
-                        live2dContainer.style.outline = 'none !important';
-                        live2dContainer.style.boxShadow = 'none !important';
-                        live2dContainer.style.bottom = '50px';
-                    }
-                    if (live2dCanvas) {
-                        live2dCanvas.style.border = 'none !important';
-                        live2dCanvas.style.outline = 'none !important';
-                        live2dCanvas.style.boxShadow = 'none !important';
-                    }
-                };
-                
-                // 立即执行一次，然后每秒检查一次，连续5次
-                ensureStyles();
-                for (let i = 1; i <= 5; i++) {
-                    setTimeout(ensureStyles, i * 1000);
-                }
-                
-                console.log("🐱 Live2D 小猫已成功移动到可视化器面板！");
-                
-                // 获取模型实例
-                currentModel = window.L2Dwidget.getModel();
-            }
-        } catch (error) {
-            console.log("模型移动延迟，将在说话时重试");
-        }
+        moveLive2DToContainer(targetContainer);
     }, 3000);
 }
+
+// 将 Live2D 元素移动到目标容器并设置样式（只执行一次）
+function moveLive2DToContainer(targetContainer) {
+    try {
+        const live2dCanvas = document.querySelector('#L2dCanvas');
+        const live2dContainer = document.querySelector('.live2d-widget-container');
+
+        if (!live2dCanvas || !live2dContainer || !targetContainer) {
+            console.log('🐱 Live2D 元素尚未就绪，稍后重试...');
+            setTimeout(() => moveLive2DToContainer(targetContainer), 1000);
+            return;
+        }
+
+        // 移动到目标容器
+        targetContainer.appendChild(live2dContainer);
+
+        // 使用相对/绝对定位适配面板，不再使用 fixed
+        Object.assign(live2dContainer.style, {
+            position: 'absolute',
+            right: '0px',
+            bottom: '50px',
+            left: 'auto',
+            top: 'auto',
+            width: '240px',
+            height: '300px',
+            pointerEvents: 'none',
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            boxShadow: 'none',
+            zIndex: '10'
+        });
+
+        Object.assign(live2dCanvas.style, {
+            background: 'transparent',
+            width: '100%',
+            height: '100%',
+            border: 'none',
+            outline: 'none',
+            boxShadow: 'none'
+        });
+
+        console.log('🐱 Live2D 小猫已成功移动到可视化器面板！');
+
+        // 获取模型实例
+        try {
+            currentModel = window.L2Dwidget.getModel();
+        } catch (e) {
+            // 模型可能还未完全就绪，忽略
+        }
+    } catch (error) {
+        console.log('🐱 移动 Live2D 失败:', error.message);
+    }
+}
+
+// 销毁 Live2D（面板隐藏时释放资源）
+function destroyLive2D() {
+    if (!live2dInitialized) return;
+
+    try {
+        const live2dContainer = document.querySelector('.live2d-widget-container');
+        if (live2dContainer) {
+            live2dContainer.remove();
+        }
+        const live2dCanvas = document.querySelector('#L2dCanvas');
+        if (live2dCanvas) {
+            live2dCanvas.remove();
+        }
+        currentModel = null;
+        live2dInitialized = false;
+        console.log('🐱 Live2D 已销毁，释放资源');
+    } catch (error) {
+        console.log('🐱 销毁 Live2D 时出错:', error.message);
+    }
+}
+
+// 监听可视化器面板的显示/隐藏，延迟初始化 Live2D
+function observeVisualizerPanel() {
+    const visualizerPanel = document.getElementById('visualizer-panel');
+    if (!visualizerPanel) return;
+
+    // 如果面板已经可见，立即初始化
+    if (!visualizerPanel.classList.contains('hidden')) {
+        initLive2D();
+    }
+
+    // 监听 class 变化来检测面板显示/隐藏
+    live2dPanelObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            if (mutation.attributeName === 'class') {
+                const isHidden = visualizerPanel.classList.contains('hidden');
+                if (!isHidden) {
+                    // 面板打开 -> 初始化 Live2D
+                    initLive2D();
+                    // 显示欢迎消息
+                    setTimeout(() => {
+                        if (isChatVisible() && !live2dWelcomeShown) {
+                            live2dWelcomeShown = true;
+                            const welcomeMessage = window.languageManager ?
+                                window.languageManager.getText('catChat', 'welcome') :
+                                "Hello! I'm your creative cat artist. I can turn your rhythms into AI art! Meow~ 🎨";
+                            showSpeechBubble(welcomeMessage);
+                        }
+                    }, 3500);
+                } else {
+                    // 面板隐藏 -> 销毁 Live2D 释放资源
+                    destroyLive2D();
+                }
+            }
+        }
+    });
+
+    live2dPanelObserver.observe(visualizerPanel, { attributes: true });
+    console.log('🐱 已开始监听可视化器面板状态');
+}
+
+let live2dWelcomeShown = false;
 
 // 获取模型对象
 function getModel() {
     if (currentModel) return currentModel;
-    
+
     try {
         currentModel = window.L2Dwidget.getModel();
         return currentModel;
@@ -387,22 +456,10 @@ function initCatChat() {
         // 点击发送
         sendBtn.addEventListener('click', handleCatChat);
 
-        // 初始化 Live2D
-        initLive2D();
-        
-        console.log('🐱 小猫聊天系统事件监听器已设置');
+        // 延迟初始化：监听可视化器面板显示/隐藏，面板打开时才加载 Live2D
+        observeVisualizerPanel();
 
-        // 延迟显示欢迎消息，等待可视化器面板显示
-        setTimeout(() => {
-            if (isChatVisible()) {
-                // 检查当前语言设置
-                const welcomeMessage = window.languageManager ? 
-                    window.languageManager.getText('catChat', 'welcome') :
-                    "Hello! I'm your creative cat artist. I can turn your rhythms into AI art! Meow~ 🎨";
-                
-                showSpeechBubble(welcomeMessage);
-            }
-        }, 3000);
+        console.log('🐱 小猫聊天系统事件监听器已设置（Live2D 将在面板打开时加载）');
     };
     
     waitForPanel();
@@ -424,6 +481,11 @@ function cleanup() {
     if (typingInterval) {
         clearInterval(typingInterval);
     }
+    if (live2dPanelObserver) {
+        live2dPanelObserver.disconnect();
+        live2dPanelObserver = null;
+    }
+    destroyLive2D();
 }
 
 // 导出到全局作用域，以便可视化器可以控制小猫
