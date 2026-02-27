@@ -19,7 +19,15 @@
     <!-- ABC记谱法库 -->
     <script src="https://cdn.jsdelivr.net/npm/abcjs@6.2.2/dist/abcjs-basic-min.js"></script>
     
-    <!-- Three.js now resolved by Vite from node_modules -->
+    <!-- Three.js resolved via importmap (bare specifiers work without bundler) -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.183.1/build/three.module.js",
+            "three/": "https://unpkg.com/three@0.183.1/"
+        }
+    }
+    </script>
     
     <!-- Colyseus客户端库（本地版本，解决404问题） -->
     <!-- <script src="lib/colyseus.js"></script>
@@ -1233,7 +1241,7 @@
     </div>
     
     <!-- 先加载节拍器，最后加载 Three.js 场景 -->
-    <script src="audio-sequencer.js"></script>
+    <script type="module" src="audio-sequencer.js"></script>
 
     <!-- Colyseus调试工具 -->
     <script src="debug-colyseus.js"></script>
@@ -1249,9 +1257,9 @@
     <script src="CircleToABC.js"></script>
     
     <!-- three-scene.js and integration.js are now imported via src/main.js -->
-    <script type="module" src="/src/main.js"></script>
+    <script type="module" src="src/main.js"></script>
 
-    <script src="partySyncColyseus.js"></script>
+    <script type="module" src="partySyncColyseus.js"></script>
     <!-- 步进圆环总览视图 -->
     <script src="CircleOverview.js"></script>
     

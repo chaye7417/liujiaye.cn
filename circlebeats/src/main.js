@@ -1,11 +1,10 @@
 /**
  * CircleBeats - Main Entry Point
  *
- * This is the ES module entry point for Vite.
- * Currently it bridges legacy scripts by importing the two existing
- * module-type files (integration.js, three-scene.js) so that Vite
- * can resolve their bare-specifier imports (e.g. 'three') from
- * node_modules instead of relying on an importmap.
+ * ES module entry point loaded via <script type="module"> in index.html.
+ * Three.js bare-specifier imports (e.g. 'three', 'three/examples/...')
+ * are resolved via the <script type="importmap"> block in index.html,
+ * which maps them to unpkg CDN URLs. No bundler required.
  *
  * All other legacy scripts remain as regular <script> tags in
  * index.html and will be migrated to ES module imports incrementally.
@@ -18,8 +17,8 @@ import { eventBus } from './events.js';
 window.circleBeatsEventBus = eventBus;
 
 // Import the two files that were already ES modules.
-// three-scene.js uses bare-specifier imports like 'three' which Vite
-// resolves from node_modules.
+// three-scene.js uses bare-specifier imports like 'three' which are
+// resolved via importmap in index.html.
 import '../three-scene.js';
 
 // integration.js coordinates Three.js and p5.js interaction
