@@ -4,9 +4,10 @@
 {% block head %}
 <style>
     .page-wrap {
-        max-width: 1200px;
+        width: 95vw;
+        max-width: 1900px;
         margin: 0 auto;
-        padding: 20px 14px 30px;
+        padding: 14px 8px 20px;
     }
 
     .panel {
@@ -112,7 +113,7 @@
     .content-grid {
         margin-top: 14px;
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: minmax(180px, 5fr) minmax(0, 95fr);
         gap: 12px;
     }
 
@@ -125,7 +126,7 @@
 
     .spnmn-editor {
         width: 100%;
-        min-height: 64vh;
+        min-height: 76vh;
         padding: 12px 14px;
         border: 1px solid var(--border);
         border-radius: 8px;
@@ -147,13 +148,13 @@
         border: 1px solid var(--border);
         border-radius: 8px;
         overflow: hidden;
-        min-height: 64vh;
+        min-height: 82vh;
         background: #fff;
     }
 
     .preview-frame {
         width: 100%;
-        height: 64vh;
+        height: 82vh;
         border: 0;
         display: block;
     }
