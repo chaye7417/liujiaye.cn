@@ -1,0 +1,206 @@
+"""时值与节奏转换工具：quarterLength → spnmn 时值标记。"""
+
+from __future__ import annotations
+
+import math
+from collections import defaultdict
+from typing import Any, Dict, List, Optional, Tuple
+
+from music21 import duration as m21dur
+from music21 import note, stream
+
+
+def _is_close(a: float, b: float, tol: float = 0.01) -> bool:
+    """浮点近似比较。"""
+    return abs(a - b) < tol
+
+
+def deduplicate_by_offset(elements: List[Any]) -> List[Any]:
+    """同一 offset 有音符和休止符重叠时，优先保留音符。
+
+    Args:
+        elements: music21 元素列表（Note / Rest / Chord 等）。
+
+    Returns:
+        去重后的元素列表，按 offset 排序。
+    """
+    by_offset: Dict[float, List[Any]] = defaultdict(list)
+    for el in elements:
+        by_offset[float(el.offset)].append(el)
+
+    result: List[Any] = []
+    for offset_val in sorted(by_offset.keys()):
+        group = by_offset[offset_val]
+        if len(group) == 1:
+            result.append(group[0])
+        else:
+            notes_at = [e for e in group if not isinstance(e, note.Rest)]
+            if notes_at:
+                result.append(notes_at[0])
+            else:
+                result.append(group[0])
+    return result
+
+
+def _beat_slots_for_ts(numerator: int, denominator: int) -> List[float]:
+    """根据拍号返回每一拍的起始 offset 列表（相对小节开头）。
+
+    Args:
+        numerator: 拍号分子。
+        denominator: 拍号分母。
+
+    Returns:
+        每拍的 quarterLength 起始位置列表。
+    """
+    beat_ql = 4.0 / denominator
+    return [i * beat_ql for i in range(numerator)]
+
+
+def _classify_ql(ql: float) -> Tuple[str, float]:
+    """将 quarterLength 分类为基础类型。
+
+    Args:
+        ql: quarterLength 值。
+
+    Returns:
+        (type_name, remainder) 元组。
+        type_name: 'whole'|'dotted_half'|'half'|'dotted_quarter'|
+                   'quarter'|'dotted_eighth'|'eighth'|'sixteenth'|'other'
+    """
+    if _is_close(ql, 4.0):
+        return "whole", 0.0
+    if _is_close(ql, 3.0):
+        return "dotted_half", 0.0
+    if _is_close(ql, 2.0):
+        return "half", 0.0
+    if _is_close(ql, 1.5):
+        return "dotted_quarter", 0.0
+    if _is_close(ql, 1.0):
+        return "quarter", 0.0
+    if _is_close(ql, 0.75):
+        return "dotted_eighth", 0.0
+    if _is_close(ql, 0.5):
+        return "eighth", 0.0
+    if _is_close(ql, 0.25):
+        return "sixteenth", 0.0
+    if _is_close(ql, 0.125):
+        return "thirty_second", 0.0
+    return "other", ql
+
+
+def expand_to_beat_tokens(
+    token: str,
+    ql: float,
+    beat_ql: float,
+    is_tied: bool = False,
+) -> List[str]:
+    """将一个音符 token 按时值展开为拍级别的 spnmn 标记序列。
+
+    只处理占据整数拍或常见时值的情况。
+    超出单拍的部分用延时线 '-' 填充。
+
+    Args:
+        token: 音符 token 字符串（如 '1', '#4e', '0'）。
+        ql: 音符的 quarterLength。
+        beat_ql: 每拍的 quarterLength。
+        is_tied: 是否有连音线延续到下一个音符。
+
+    Returns:
+        spnmn 标记列表，如 ['1', '-', '-', '-']。
+    """
+    tie_suffix = "~" if is_tied else ""
+
+    # 全音符 (4 beats in 4/4)
+    if _is_close(ql, beat_ql * 4):
+        return [token + tie_suffix, "-", "-", "-"]
+
+    # 附点二分 (3 beats)
+    if _is_close(ql, beat_ql * 3):
+        return [token + tie_suffix, "-", "."]
+
+    # 二分 (2 beats)
+    if _is_close(ql, beat_ql * 2):
+        return [token + tie_suffix, "-"]
+
+    # 附点四分 (1.5 beats) — 用附点表示
+    if _is_close(ql, beat_ql * 1.5):
+        return [token + "." + tie_suffix]
+
+    # 四分 (1 beat)
+    if _is_close(ql, beat_ql):
+        return [token + tie_suffix]
+
+    # 超过 4 拍的长音符
+    if ql > beat_ql * 4:
+        full_beats = int(ql / beat_ql)
+        remainder = ql - full_beats * beat_ql
+        result = [token + tie_suffix] + ["-"] * (full_beats - 1)
+        if _is_close(remainder, beat_ql * 0.5):
+            result.append(".")
+        return result
+
+    # 非整拍：延时线填充到最近整数拍
+    if ql > beat_ql:
+        full_beats = int(ql / beat_ql)
+        remainder = ql - full_beats * beat_ql
+        result = [token + tie_suffix] + ["-"] * (full_beats - 1)
+        if _is_close(remainder, beat_ql * 0.5):
+            result.append(".")
+        elif remainder > 0.01:
+            result.append("-")
+        return result
+
+    # 亚拍音符（八分、十六分等）直接返回 token
+    return [token + tie_suffix]
+
+
+def group_sub_beat_tokens(tokens_with_ql: List[Tuple[str, float]], beat_ql: float) -> str:
+    """将一拍内的亚拍音符用括号分组。
+
+    Args:
+        tokens_with_ql: [(token, quarterLength), ...] 一拍内的音符。
+        beat_ql: 每拍的 quarterLength。
+
+    Returns:
+        分组后的 spnmn 字符串。
+    """
+    if len(tokens_with_ql) == 1:
+        tok, ql = tokens_with_ql[0]
+        if _is_close(ql, beat_ql):
+            return tok
+        # 附点四分（占 1.5 拍）的情况由上层处理
+        return tok
+
+    total_ql = sum(ql for _, ql in tokens_with_ql)
+
+    # 两个八分音符
+    if len(tokens_with_ql) == 2:
+        t1, q1 = tokens_with_ql[0]
+        t2, q2 = tokens_with_ql[1]
+        if _is_close(q1, beat_ql / 2) and _is_close(q2, beat_ql / 2):
+            return f"({t1}{t2})"
+        # 附点八分 + 十六分
+        if _is_close(q1, beat_ql * 0.75) and _is_close(q2, beat_ql * 0.25):
+            return f"({t1}.{t2})"
+        # 十六分 + 附点八分
+        if _is_close(q1, beat_ql * 0.25) and _is_close(q2, beat_ql * 0.75):
+            return f"({t1}{t2}.)"
+        return f"({t1}{t2})"
+
+    # 四个十六分音符
+    if len(tokens_with_ql) == 4 and all(
+        _is_close(q, beat_ql / 4) for _, q in tokens_with_ql
+    ):
+        t = [tok for tok, _ in tokens_with_ql]
+        return f"(({t[0]}{t[1]})({t[2]}{t[3]}))"
+
+    # 三连音
+    if len(tokens_with_ql) == 3 and all(
+        _is_close(q, beat_ql / 3) for _, q in tokens_with_ql
+    ):
+        t = [tok for tok, _ in tokens_with_ql]
+        return f"T({t[0]}{t[1]}{t[2]})"
+
+    # 通用：用括号包裹
+    inner = "".join(tok for tok, _ in tokens_with_ql)
+    return f"({inner})"

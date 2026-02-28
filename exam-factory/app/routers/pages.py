@@ -45,6 +45,12 @@ async def page_workspace(request: Request):
     return templates.TemplateResponse("workspace.html", {"request": request})
 
 
+@router.get("/jianpu", response_class=HTMLResponse)
+async def page_jianpu(request: Request):
+    """MusicXML 转简谱页：公开页面，无需登录。"""
+    return templates.TemplateResponse("jianpu.html", {"request": request})
+
+
 @router.get("/profile/setup", response_class=HTMLResponse)
 async def page_profile_setup(request: Request):
     """资料补全页：未登录重定向登录页，已补全重定向工作台。"""
