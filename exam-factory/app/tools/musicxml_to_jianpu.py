@@ -254,9 +254,9 @@ def _process_measure(
     三连音分组策略：收集连续 tuplet 音符，按 numberNotesActual 个一组输出。
 
     Args:
-        lyrics_out: 可选，收集与 token 对齐的歌词字符列表。
-            每个音符/休止符对应一个歌词位置，
-            每个延长线 '-' 也对应一个 '_'。
+        lyrics_out: 可选，收集歌词字符列表。
+            只有音符攻击消耗歌词位置；
+            休止符、延音线、附点、倚音均不消耗。
     """
     tokens: list[str] = []
     # 如果有多个声部，只取第一个声部，避免混合多声部内容
@@ -269,14 +269,18 @@ def _process_measure(
     elements = _deduplicate_by_offset(raw)
     i = 0
 
-    def _collect_lyric(el: music21.base.Music21Object, token: str) -> None:
-        """收集一个元素的歌词（含延长线占位）。"""
+    def _collect_lyric(el: music21.base.Music21Object) -> None:
+        """收集一个元素的歌词。
+
+        只有音符攻击消耗歌词位置。
+        休止符、延音线 '-'、附点 '.' 均不消耗。
+        """
         if lyrics_out is None:
             return
+        # 休止符不消耗歌词位置（LilyPond \\lyricsto 自动跳过）
+        if isinstance(el, note.Rest):
+            return
         lyrics_out.append(_get_lyric(el))
-        # 每个延长线 '-' 需要一个 '_' 占位（但排除 tie 的 '~'）
-        dash_count = token.count("-")
-        lyrics_out.extend(["_"] * dash_count)
 
     while i < len(elements):
         el = elements[i]
@@ -320,10 +324,11 @@ def _process_measure(
                         for g in group
                     ]
                     tokens.append(f"{actual}[ {' '.join(inner)} ]")
-                    # 每个 tuplet 音符占一个歌词位置
+                    # 只有音符消耗歌词位置，休止符不消耗
                     if lyrics_out is not None:
                         for g in group:
-                            lyrics_out.append(_get_lyric(g))
+                            if not isinstance(g, note.Rest):
+                                lyrics_out.append(_get_lyric(g))
                 else:
                     for g in group:
                         token = _element_to_token(
@@ -332,7 +337,7 @@ def _process_measure(
                         )
                         if token:
                             tokens.append(token)
-                            _collect_lyric(g, token)
+                            _collect_lyric(g)
 
             i = j
             continue
@@ -344,7 +349,7 @@ def _process_measure(
         )
         if token:
             tokens.append(token)
-            _collect_lyric(el, token)
+            _collect_lyric(el)
         i += 1
 
     return tokens
@@ -481,14 +486,11 @@ def convert_musicxml_to_jianpu(
 
         bar_text = " ".join(tokens)
 
-        # 弱起小节：在前面补休止符，歌词用 '_' 占位
+        # 弱起小节：在前面补休止符（休止符不消耗歌词位置）
         if m.paddingLeft > 0:
             pickup = _pickup_rests(float(m.paddingLeft))
             if pickup:
                 bar_text = f"{pickup} {bar_text}"
-                # 补齐弱起休止的歌词占位（每个 '0' 和 '-' 各占一位）
-                pickup_positions = pickup.count("0") + pickup.count("-")
-                measure_lyrics = ["_"] * pickup_positions + measure_lyrics
 
         bar_strings.append(bar_text)
 
