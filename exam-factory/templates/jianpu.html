@@ -4,35 +4,35 @@
 {% block head %}
 <style>
     .page-wrap {
-        width: 95vw;
-        max-width: 1900px;
+        width: 98vw;
+        max-width: 2200px;
         margin: 0 auto;
-        padding: 14px 8px 20px;
+        padding: 8px 6px 12px;
     }
 
     .panel {
         background: var(--card-bg);
         border: 1px solid var(--border);
         border-radius: 12px;
-        padding: 16px;
+        padding: 10px;
     }
 
     .title {
-        margin: 0 0 6px;
-        font-size: 20px;
+        margin: 0 0 4px;
+        font-size: 18px;
         color: var(--text);
     }
 
     .desc {
-        margin: 0 0 14px;
-        font-size: 14px;
+        margin: 0 0 8px;
+        font-size: 13px;
         color: var(--text-muted);
     }
 
     .upload-area {
         border: 2px dashed var(--border);
         border-radius: 10px;
-        padding: 28px 16px;
+        padding: 14px 12px;
         text-align: center;
         cursor: pointer;
         transition: all 0.18s ease;
@@ -45,12 +45,12 @@
     }
 
     .upload-icon {
-        font-size: 36px;
-        margin-bottom: 6px;
+        font-size: 28px;
+        margin-bottom: 3px;
     }
 
     .upload-main {
-        font-size: 15px;
+        font-size: 14px;
         color: var(--text);
     }
 
@@ -110,65 +110,63 @@
         display: none;
     }
 
-    .content-grid {
-        margin-top: 14px;
-        display: grid;
-        grid-template-columns: minmax(180px, 5fr) minmax(0, 95fr);
-        gap: 12px;
-    }
-
-    .block-title {
-        margin: 0 0 8px;
-        font-size: 14px;
-        font-weight: 600;
-        color: var(--text);
-    }
-
     .spnmn-editor {
-        width: 100%;
-        min-height: 76vh;
-        padding: 12px 14px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: var(--bg);
-        color: var(--text);
-        font-family: "SF Mono", "Fira Code", "Consolas", monospace;
-        font-size: 13px;
-        line-height: 1.55;
-        resize: vertical;
+        position: absolute;
+        left: -9999px;
+        opacity: 0;
+        width: 1px;
+        height: 1px;
+        pointer-events: none;
     }
 
-    .spnmn-editor:focus {
-        outline: none;
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px var(--primary-light);
+    .preview-stage {
+        margin-top: 8px;
+        position: relative;
     }
 
     .preview-wrap {
         border: 1px solid var(--border);
         border-radius: 8px;
         overflow: hidden;
-        min-height: 82vh;
+        min-height: calc(100vh - 240px);
         background: #fff;
     }
 
     .preview-frame {
         width: 100%;
-        height: 82vh;
+        height: calc(100vh - 240px);
         border: 0;
         display: block;
     }
 
-    .actions {
-        margin-top: 10px;
+    .icon-actions {
+        position: absolute;
+        top: 10px;
+        right: 10px;
         display: flex;
         gap: 8px;
-        flex-wrap: wrap;
+        z-index: 2;
     }
 
-    .actions .btn {
-        font-size: 13px;
-        padding: 7px 14px;
+    .icon-btn {
+        width: 36px;
+        height: 36px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.92);
+        color: var(--text);
+        font-size: 16px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.16s ease;
+    }
+
+    .icon-btn:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+        transform: translateY(-1px);
     }
 
     .toast {
@@ -193,14 +191,12 @@
     }
 
     @media (max-width: 960px) {
-        .content-grid {
-            grid-template-columns: 1fr;
+        .preview-wrap {
+            min-height: 66vh;
         }
 
-        .spnmn-editor,
         .preview-frame {
-            min-height: 52vh;
-            height: 52vh;
+            height: 66vh;
         }
     }
 
@@ -210,15 +206,17 @@
         }
 
         .panel {
-            padding: 12px;
+            padding: 8px;
         }
 
-        .actions {
-            flex-direction: column;
+        .icon-actions {
+            top: 8px;
+            right: 8px;
         }
 
-        .actions .btn {
-            width: 100%;
+        .icon-btn {
+            width: 34px;
+            height: 34px;
         }
     }
 </style>
@@ -247,22 +245,14 @@
             <span id="status-text"></span>
         </div>
 
-        <div class="content-grid">
-            <div>
-                <div class="block-title">SPNMN 文本</div>
-                <textarea id="spnmn-editor" class="spnmn-editor" placeholder="转换结果会显示在这里..."></textarea>
-                <div class="actions">
-                    <button class="btn btn-secondary" onclick="copyText()">&#x1F4CB; 复制文本</button>
-                    <button class="btn btn-secondary" onclick="downloadSpnmn()">&#x1F4BE; 下载 .spnmn</button>
-                    <button class="btn btn-secondary" onclick="refreshPreview()">&#x1F504; 重新渲染预览</button>
-                </div>
+        <textarea id="spnmn-editor" class="spnmn-editor"></textarea>
+        <div class="preview-stage">
+            <div class="icon-actions">
+                <button class="icon-btn" onclick="copyText()" title="复制文本" aria-label="复制文本">&#x1F4CB;</button>
+                <button class="icon-btn" onclick="downloadSpnmn()" title="下载 .spnmn" aria-label="下载 .spnmn">&#x1F4BE;</button>
             </div>
-
-            <div>
-                <div class="block-title">简谱预览</div>
-                <div class="preview-wrap">
-                    <iframe id="sparks-preview" class="preview-frame" src="/static/sparks-nmn/index.html"></iframe>
-                </div>
+            <div class="preview-wrap">
+                <iframe id="sparks-preview" class="preview-frame" src="/static/sparks-nmn/index.html"></iframe>
             </div>
         </div>
     </div>
@@ -418,10 +408,12 @@
     }
 
     function fallbackCopy(text) {
-        const editor = document.getElementById('spnmn-editor');
-        editor.focus();
-        editor.select();
+        const temp = document.createElement('textarea');
+        temp.value = text;
+        document.body.appendChild(temp);
+        temp.select();
         document.execCommand('copy');
+        document.body.removeChild(temp);
         showToast('已复制到剪贴板');
     }
 
