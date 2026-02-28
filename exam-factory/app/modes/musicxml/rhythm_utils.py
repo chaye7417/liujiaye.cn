@@ -157,6 +157,14 @@ def expand_to_beat_tokens(
 def group_sub_beat_tokens(tokens_with_ql: List[Tuple[str, float]], beat_ql: float) -> str:
     """将一拍内的亚拍音符用括号分组。
 
+    Sparks NMN 括号规则：
+    - 每层括号加一条减时线（时值减半）
+    - (ab) = 两个八分音符
+    - ((ab)(cd)) = 四个十六分音符
+    - (a(bc)) = 八分 + 两个十六分
+    - ((ab)c) = 两个十六分 + 八分
+    - (a.b) = 附点八分 + 十六分
+
     Args:
         tokens_with_ql: [(token, quarterLength), ...] 一拍内的音符。
         beat_ql: 每拍的 quarterLength。
@@ -168,39 +176,82 @@ def group_sub_beat_tokens(tokens_with_ql: List[Tuple[str, float]], beat_ql: floa
         tok, ql = tokens_with_ql[0]
         if _is_close(ql, beat_ql):
             return tok
-        # 附点四分（占 1.5 拍）的情况由上层处理
         return tok
 
-    total_ql = sum(ql for _, ql in tokens_with_ql)
+    eighth = beat_ql / 2      # 八分音符时值
+    sixteenth = beat_ql / 4   # 十六分音符时值
+    thirtysecond = beat_ql / 8  # 三十二分音符时值
 
-    # 两个八分音符
+    # === 2 个音符 ===
     if len(tokens_with_ql) == 2:
         t1, q1 = tokens_with_ql[0]
         t2, q2 = tokens_with_ql[1]
-        if _is_close(q1, beat_ql / 2) and _is_close(q2, beat_ql / 2):
+        # 八分 + 八分
+        if _is_close(q1, eighth) and _is_close(q2, eighth):
             return f"({t1}{t2})"
         # 附点八分 + 十六分
-        if _is_close(q1, beat_ql * 0.75) and _is_close(q2, beat_ql * 0.25):
+        if _is_close(q1, beat_ql * 0.75) and _is_close(q2, sixteenth):
             return f"({t1}.{t2})"
         # 十六分 + 附点八分
-        if _is_close(q1, beat_ql * 0.25) and _is_close(q2, beat_ql * 0.75):
+        if _is_close(q1, sixteenth) and _is_close(q2, beat_ql * 0.75):
             return f"({t1}{t2}.)"
+        # 十六分 + 十六分（半拍内两个十六分）
+        if _is_close(q1, sixteenth) and _is_close(q2, sixteenth):
+            return f"({t1}{t2})"
         return f"({t1}{t2})"
 
-    # 四个十六分音符
-    if len(tokens_with_ql) == 4 and all(
-        _is_close(q, beat_ql / 4) for _, q in tokens_with_ql
-    ):
-        t = [tok for tok, _ in tokens_with_ql]
-        return f"(({t[0]}{t[1]})({t[2]}{t[3]}))"
+    # === 3 个音符 ===
+    if len(tokens_with_ql) == 3:
+        t1, q1 = tokens_with_ql[0]
+        t2, q2 = tokens_with_ql[1]
+        t3, q3 = tokens_with_ql[2]
 
-    # 三连音
-    if len(tokens_with_ql) == 3 and all(
-        _is_close(q, beat_ql / 3) for _, q in tokens_with_ql
-    ):
-        t = [tok for tok, _ in tokens_with_ql]
-        return f"T({t[0]}{t[1]}{t[2]})"
+        # 三连音
+        if all(_is_close(q, beat_ql / 3) for _, q in tokens_with_ql):
+            return f"T({t1}{t2}{t3})"
 
-    # 通用：用括号包裹
+        # 八分 + 十六分 + 十六分 → (a(bc))
+        if _is_close(q1, eighth) and _is_close(q2, sixteenth) and _is_close(q3, sixteenth):
+            return f"({t1}({t2}{t3}))"
+
+        # 十六分 + 十六分 + 八分 → ((ab)c)
+        if _is_close(q1, sixteenth) and _is_close(q2, sixteenth) and _is_close(q3, eighth):
+            return f"(({t1}{t2}){t3})"
+
+        # 十六分 + 八分 + 十六分 → ((a)b(c)) 用通用处理
+        # 八分 + 八分 + 八分（3 个八分超出一拍，少见但处理）
+        if all(_is_close(q, eighth) for _, q in tokens_with_ql):
+            return f"({t1}{t2}{t3})"
+
+        # 通用 3 音符
+        inner = "".join(tok for tok, _ in tokens_with_ql)
+        return f"({inner})"
+
+    # === 4 个音符 ===
+    if len(tokens_with_ql) == 4:
+        t1, q1 = tokens_with_ql[0]
+        t2, q2 = tokens_with_ql[1]
+        t3, q3 = tokens_with_ql[2]
+        t4, q4 = tokens_with_ql[3]
+
+        # 四个十六分音符
+        if all(_is_close(q, sixteenth) for _, q in tokens_with_ql):
+            return f"(({t1}{t2})({t3}{t4}))"
+
+        # 附点十六分 + 三十二分 + 十六分 + 十六分 → ((a.(b))(cd))
+        if (_is_close(q1, sixteenth * 1.5) and _is_close(q2, thirtysecond)
+                and _is_close(q3, sixteenth) and _is_close(q4, sixteenth)):
+            return f"(({t1}.({t2}))({t3}{t4}))"
+
+        # 十六分 + 十六分 + 附点十六分 + 三十二分 → ((ab)(c.(d)))
+        if (_is_close(q1, sixteenth) and _is_close(q2, sixteenth)
+                and _is_close(q3, sixteenth * 1.5) and _is_close(q4, thirtysecond)):
+            return f"(({t1}{t2})({t3}.({t4})))"
+
+        # 通用 4 音符
+        inner = "".join(tok for tok, _ in tokens_with_ql)
+        return f"({inner})"
+
+    # === 5+ 个音符（通用处理）===
     inner = "".join(tok for tok, _ in tokens_with_ql)
     return f"({inner})"
