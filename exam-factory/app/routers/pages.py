@@ -61,3 +61,9 @@ async def page_profile_setup(request: Request):
     if row and row["profile_completed"]:
         return RedirectResponse("/workspace", status_code=302)
     return templates.TemplateResponse("profile_setup.html", {"request": request})
+
+
+@router.get("/tools", response_class=HTMLResponse)
+async def page_tools(request: Request):
+    """工具箱页面。"""
+    return templates.TemplateResponse("tools.html", {"request": request})

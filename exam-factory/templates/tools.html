@@ -1,0 +1,452 @@
+{% extends "base.html" %}
+{% block title %}工具箱 - 试卷工厂{% endblock %}
+
+{% block head %}
+<style>
+    .tools-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 24px;
+    }
+    .tools-header {
+        margin-bottom: 24px;
+    }
+    .tools-header h2 {
+        font-size: 24px;
+        font-weight: 600;
+        margin: 0 0 8px 0;
+    }
+    .tools-header p {
+        color: var(--text-muted);
+        margin: 0;
+    }
+    .tool-card {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 24px;
+    }
+    .tool-card h3 {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0 0 16px 0;
+    }
+    /* 上传区域 */
+    .upload-zone {
+        border: 2px dashed var(--border);
+        border-radius: 12px;
+        padding: 40px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-bottom: 16px;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+        border-color: var(--primary);
+        background: var(--primary-light, #f0f7ff);
+    }
+    .upload-zone p {
+        margin: 8px 0 0;
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+    .upload-zone .icon {
+        font-size: 36px;
+        margin-bottom: 8px;
+    }
+    /* 结果区域 */
+    .result-area {
+        display: none;
+        margin-top: 24px;
+    }
+    .result-area.show { display: block; }
+    .result-split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-top: 16px;
+    }
+    @media (max-width: 768px) {
+        .result-split { grid-template-columns: 1fr; }
+    }
+    .result-panel {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .result-panel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 14px;
+        background: #f8f9fa;
+        border-bottom: 1px solid var(--border);
+        font-size: 14px;
+        font-weight: 500;
+    }
+    .result-panel-body {
+        padding: 14px;
+    }
+    /* 代码编辑器 */
+    .jianpu-editor {
+        width: 100%;
+        min-height: 200px;
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        font-size: 14px;
+        line-height: 1.6;
+        border: none;
+        outline: none;
+        resize: vertical;
+        padding: 0;
+    }
+    /* PDF 预览 */
+    .pdf-preview {
+        min-height: 200px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted);
+    }
+    .pdf-preview iframe {
+        width: 100%;
+        height: 400px;
+        border: none;
+    }
+    .pdf-preview img {
+        max-width: 100%;
+        height: auto;
+    }
+    /* 工具栏 */
+    .tool-actions {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        margin-top: 16px;
+        flex-wrap: wrap;
+    }
+    .tool-actions select {
+        padding: 8px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        font-size: 14px;
+    }
+    /* 元信息 */
+    .meta-info {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+        font-size: 13px;
+        color: var(--text-muted);
+    }
+    .meta-info span {
+        background: #f0f0f0;
+        padding: 4px 10px;
+        border-radius: 12px;
+    }
+    /* 警告 */
+    .warnings {
+        margin-top: 12px;
+        padding: 10px 14px;
+        background: #fff8e1;
+        border: 1px solid #ffe082;
+        border-radius: 8px;
+        font-size: 13px;
+        color: #f57f17;
+    }
+    .warnings ul { margin: 4px 0 0 16px; padding: 0; }
+    /* 按钮 */
+    .btn-tool {
+        padding: 8px 20px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        border: 1px solid var(--border);
+        background: white;
+        transition: all 0.2s;
+    }
+    .btn-tool:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+    .btn-tool.primary {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+    .btn-tool.primary:hover {
+        opacity: 0.9;
+    }
+    .btn-tool:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    /* 加载状态 */
+    .loading { opacity: 0.6; pointer-events: none; }
+    .spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid #ccc;
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        margin-right: 6px;
+        vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* 返回链接 */
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--text-muted);
+        text-decoration: none;
+        font-size: 14px;
+        margin-bottom: 16px;
+    }
+    .back-link:hover { color: var(--primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tools-container">
+    <a href="/workspace" class="back-link">&larr; 返回工作台</a>
+
+    <div class="tools-header">
+        <h2>工具箱</h2>
+        <p>独立工具，无需创建任务即可使用</p>
+    </div>
+
+    <!-- MusicXML 转简谱 -->
+    <div class="tool-card">
+        <h3>MusicXML 转简谱</h3>
+        <p style="color: var(--text-muted); font-size: 14px; margin: 0 0 16px;">
+            上传 MusicXML 文件（MuseScore / Sibelius / Finale 导出），自动转换为简谱
+        </p>
+
+        <!-- 上传区 -->
+        <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+            <div class="icon">&#127925;</div>
+            <div><strong>点击或拖拽上传 MusicXML 文件</strong></div>
+            <p>支持 .musicxml / .xml / .mxl 格式</p>
+        </div>
+        <input type="file" id="fileInput" accept=".musicxml,.xml,.mxl" style="display:none">
+
+        <!-- 结果区 -->
+        <div class="result-area" id="resultArea">
+            <!-- 元信息 -->
+            <div class="meta-info" id="metaInfo"></div>
+            <!-- 警告 -->
+            <div class="warnings" id="warnings" style="display:none">
+                <strong>注意：</strong>
+                <ul id="warningList"></ul>
+            </div>
+
+            <!-- 左右分栏 -->
+            <div class="result-split">
+                <!-- 左：jianpu-ly 源码 -->
+                <div class="result-panel">
+                    <div class="result-panel-header">
+                        <span>jianpu-ly 源码</span>
+                        <button class="btn-tool" onclick="copyJianpu()" style="padding:4px 12px; font-size:12px;">复制</button>
+                    </div>
+                    <div class="result-panel-body">
+                        <textarea class="jianpu-editor" id="jianpuEditor"></textarea>
+                    </div>
+                </div>
+                <!-- 右：渲染预览 -->
+                <div class="result-panel">
+                    <div class="result-panel-header">
+                        <span>简谱预览</span>
+                    </div>
+                    <div class="result-panel-body">
+                        <div class="pdf-preview" id="pdfPreview">
+                            <span>点击「渲染简谱」查看预览</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 操作栏 -->
+            <div class="tool-actions">
+                <select id="fontSelect">
+                    <option value="gonville">Gonville（传统手刻）</option>
+                    <option value="emmentaler">Emmentaler（LilyPond 默认）</option>
+                    <option value="profondo">Profondo（现代清晰）</option>
+                    <option value="cadence">Cadence（优雅圆润）</option>
+                    <option value="lilyjazz">LilyJazz（手写爵士）</option>
+                    <option value="beethoven">Beethoven（古典风格）</option>
+                </select>
+                <button class="btn-tool primary" id="renderBtn" onclick="renderJianpu()">
+                    渲染简谱
+                </button>
+                <button class="btn-tool" id="downloadBtn" onclick="downloadPdf()" style="display:none">
+                    下载 PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentTaskId = '';
+    let currentPdfUrl = '';
+
+    // ===== 拖拽上传 =====
+    const zone = document.getElementById('uploadZone');
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file) handleFile(file);
+    });
+
+    document.getElementById('fileInput').addEventListener('change', e => {
+        const file = e.target.files[0];
+        if (file) handleFile(file);
+    });
+
+    // ===== 上传转换 =====
+    async function handleFile(file) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (!['musicxml', 'xml', 'mxl'].includes(ext)) {
+            alert('仅支持 .musicxml / .xml / .mxl 文件');
+            return;
+        }
+
+        zone.innerHTML = '<div class="spinner"></div> 正在转换...';
+        zone.style.pointerEvents = 'none';
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const resp = await fetch('/api/tools/musicxml-to-jianpu', {
+                method: 'POST',
+                body: formData,
+            });
+            const json = await resp.json();
+
+            if (!resp.ok) {
+                throw new Error(json.detail || '转换失败');
+            }
+
+            const data = json.data;
+            currentTaskId = data.task_id;
+
+            // 显示结果区
+            document.getElementById('resultArea').classList.add('show');
+
+            // 填充编辑器
+            document.getElementById('jianpuEditor').value = data.jianpu_text;
+
+            // 元信息
+            const meta = document.getElementById('metaInfo');
+            meta.innerHTML = `
+                <span>调号: ${data.key_name}</span>
+                <span>拍号: ${data.time_signature}</span>
+                <span>小节数: ${data.total_measures}</span>
+                <span>声部: ${data.part_name}</span>
+            `;
+
+            // 警告
+            if (data.warnings && data.warnings.length > 0) {
+                document.getElementById('warnings').style.display = 'block';
+                document.getElementById('warningList').innerHTML =
+                    data.warnings.map(w => `<li>${w}</li>`).join('');
+            } else {
+                document.getElementById('warnings').style.display = 'none';
+            }
+
+            // 重置预览
+            document.getElementById('pdfPreview').innerHTML = '<span>点击「渲染简谱」查看预览</span>';
+            document.getElementById('downloadBtn').style.display = 'none';
+
+            // 恢复上传区
+            zone.innerHTML = `
+                <div class="icon">&#9989;</div>
+                <div><strong>${file.name}</strong> 转换成功</div>
+                <p>点击重新上传其他文件</p>
+            `;
+            zone.style.pointerEvents = 'auto';
+
+        } catch (err) {
+            alert(err.message);
+            zone.innerHTML = `
+                <div class="icon">&#127925;</div>
+                <div><strong>点击或拖拽上传 MusicXML 文件</strong></div>
+                <p>支持 .musicxml / .xml / .mxl 格式</p>
+            `;
+            zone.style.pointerEvents = 'auto';
+        }
+    }
+
+    // ===== 渲染简谱 =====
+    async function renderJianpu() {
+        const text = document.getElementById('jianpuEditor').value.trim();
+        if (!text) { alert('请先上传 MusicXML 文件或输入 jianpu-ly 文本'); return; }
+
+        const btn = document.getElementById('renderBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span>渲染中...';
+
+        const formData = new FormData();
+        formData.append('jianpu_text', text);
+        formData.append('font', document.getElementById('fontSelect').value);
+        formData.append('task_id', currentTaskId);
+
+        try {
+            const resp = await fetch('/api/tools/jianpu-render', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!resp.ok) {
+                const json = await resp.json();
+                throw new Error(json.detail || '渲染失败');
+            }
+
+            const blob = await resp.blob();
+            currentPdfUrl = URL.createObjectURL(blob);
+
+            // 显示 PDF 预览
+            document.getElementById('pdfPreview').innerHTML =
+                `<iframe src="${currentPdfUrl}#toolbar=0&navpanes=0"></iframe>`;
+            document.getElementById('downloadBtn').style.display = 'inline-block';
+
+        } catch (err) {
+            alert(err.message);
+            document.getElementById('pdfPreview').innerHTML =
+                `<span style="color:#e53935;">渲染失败: ${err.message}</span>`;
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '渲染简谱';
+        }
+    }
+
+    // ===== 复制 =====
+    function copyJianpu() {
+        const editor = document.getElementById('jianpuEditor');
+        editor.select();
+        navigator.clipboard.writeText(editor.value).then(() => {
+            const btn = event.target;
+            const orig = btn.textContent;
+            btn.textContent = '已复制';
+            setTimeout(() => btn.textContent = orig, 1500);
+        });
+    }
+
+    // ===== 下载 =====
+    function downloadPdf() {
+        if (!currentPdfUrl) return;
+        const a = document.createElement('a');
+        a.href = currentPdfUrl;
+        a.download = 'jianpu.pdf';
+        a.click();
+    }
+</script>
+{% endblock %}
