@@ -93,32 +93,57 @@ def convert_musicxml_to_spnmn(
     # ---------- 逐小节转换 ----------
     measures = list(target_part.getElementsByClass(stream.Measure))
     total_measures = len(measures)
-    note_line_parts: List[str] = []
-    lyric_tuples: List[Tuple[str, str]] = []
 
+    # 每小节转换为 (tokens, lyrics)
+    measure_results: List[Tuple[List[str], List[Tuple[str, str]]]] = []
     for m_idx, measure in enumerate(measures):
         m_tokens, m_lyrics = _convert_measure(
             measure, scale_pc_map, tonic_octave, ts, beat_ql, warnings,
         )
         if m_tokens:
-            note_line_parts.append(" ".join(m_tokens))
-            lyric_tuples.extend(m_lyrics)
+            measure_results.append((m_tokens, m_lyrics))
 
-    # ---------- 组装输出 ----------
+    # ---------- 判断歌词语言 ----------
+    all_lyrics: List[Tuple[str, str]] = []
+    for _, m_lyrics in measure_results:
+        all_lyrics.extend(m_lyrics)
+    has_lyrics = any(t[0].strip() for t in all_lyrics)
+    is_cjk = _is_cjk_lyrics([t[0] for t in all_lyrics]) if has_lyrics else True
+
+    # ---------- 按行分组（每行 4 小节） ----------
+    measures_per_line = 4
     header = build_header(title, composer, key_name_str, ts_str, qpm)
-    note_line = " | ".join(note_line_parts) + " |"
-    spnmn_lines = [header, "---"]
+    spnmn_lines = [header]
 
-    spnmn_lines.append(f"N: {note_line}")
+    for line_start in range(0, len(measure_results), measures_per_line):
+        chunk = measure_results[line_start:line_start + measures_per_line]
+        spnmn_lines.append("---")
 
-    if any(t[0].strip() for t in lyric_tuples):
-        texts_only = [t[0] for t in lyric_tuples]
-        if _is_cjk_lyrics(texts_only):
-            lyric_text = "".join(texts_only)
-            spnmn_lines.append(f"Lc: {lyric_text}")
+        # 组装 N: 行
+        note_parts = [" ".join(tokens) for tokens, _ in chunk]
+        # 最后一行最后一个小节用 ||| 结尾，其余用 |
+        is_last_line = line_start + measures_per_line >= len(measure_results)
+        separator = " ||| " if is_last_line else " | "
+        note_line = " | ".join(note_parts)
+        if is_last_line:
+            note_line += " |||"
         else:
-            lyric_text = _build_lw_line(lyric_tuples)
-            spnmn_lines.append(f"Lw: {lyric_text}")
+            note_line += " |"
+        spnmn_lines.append(f"N: {note_line}")
+
+        # 组装歌词行
+        if has_lyrics:
+            line_lyrics: List[Tuple[str, str]] = []
+            for _, m_lyrics in chunk:
+                line_lyrics.extend(m_lyrics)
+
+            if any(t[0].strip() for t in line_lyrics):
+                if is_cjk:
+                    lyric_text = "".join(t[0] for t in line_lyrics)
+                    spnmn_lines.append(f"Lc: {lyric_text}")
+                else:
+                    lyric_text = _build_lw_line(line_lyrics)
+                    spnmn_lines.append(f"Lw: {lyric_text}")
 
     spnmn_text = "\n".join(spnmn_lines) + "\n"
 
