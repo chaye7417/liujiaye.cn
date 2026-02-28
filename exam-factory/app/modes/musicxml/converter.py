@@ -230,16 +230,27 @@ def _convert_measure(
             )
             # 标记后续被占用的拍
             occupied_beats = int(ql / beat_ql)
-            # 附点判断：如果占用 n.5 拍，多占一拍
-            remainder = ql - occupied_beats * beat_ql
             for i in range(1, occupied_beats):
                 if beat_idx + i < num_beats:
                     consumed[beat_idx + i] = True
         else:
-            # 亚拍音符（八分、十六分等）
+            # 亚拍音符（八分、十六分等），以及弱拍起跨拍音符。
+            # 若跨拍，则把后续拍的延续段补成 '-'，避免时值丢失。
+            first_seg_ql = min(ql, max(beat_ql - sub_offset, 0.0))
+            remaining = max(0.0, ql - first_seg_ql)
             beats[beat_idx].append(
-                (token, ql, lyric_char, is_tied, is_tie_rhs),
+                (token, first_seg_ql, lyric_char, is_tied, is_tie_rhs),
             )
+
+            cont_beat = beat_idx + 1
+            while remaining > 0.01 and cont_beat < num_beats:
+                cont_ql = min(remaining, beat_ql)
+                # 延续段作为 '-' 放到后续拍（或后续亚拍）里。
+                beats[cont_beat].append(
+                    ("-", cont_ql, ("", ""), False, True),
+                )
+                remaining -= cont_ql
+                cont_beat += 1
 
     # 逐拍输出
     result_tokens: List[str] = []
