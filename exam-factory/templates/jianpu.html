@@ -3,36 +3,35 @@
 
 {% block head %}
 <style>
-    .simple-wrap {
-        max-width: 980px;
+    .page-wrap {
+        max-width: 1200px;
         margin: 0 auto;
-        padding: 24px 16px 32px;
+        padding: 20px 14px 30px;
     }
 
-    .simple-card {
+    .panel {
         background: var(--card-bg);
         border: 1px solid var(--border);
         border-radius: 12px;
-        padding: 18px;
+        padding: 16px;
     }
 
-    .page-title {
+    .title {
         margin: 0 0 6px;
         font-size: 20px;
-        font-weight: 700;
         color: var(--text);
     }
 
-    .page-desc {
-        margin: 0 0 16px;
-        color: var(--text-muted);
+    .desc {
+        margin: 0 0 14px;
         font-size: 14px;
+        color: var(--text-muted);
     }
 
     .upload-area {
         border: 2px dashed var(--border);
         border-radius: 10px;
-        padding: 30px 20px;
+        padding: 28px 16px;
         text-align: center;
         cursor: pointer;
         transition: all 0.18s ease;
@@ -45,7 +44,7 @@
     }
 
     .upload-icon {
-        font-size: 38px;
+        font-size: 36px;
         margin-bottom: 6px;
     }
 
@@ -61,7 +60,7 @@
     }
 
     .upload-file {
-        margin-top: 10px;
+        margin-top: 9px;
         font-size: 13px;
         color: var(--primary);
         word-break: break-all;
@@ -70,7 +69,7 @@
 
     .status {
         margin-top: 12px;
-        padding: 9px 12px;
+        padding: 8px 12px;
         border-radius: 8px;
         font-size: 13px;
         display: none;
@@ -110,8 +109,15 @@
         display: none;
     }
 
-    .editor-label {
-        margin: 16px 0 8px;
+    .content-grid {
+        margin-top: 14px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    .block-title {
+        margin: 0 0 8px;
         font-size: 14px;
         font-weight: 600;
         color: var(--text);
@@ -119,7 +125,7 @@
 
     .spnmn-editor {
         width: 100%;
-        min-height: 56vh;
+        min-height: 64vh;
         padding: 12px 14px;
         border: 1px solid var(--border);
         border-radius: 8px;
@@ -137,8 +143,23 @@
         box-shadow: 0 0 0 3px var(--primary-light);
     }
 
+    .preview-wrap {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        overflow: hidden;
+        min-height: 64vh;
+        background: #fff;
+    }
+
+    .preview-frame {
+        width: 100%;
+        height: 64vh;
+        border: 0;
+        display: block;
+    }
+
     .actions {
-        margin-top: 12px;
+        margin-top: 10px;
         display: flex;
         gap: 8px;
         flex-wrap: wrap;
@@ -170,13 +191,25 @@
         transform: translateX(-50%) translateY(0);
     }
 
-    @media (max-width: 480px) {
-        .simple-wrap {
-            padding: 16px 10px 24px;
+    @media (max-width: 960px) {
+        .content-grid {
+            grid-template-columns: 1fr;
         }
 
-        .simple-card {
-            padding: 14px;
+        .spnmn-editor,
+        .preview-frame {
+            min-height: 52vh;
+            height: 52vh;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .page-wrap {
+            padding: 12px 8px 20px;
+        }
+
+        .panel {
+            padding: 12px;
         }
 
         .actions {
@@ -195,10 +228,10 @@
     <a href="/" class="logo">MusicXML 转 Sparks NMN</a>
 </nav>
 
-<div class="simple-wrap">
-    <div class="simple-card">
-        <h1 class="page-title">拖入 MusicXML，自动转换为 SPNMN</h1>
-        <p class="page-desc">只保留核心流程：上传文件后直接转换，不显示额外信息。</p>
+<div class="page-wrap">
+    <div class="panel">
+        <h1 class="title">拖入 MusicXML，自动转换并显示简谱</h1>
+        <p class="desc">上传后会自动转换，右侧直接显示简谱预览，不需要额外点击打开。</p>
 
         <div class="upload-area" id="upload-area" onclick="document.getElementById('musicxml-file').click()">
             <div class="upload-icon">&#x1F4E5;</div>
@@ -213,13 +246,23 @@
             <span id="status-text"></span>
         </div>
 
-        <div class="editor-label">SPNMN 文本</div>
-        <textarea id="spnmn-editor" class="spnmn-editor" placeholder="转换结果会显示在这里..."></textarea>
+        <div class="content-grid">
+            <div>
+                <div class="block-title">SPNMN 文本</div>
+                <textarea id="spnmn-editor" class="spnmn-editor" placeholder="转换结果会显示在这里..."></textarea>
+                <div class="actions">
+                    <button class="btn btn-secondary" onclick="copyText()">&#x1F4CB; 复制文本</button>
+                    <button class="btn btn-secondary" onclick="downloadSpnmn()">&#x1F4BE; 下载 .spnmn</button>
+                    <button class="btn btn-secondary" onclick="refreshPreview()">&#x1F504; 重新渲染预览</button>
+                </div>
+            </div>
 
-        <div class="actions">
-            <button class="btn btn-secondary" onclick="copyText()">&#x1F4CB; 复制文本</button>
-            <button class="btn btn-secondary" onclick="downloadSpnmn()">&#x1F4BE; 下载 .spnmn</button>
-            <button class="btn btn-primary" onclick="openInSparks()">&#x1F517; 在 Sparks NMN 打开</button>
+            <div>
+                <div class="block-title">简谱预览</div>
+                <div class="preview-wrap">
+                    <iframe id="sparks-preview" class="preview-frame" src="/static/sparks-nmn/index.html"></iframe>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -229,7 +272,7 @@
 
 {% block scripts %}
 <script>
-    let currentTitle = "score";
+    let currentTitle = 'score';
     let currentFile = null;
 
     const uploadArea = document.getElementById('upload-area');
@@ -299,10 +342,26 @@
             }
 
             document.getElementById('spnmn-editor').value = data.spnmn_text || '';
-            showStatus('success', '转换完成');
+            refreshPreview();
+            showStatus('success', '转换完成，已更新预览');
         } catch (err) {
             showStatus('error', '请求失败: ' + err.message);
         }
+    }
+
+    function refreshPreview() {
+        const spnmnText = document.getElementById('spnmn-editor').value;
+        if (!spnmnText.trim()) {
+            showToast('没有可预览的内容');
+            return;
+        }
+
+        localStorage.setItem('sparks-nmn-demo-src', spnmnText);
+        const iframe = document.getElementById('sparks-preview');
+        iframe.src = 'about:blank';
+        setTimeout(function () {
+            iframe.src = '/static/sparks-nmn/index.html?t=' + Date.now();
+        }, 80);
     }
 
     function showStatus(type, text) {
@@ -317,18 +376,8 @@
         if (type !== 'loading') {
             setTimeout(function () {
                 bar.classList.remove('show');
-            }, 4500);
+            }, 4200);
         }
-    }
-
-    function openInSparks() {
-        const spnmnText = document.getElementById('spnmn-editor').value;
-        if (!spnmnText.trim()) {
-            showToast('没有可打开的内容');
-            return;
-        }
-        localStorage.setItem('sparks-nmn-demo-src', spnmnText);
-        window.open('/static/sparks-nmn/index.html?t=' + Date.now(), '_blank');
     }
 
     function downloadSpnmn() {
@@ -381,7 +430,7 @@
         toast.classList.add('show');
         setTimeout(function () {
             toast.classList.remove('show');
-        }, 2500);
+        }, 2400);
     }
 </script>
 {% endblock %}
