@@ -114,9 +114,10 @@ def expand_to_beat_tokens(
     if _is_close(ql, beat_ql * 4):
         return [token + tie_suffix, "-", "-", "-"]
 
-    # 附点二分 (3 beats)
+    # 附点二分 (3 beats)：
+    # 在当前项目的目标记法中，3 拍统一写作 "X - -"（不用点记号）。
     if _is_close(ql, beat_ql * 3):
-        return [token + tie_suffix, "-", "."]
+        return [token + tie_suffix, "-", "-"]
 
     # 二分 (2 beats)
     if _is_close(ql, beat_ql * 2):
