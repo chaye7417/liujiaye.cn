@@ -31,6 +31,7 @@ from app.modes.musicxml.rhythm_utils import (
     deduplicate_by_offset,
     expand_to_beat_tokens,
     group_sub_beat_tokens,
+    remove_overlapping_rests,
 )
 
 
@@ -190,6 +191,7 @@ def _convert_measure(
     """
     elements = list(measure.flatten().notesAndRests)
     elements = deduplicate_by_offset(elements)
+    elements = remove_overlapping_rests(elements)
     elements.sort(key=lambda e: float(e.offset))
 
     if not elements:

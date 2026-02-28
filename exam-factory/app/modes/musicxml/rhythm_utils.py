@@ -42,6 +42,44 @@ def deduplicate_by_offset(elements: List[Any]) -> List[Any]:
     return result
 
 
+def remove_overlapping_rests(
+    elements: List[Any],
+    tol: float = 1e-6,
+) -> List[Any]:
+    """移除与任意音符时值区间重叠的休止符。
+
+    MusicXML 在多声部合并后常出现“占位休止符”（用于版面/声部对齐），
+    这些休止符并非实际听感上的停顿。若直接转换会产生多余的 0。
+    """
+    note_ranges: List[Tuple[float, float]] = []
+    for el in elements:
+        if isinstance(el, note.Rest):
+            continue
+        start = float(el.offset)
+        end = start + float(el.duration.quarterLength)
+        note_ranges.append((start, end))
+
+    if not note_ranges:
+        return elements
+
+    filtered: List[Any] = []
+    for el in elements:
+        if not isinstance(el, note.Rest):
+            filtered.append(el)
+            continue
+
+        r_start = float(el.offset)
+        r_end = r_start + float(el.duration.quarterLength)
+        overlaps = any(
+            (r_start < n_end - tol) and (n_start < r_end - tol)
+            for n_start, n_end in note_ranges
+        )
+        if not overlaps:
+            filtered.append(el)
+
+    return filtered
+
+
 def _beat_slots_for_ts(numerator: int, denominator: int) -> List[float]:
     """根据拍号返回每一拍的起始 offset 列表（相对小节开头）。
 
