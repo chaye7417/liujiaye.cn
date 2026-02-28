@@ -189,12 +189,12 @@ def group_sub_beat_tokens(tokens_with_ql: List[Tuple[str, float]], beat_ql: floa
         # 八分 + 八分
         if _is_close(q1, eighth) and _is_close(q2, eighth):
             return f"({t1}{t2})"
-        # 附点八分 + 十六分
+        # 附点八分 + 十六分 → (a.(b)) 十六分需要额外括号获得双减时线
         if _is_close(q1, beat_ql * 0.75) and _is_close(q2, sixteenth):
-            return f"({t1}.{t2})"
-        # 十六分 + 附点八分
+            return f"({t1}.({t2}))"
+        # 十六分 + 附点八分 → ((a)b.)
         if _is_close(q1, sixteenth) and _is_close(q2, beat_ql * 0.75):
-            return f"({t1}{t2}.)"
+            return f"(({t1}){t2}.)"
         # 十六分 + 十六分（半拍内两个十六分）
         if _is_close(q1, sixteenth) and _is_close(q2, sixteenth):
             return f"({t1}{t2})"
@@ -238,16 +238,16 @@ def group_sub_beat_tokens(tokens_with_ql: List[Tuple[str, float]], beat_ql: floa
         if all(_is_close(q, sixteenth) for _, q in tokens_with_ql):
             return f"(({t1}{t2})({t3}{t4}))"
 
-        # 附点十六分 + 三十二分 + 十六分 + 十六分 → ((a.b)(cd))
-        # 附点 `.` 让 a 占 3/4、b 占 1/4，无需额外括号包裹 b
+        # 附点十六分 + 三十二分 + 十六分 + 十六分 → ((a.(b))(cd))
+        # 三十二分需要第三层括号获得三条减时线
         if (_is_close(q1, sixteenth * 1.5) and _is_close(q2, thirtysecond)
                 and _is_close(q3, sixteenth) and _is_close(q4, sixteenth)):
-            return f"(({t1}.{t2})({t3}{t4}))"
+            return f"(({t1}.({t2}))({t3}{t4}))"
 
-        # 十六分 + 十六分 + 附点十六分 + 三十二分 → ((ab)(c.d))
+        # 十六分 + 十六分 + 附点十六分 + 三十二分 → ((ab)(c.(d)))
         if (_is_close(q1, sixteenth) and _is_close(q2, sixteenth)
                 and _is_close(q3, sixteenth * 1.5) and _is_close(q4, thirtysecond)):
-            return f"(({t1}{t2})({t3}.{t4}))"
+            return f"(({t1}{t2})({t3}.({t4})))"
 
         # 通用 4 音符
         inner = "".join(tok for tok, _ in tokens_with_ql)
