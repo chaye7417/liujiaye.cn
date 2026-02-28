@@ -349,10 +349,26 @@
 
         localStorage.setItem('sparks-nmn-demo-src', spnmnText);
         const iframe = document.getElementById('sparks-preview');
+        iframe.onload = function () {
+            hideSparksTrialBanner();
+        };
         iframe.src = 'about:blank';
         setTimeout(function () {
             iframe.src = '/static/sparks-nmn/index.html?t=' + Date.now();
         }, 80);
+    }
+
+    function hideSparksTrialBanner() {
+        const iframe = document.getElementById('sparks-preview');
+        const doc = iframe && iframe.contentDocument;
+        if (!doc) return;
+
+        // 移除试用模式顶部提示块。
+        const banner = doc.querySelector('.demo-important-warning-title');
+        if (banner && banner.parentElement) {
+            const container = banner.closest('div[style*=\"height\"]') || banner.parentElement;
+            container.remove();
+        }
     }
 
     function showStatus(type, text) {
@@ -424,6 +440,14 @@
         setTimeout(function () {
             toast.classList.remove('show');
         }, 2400);
+    }
+
+    // 首次加载预览时也隐藏试用模式提示。
+    const initialIframe = document.getElementById('sparks-preview');
+    if (initialIframe) {
+        initialIframe.onload = function () {
+            hideSparksTrialBanner();
+        };
     }
 </script>
 {% endblock %}
