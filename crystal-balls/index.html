@@ -2,10 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="utf-8" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <!-- 添加Tone.js库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-    <link rel="stylesheet" type="text/css" href="style.css">
     <style>
         html, body {
             margin: 0;
@@ -83,10 +81,6 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-
-    <!-- Socket.IO -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
-
     <!-- 你的主脚本 -->
     <script src="sketch.js"></script>
 
@@ -99,15 +93,6 @@
             const isVisible = controller.style.display === 'block';
             controller.style.display = isVisible ? 'none' : 'block';
             toggleBtn.textContent = isVisible ? '显示控制面板' : '隐藏控制面板';
-        });
-
-        // 添加滑块值的实时更新
-        document.getElementById('maxBalls').addEventListener('input', function() {
-            document.getElementById('maxBallsValue').textContent = this.value;
-        });
-
-        document.getElementById('reverb').addEventListener('input', function() {
-            document.getElementById('reverbValue').textContent = this.value;
         });
     </script>
 </body>

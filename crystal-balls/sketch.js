@@ -2,7 +2,7 @@ let scene, camera, renderer, controls;
 let balls = [];
 let platform;
 let composer;
-let socket;
+
 let maxBalls = 10;
 let reverbAmount = 0.3;
 let nextBallTime = 0;
@@ -39,7 +39,35 @@ function initTone() {
         volume: -10 // 降低整体音量，避免多个音符同时播放时过载
     }).connect(reverb);
     
+    initPannerPool();
     console.log("PolySynth initialized");
+}
+
+// 声像节点池
+const pannerPool = [];
+const MAX_PANNERS = 8;
+
+// 初始化声像节点池
+function initPannerPool() {
+    for (let i = 0; i < MAX_PANNERS; i++) {
+        pannerPool.push({
+            panner: new Tone.Panner(0).connect(reverb),
+            inUse: false
+        });
+    }
+}
+
+// 获取可用的声像节点
+function getPanner(pan) {
+    let entry = pannerPool.find(p => !p.inUse);
+    if (!entry) {
+        // 所有都在用，强制复用第一个
+        entry = pannerPool[0];
+    }
+    entry.panner.pan.value = pan;
+    entry.inUse = true;
+    setTimeout(() => { entry.inUse = false; }, 500);
+    return entry.panner;
 }
 
 // 触发声音函数
@@ -47,61 +75,30 @@ function triggerSound(size, bounceCount, pan) {
     if (Tone.context.state !== "running") {
         Tone.context.resume();
     }
-    
-    // 大幅提高整体音高
-    // 调整基础音符到更高的八度，同时保持尺寸对音高的影响
-    const baseNote = 84 - Math.floor(size * 1.2);  // 尺寸越大，音高越低，但整体音高提高了
-    const note = Tone.Frequency(baseNote - bounceCount, "midi").toNote();
-    
-    // 弹跳力度映射到音量
-    const velocity = Math.max(0.05, 1 - bounceCount * 0.1);  // 减缓音量衰减速度
-    
-    // 设置混响量
-    reverb.wet.value = reverbAmount;
-    
-    // 创建一个唯一的ID用于此次声音事件
-    const soundId = `ball-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-    
-    // 创建专门用于这个音符的声像
-    const individualPanner = new Tone.Panner(pan).connect(reverb);
-    
-    // 为这个特定的声音创建一个临时的单音合成器
-    const tempSynth = new Tone.Synth({
-        oscillator: {
-            type: "sine"
-        },
-        envelope: {
-            attack: 0,
-            decay: 0.2,
-            sustain: 0.3,
-            release: 1.0
-        }
-    }).connect(individualPanner);
-    
-    // 设置音量
-    tempSynth.volume.value = Tone.gainToDb(velocity);
-    
-    // 触发音符
-    tempSynth.triggerAttackRelease(note, "32n", undefined, velocity);
-    
-    // 在音符结束后释放资源
-    setTimeout(() => {
-        tempSynth.dispose();
-        individualPanner.dispose();
-    }, 1000); // 1秒后释放，确保声音完全播放结束
-    
-    // 打印声音信息以便调试
-    console.log(`Sound: size=${size}, note=${note}, pan=${pan.toFixed(2)}, id=${soundId}`);
-}
 
-// 初始化 Socket.IO
-function initSocket() {
-    socket = io();
+    const baseNote = 84 - Math.floor(size * 1.2);
+    const note = Tone.Frequency(baseNote - bounceCount, "midi").toNote();
+    const velocity = Math.max(0.05, 1 - bounceCount * 0.1);
+
+    reverb.wet.value = reverbAmount;
+
+    // 使用声像节点池
+    const panner = getPanner(pan);
+
+    // 临时将 polySynth 连接到带声像的节点
+    polySynth.disconnect();
+    polySynth.connect(panner);
+    polySynth.triggerAttackRelease(note, "32n", undefined, velocity);
+
+    // 短暂延迟后恢复默认连接
+    setTimeout(() => {
+        polySynth.disconnect();
+        polySynth.connect(reverb);
+    }, 100);
 }
 
 function init() {
     try {
-        initSocket();
         initTone();  // 初始化Tone.js
         
         // 创建场景
@@ -147,17 +144,6 @@ function init() {
 
         // 设置窗口大小调整
         window.addEventListener('resize', onWindowResize, false);
-
-        // 创建立方体环境贴图
-        const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(512, {
-            generateMipmaps: true,
-            minFilter: THREE.LinearMipmapLinearFilter
-        });
-        const cubeCamera = new THREE.CubeCamera(0.1, 5000, cubeRenderTarget);
-        scene.add(cubeCamera);
-
-        // 将环境贴图保存为全局变量
-        window.envMap = cubeRenderTarget.texture;
 
         console.log('Scene initialized successfully');
     } catch (error) {
@@ -424,7 +410,7 @@ class Ball {
         this.mesh.position.set(x, y, z);
         
         // 创建专用的环境贴图相机
-        this.cubeRenderTarget = new THREE.WebGLCubeRenderTarget(256, {
+        this.cubeRenderTarget = new THREE.WebGLCubeRenderTarget(128, {
             generateMipmaps: true,
             minFilter: THREE.LinearMipmapLinearFilter
         });
@@ -450,11 +436,15 @@ class Ball {
         this.fadeTime = 0;
         this.glowTime = 0;
         this.lastBounceTime = 0; // 添加最后一次弹跳时间记录
+        this.frameCount = 0;
     }
 
     update() {
-        // 始终更新环境贴图
-        this.updateEnvironmentMap();
+        // 每30帧更新一次环境贴图（性能优化）
+        this.frameCount++;
+        if (this.frameCount % 30 === 0) {
+            this.updateEnvironmentMap();
+        }
 
         // 处理淡入淡出
         if (this.fadeState === 'in') {
@@ -636,11 +626,8 @@ function animate() {
         
         // 更新控制器
         controls.update();
-        
-        // 渲染场景
-        renderer.render(scene, camera);
-        
-        // 后期处理
+
+        // 后期处理（EffectComposer 内部已包含 RenderPass，无需额外调用 renderer.render）
         if (composer) {
             composer.render();
         }
@@ -657,41 +644,6 @@ function onWindowResize() {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
     composer.setSize(window.innerWidth, window.innerHeight);
-}
-
-// 创建渐变纹理
-function createGradientTexture() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 2;
-    canvas.height = 512;
-    const context = canvas.getContext('2d');
-
-    // 创建渐变
-    const gradient = context.createLinearGradient(0, 0, 0, 512);
-    gradient.addColorStop(0, '#0a192f');    // 深蓝色顶部
-    gradient.addColorStop(0.5, '#172a45');   // 中间色
-    gradient.addColorStop(1, '#0a192f');    // 深蓝色底部
-
-    context.fillStyle = gradient;
-    context.fillRect(0, 0, 2, 512);
-
-    const texture = new THREE.Texture(canvas);
-    texture.needsUpdate = true;
-    return texture;
-}
-
-// 创建背景网格
-function createBackgroundMesh(texture) {
-    const geometry = new THREE.PlaneGeometry(5000, 5000);
-    const material = new THREE.MeshBasicMaterial({
-        map: texture,
-        transparent: true,
-        opacity: 0.8
-    });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.z = -2000;
-    mesh.rotation.z = Math.PI; // 旋转以适应场景
-    return mesh;
 }
 
 // 初始化场景
