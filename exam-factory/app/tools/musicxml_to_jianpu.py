@@ -91,6 +91,8 @@ def _octave_mark(pitch_obj: music21.pitch.Pitch, tonic_octave: int) -> str:
 # ---------------------------------------------------------------------------
 # (quarterLength as Fraction, prefix, suffix)
 _DURATION_MAP: list[tuple[Fraction, str, str]] = [
+    (Fraction(1, 8), "d", ""),       # 三十二分
+    (Fraction(3, 16), "d", "."),     # 附点三十二分
     (Fraction(1, 4), "s", ""),       # 十六分
     (Fraction(3, 8), "s", "."),      # 附点十六分
     (Fraction(1, 2), "q", ""),       # 八分
@@ -255,6 +257,20 @@ def _process_measure(
 
     while i < len(elements):
         el = elements[i]
+
+        # 倚音（grace notes）：收集连续倚音，用 g[...] 语法输出
+        if hasattr(el, 'duration') and el.duration.isGrace:
+            grace_tokens: list[str] = []
+            while i < len(elements) and elements[i].duration.isGrace:
+                gel = elements[i]
+                if isinstance(gel, note.Note):
+                    degree, acc = _pitch_to_jianpu_degree(gel.pitch, scale_pcs)
+                    oct = _octave_mark(gel.pitch, tonic_octave)
+                    grace_tokens.append(f"s{acc}{degree}{oct}")
+                i += 1
+            if grace_tokens:
+                tokens.append(f"g[{''.join(grace_tokens)}]")
+            continue
 
         if _is_tuplet(el):
             actual, normal = _get_tuplet_ratio(el)
@@ -422,6 +438,8 @@ def convert_musicxml_to_jianpu(
         raise ValueError("文件中没有找到小节")
 
     bar_strings: list[str] = []
+    all_lyrics: list[str] = []
+    has_lyrics = False
     chord_warned: list[bool] = [False]
 
     for m in measures:
@@ -442,16 +460,52 @@ def convert_musicxml_to_jianpu(
 
         bar_strings.append(bar_text)
 
+        # 提取歌词：遍历小节中的音符，收集对应歌词
+        voices = list(m.voices)
+        if voices:
+            mel_source = voices[0]
+        else:
+            mel_source = m
+        for el in mel_source.flatten().notesAndRests:
+            if el.duration.isGrace:
+                continue
+            if isinstance(el, note.Note):
+                if el.lyrics:
+                    lyric_text = el.lyrics[0].text or "_"
+                    all_lyrics.append(lyric_text)
+                    has_lyrics = True
+                else:
+                    all_lyrics.append("_")
+            elif isinstance(el, note.Rest):
+                pass  # 休止符不需要歌词占位
+
     if not bar_strings:
         raise ValueError("未提取到任何音符")
 
+    # 提取标题信息
+    title = ""
+    composer = ""
+    if hasattr(score, 'metadata') and score.metadata:
+        title = score.metadata.title or ""
+        composer = score.metadata.composer or ""
+
     # 组装 jianpu-ly
     lines: list[str] = []
+    if title:
+        lines.append(f"title={title}")
+    if composer:
+        lines.append(f"composer={composer}")
     if clef_str:
         lines.append(clef_str)
     lines.append(jianpu_key_str)
     lines.append(ts_str)
     lines.append(" | ".join(bar_strings) + " |")
+
+    # 添加歌词
+    if has_lyrics:
+        lyrics_text = "".join(all_lyrics).rstrip("_")
+        if lyrics_text:
+            lines.append(f"H: {lyrics_text}")
 
     return {
         "jianpu_text": "\n".join(lines),
