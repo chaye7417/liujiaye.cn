@@ -233,16 +233,30 @@ def _deduplicate_by_offset(
     return result
 
 
+def _get_lyric(el: music21.base.Music21Object) -> str:
+    """获取元素对应的歌词字符。"""
+    if isinstance(el, note.Note) and el.lyrics:
+        text = el.lyrics[0].text
+        return text if text else "_"
+    return "_"
+
+
 def _process_measure(
     m: stream.Measure,
     scale_pcs: list[int],
     tonic_octave: int,
     warnings: list[str],
     chord_warned: list[bool],
+    lyrics_out: list[str] | None = None,
 ) -> list[str]:
     """处理单小节，返回 jianpu-ly token 列表。
 
     三连音分组策略：收集连续 tuplet 音符，按 numberNotesActual 个一组输出。
+
+    Args:
+        lyrics_out: 可选，收集与 token 对齐的歌词字符列表。
+            每个音符/休止符对应一个歌词位置，
+            每个延长线 '-' 也对应一个 '_'。
     """
     tokens: list[str] = []
     # 如果有多个声部，只取第一个声部，避免混合多声部内容
@@ -255,10 +269,19 @@ def _process_measure(
     elements = _deduplicate_by_offset(raw)
     i = 0
 
+    def _collect_lyric(el: music21.base.Music21Object, token: str) -> None:
+        """收集一个元素的歌词（含延长线占位）。"""
+        if lyrics_out is None:
+            return
+        lyrics_out.append(_get_lyric(el))
+        # 每个延长线 '-' 需要一个 '_' 占位（但排除 tie 的 '~'）
+        dash_count = token.count("-")
+        lyrics_out.extend(["_"] * dash_count)
+
     while i < len(elements):
         el = elements[i]
 
-        # 倚音（grace notes）：收集连续倚音，用 g[...] 语法输出
+        # 倚音（grace notes）：不占歌词位置
         if hasattr(el, 'duration') and el.duration.isGrace:
             grace_tokens: list[str] = []
             while i < len(elements) and elements[i].duration.isGrace:
@@ -289,7 +312,6 @@ def _process_measure(
             for k in range(0, len(all_tuplet), actual):
                 group = all_tuplet[k:k + actual]
                 if len(group) == actual:
-                    # 完整的 tuplet 组
                     inner = [
                         _element_to_token(
                             g, scale_pcs, tonic_octave, True,
@@ -298,8 +320,11 @@ def _process_measure(
                         for g in group
                     ]
                     tokens.append(f"{actual}[ {' '.join(inner)} ]")
+                    # 每个 tuplet 音符占一个歌词位置
+                    if lyrics_out is not None:
+                        for g in group:
+                            lyrics_out.append(_get_lyric(g))
                 else:
-                    # 不完整组（跨小节残余）：作为普通音符输出
                     for g in group:
                         token = _element_to_token(
                             g, scale_pcs, tonic_octave, False,
@@ -307,6 +332,7 @@ def _process_measure(
                         )
                         if token:
                             tokens.append(token)
+                            _collect_lyric(g, token)
 
             i = j
             continue
@@ -318,6 +344,7 @@ def _process_measure(
         )
         if token:
             tokens.append(token)
+            _collect_lyric(el, token)
         i += 1
 
     return tokens
@@ -443,8 +470,10 @@ def convert_musicxml_to_jianpu(
     chord_warned: list[bool] = [False]
 
     for m in measures:
+        measure_lyrics: list[str] = []
         tokens = _process_measure(
             m, scale_pcs, tonic_octave, warnings, chord_warned,
+            lyrics_out=measure_lyrics,
         )
 
         if not tokens:
@@ -452,32 +481,24 @@ def convert_musicxml_to_jianpu(
 
         bar_text = " ".join(tokens)
 
-        # 弱起小节：在前面补休止符
+        # 弱起小节：在前面补休止符，歌词用 '_' 占位
         if m.paddingLeft > 0:
             pickup = _pickup_rests(float(m.paddingLeft))
             if pickup:
                 bar_text = f"{pickup} {bar_text}"
+                # 补齐弱起休止的歌词占位（每个 '0' 和 '-' 各占一位）
+                pickup_positions = pickup.count("0") + pickup.count("-")
+                measure_lyrics = ["_"] * pickup_positions + measure_lyrics
 
         bar_strings.append(bar_text)
 
-        # 提取歌词：遍历小节中的音符，收集对应歌词
-        voices = list(m.voices)
-        if voices:
-            mel_source = voices[0]
-        else:
-            mel_source = m
-        for el in mel_source.flatten().notesAndRests:
-            if el.duration.isGrace:
-                continue
-            if isinstance(el, note.Note):
-                if el.lyrics:
-                    lyric_text = el.lyrics[0].text or "_"
-                    all_lyrics.append(lyric_text)
+        # 检查是否有实际歌词
+        if not has_lyrics:
+            for ly in measure_lyrics:
+                if ly != "_":
                     has_lyrics = True
-                else:
-                    all_lyrics.append("_")
-            elif isinstance(el, note.Rest):
-                pass  # 休止符不需要歌词占位
+                    break
+        all_lyrics.extend(measure_lyrics)
 
     if not bar_strings:
         raise ValueError("未提取到任何音符")
