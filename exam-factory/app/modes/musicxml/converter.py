@@ -107,7 +107,7 @@ def convert_musicxml_to_spnmn(
     all_lyrics: List[Tuple[str, str]] = []
     for _, m_lyrics in measure_results:
         all_lyrics.extend(m_lyrics)
-    has_lyrics = any(t[0].strip() for t in all_lyrics)
+    has_lyrics = any(t[0].strip() and t[0] != "_" for t in all_lyrics)
     is_cjk = _is_cjk_lyrics([t[0] for t in all_lyrics]) if has_lyrics else True
 
     # ---------- 按行分组（每行 4 小节） ----------
@@ -137,7 +137,7 @@ def convert_musicxml_to_spnmn(
             for _, m_lyrics in chunk:
                 line_lyrics.extend(m_lyrics)
 
-            if any(t[0].strip() for t in line_lyrics):
+            if any(t[0].strip() and t[0] != "_" for t in line_lyrics):
                 if is_cjk:
                     lyric_text = "".join(t[0] for t in line_lyrics)
                     spnmn_lines.append(f"Lc: {lyric_text}")
@@ -252,15 +252,21 @@ def _convert_measure(
             tok, ql, lyric_tup, is_tied = beat_group[0]
             expanded = expand_to_beat_tokens(tok, ql, beat_ql, is_tied)
             result_tokens.extend(expanded)
-            if lyric_tup[0] and tok != "0":
-                result_lyrics.append(lyric_tup)
+            if tok != "0":
+                if lyric_tup[0]:
+                    result_lyrics.append(lyric_tup)
+                else:
+                    result_lyrics.append(("_", "single"))
         else:
             sub_tokens: List[Tuple[str, float]] = []
             for tok, ql, lyric_tup, is_tied in beat_group:
                 full_tok = tok + ("~" if is_tied else "")
                 sub_tokens.append((full_tok, ql))
-                if lyric_tup[0] and tok != "0":
-                    result_lyrics.append(lyric_tup)
+                if tok != "0":
+                    if lyric_tup[0]:
+                        result_lyrics.append(lyric_tup)
+                    else:
+                        result_lyrics.append(("_", "single"))
             grouped = group_sub_beat_tokens(sub_tokens, beat_ql)
             result_tokens.append(grouped)
 
@@ -326,7 +332,8 @@ def _build_lw_line(lyric_tuples: List[Tuple[str, str]]) -> str:
     parts: List[str] = []
     for text, syl in lyric_tuples:
         text = text.strip()
-        if not text:
+        if not text or text == "_":
+            parts.append("_")
             continue
         if syl in ("begin", "middle"):
             parts.append(text + "-")

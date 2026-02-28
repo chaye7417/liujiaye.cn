@@ -671,11 +671,19 @@
         // Sparks NMN 从 localStorage key "sparks-nmn-demo-src" 读取内容
         localStorage.setItem('sparks-nmn-demo-src', spnmnText);
 
-        // 刷新 iframe 让编辑器重新从 localStorage 加载
+        // 先清空 iframe，确保旧页面完全卸载，避免 localStorage 读取时序问题
         const iframe = document.getElementById('sparks-preview');
-        iframe.src = '/static/sparks-nmn/index.html';
+        iframe.src = 'about:blank';
 
-        showToast('已加载到预览');
+        // 等旧页面卸载完毕后，用带时间戳的 URL 重新加载（防止浏览器缓存）
+        setTimeout(function() {
+            iframe.onload = function() {
+                // iframe 加载完成后清除 onload，避免重复触发
+                iframe.onload = null;
+                showToast('预览已加载');
+            };
+            iframe.src = '/static/sparks-nmn/index.html?t=' + Date.now();
+        }, 100);
     }
 
     /* ===== 在 Sparks NMN 中打开 ===== */
@@ -687,13 +695,21 @@
         }
 
         localStorage.setItem('sparks-nmn-demo-src', spnmnText);
-        window.open('/static/sparks-nmn/index.html', '_blank');
+        window.open('/static/sparks-nmn/index.html?t=' + Date.now(), '_blank');
     }
 
     /* ===== 重新加载 iframe ===== */
     function reloadIframe() {
         const iframe = document.getElementById('sparks-preview');
-        iframe.src = iframe.src;
+        // 先清空再加载，用时间戳避免缓存
+        iframe.src = 'about:blank';
+        setTimeout(function() {
+            iframe.onload = function() {
+                iframe.onload = null;
+                showToast('预览已重新加载');
+            };
+            iframe.src = '/static/sparks-nmn/index.html?t=' + Date.now();
+        }, 100);
     }
 
     /* ===== 下载 .spnmn ===== */
