@@ -150,8 +150,21 @@ def expand_to_beat_tokens(
             result.append("-")
         return result
 
-    # 亚拍音符（八分、十六分等）直接返回 token
-    return [token + tie_suffix]
+    # 亚拍音符：必须用括号包裹以显示正确的减时线
+    eighth = beat_ql / 2
+    sixteenth = beat_ql / 4
+    tok_with_tie = token + tie_suffix
+
+    # 八分音符 → (token) 一层括号 = 一条减时线
+    if _is_close(ql, eighth):
+        return [f"({tok_with_tie})"]
+
+    # 十六分音符 → ((token)) 两层括号 = 两条减时线
+    if _is_close(ql, sixteenth):
+        return [f"(({tok_with_tie}))"]
+
+    # 其他亚拍时值用单层括号近似
+    return [f"({tok_with_tie})"]
 
 
 def group_sub_beat_tokens(tokens_with_ql: List[Tuple[str, float]], beat_ql: float) -> str:
