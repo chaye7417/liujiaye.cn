@@ -64,18 +64,35 @@ def pitch_to_degree(
     return 1, ""
 
 
-def octave_suffix(p: m21pitch.Pitch, tonic_octave: int) -> str:
+def octave_suffix(
+    p: m21pitch.Pitch,
+    tonic_octave: int,
+    tonic_pc: int = 0,
+) -> str:
     """计算八度后缀 e（升）/ d（降）。
+
+    简谱中，从主音到高半音下方的 7 个自然音级为同一"八度层"。
+    例如 D 大调 (tonic D4)：D4~C#5 为无后缀，D5~C#6 为 e，D3~C#4 为 d。
 
     Args:
         p: music21 Pitch 对象。
         tonic_octave: 主音参考八度。
+        tonic_pc: 主音 pitchClass（用于跨八度边界修正）。
 
     Returns:
         'e' * n 或 'd' * n 或 ''。
     """
     oct = p.octave if p.octave is not None else REFERENCE_OCTAVE
     diff = oct - tonic_octave
+
+    # 修正：如果 pitch 的 pitchClass 落在主音以下（在同八度内），
+    # 说明它属于上一个简谱八度层。
+    # 例如 D 大调：C#5 的 pc=1 < tonic_pc=2，但 octave=5 > tonic=4，
+    # 实际仍在基础八度内。
+    pc = p.pitchClass
+    if tonic_pc > 0 and pc < tonic_pc:
+        diff -= 1
+
     if diff > 0:
         return "e" * diff
     if diff < 0:
@@ -113,6 +130,13 @@ def format_note_token(
     Returns:
         如 '1', '#4e', 'b3d' 等。
     """
+    # 从 scale_pc_map 中找到主音的 pitchClass（degree 1 对应的 pc）
+    tonic_pc = 0
+    for pc, deg in scale_pc_map.items():
+        if deg == 1:
+            tonic_pc = pc
+            break
+
     degree, acc = pitch_to_degree(p, scale_pc_map)
-    oct = octave_suffix(p, tonic_octave)
+    oct = octave_suffix(p, tonic_octave, tonic_pc)
     return f"{acc}{degree}{oct}"
