@@ -9,7 +9,6 @@ let nextBallTime = 0;
 const radius = 500;
 
 // Tone.js相关变量
-let polySynth;
 let reverb;
 
 // 初始化 Tone.js
@@ -19,55 +18,46 @@ function initTone() {
         decay: 1.5,
         wet: reverbAmount
     }).toDestination();
-    
+
     // 预先加载混响
     reverb.generate().then(() => {
         console.log("Reverb ready");
     });
-    
-    // 创建复音合成器，能够同时发出多个音符
-    polySynth = new Tone.PolySynth(Tone.Synth, {
-        oscillator: {
-            type: "sine"
-        },
-        envelope: {
-            attack: 0,      // 攻击时间设为0
-            decay: 0.2,
-            sustain: 0.3,
-            release: 1.0
-        },
-        volume: -10 // 降低整体音量，避免多个音符同时播放时过载
-    }).connect(reverb);
-    
-    initPannerPool();
-    console.log("PolySynth initialized");
+
+    initAudioPool();
+    console.log("Audio pool initialized");
 }
 
-// 声像节点池
-const pannerPool = [];
-const MAX_PANNERS = 8;
+// 音频节点池：每个条目包含独立的 Synth + Panner
+const audioPool = [];
+const POOL_SIZE = 8;
 
-// 初始化声像节点池
-function initPannerPool() {
-    for (let i = 0; i < MAX_PANNERS; i++) {
-        pannerPool.push({
-            panner: new Tone.Panner(0).connect(reverb),
-            inUse: false
-        });
+function initAudioPool() {
+    for (let i = 0; i < POOL_SIZE; i++) {
+        const panner = new Tone.Panner(0).connect(reverb);
+        const synth = new Tone.Synth({
+            oscillator: { type: "sine" },
+            envelope: {
+                attack: 0,
+                decay: 0.2,
+                sustain: 0.3,
+                release: 1.0
+            },
+            volume: -10
+        }).connect(panner);
+        audioPool.push({ synth, panner, inUse: false });
     }
 }
 
-// 获取可用的声像节点
-function getPanner(pan) {
-    let entry = pannerPool.find(p => !p.inUse);
+function getAudioNode(pan) {
+    let entry = audioPool.find(e => !e.inUse);
     if (!entry) {
-        // 所有都在用，强制复用第一个
-        entry = pannerPool[0];
+        entry = audioPool[0]; // 强制复用
     }
     entry.panner.pan.value = pan;
     entry.inUse = true;
     setTimeout(() => { entry.inUse = false; }, 500);
-    return entry.panner;
+    return entry;
 }
 
 // 触发声音函数
@@ -82,19 +72,8 @@ function triggerSound(size, bounceCount, pan) {
 
     reverb.wet.value = reverbAmount;
 
-    // 使用声像节点池
-    const panner = getPanner(pan);
-
-    // 临时将 polySynth 连接到带声像的节点
-    polySynth.disconnect();
-    polySynth.connect(panner);
-    polySynth.triggerAttackRelease(note, "32n", undefined, velocity);
-
-    // 短暂延迟后恢复默认连接
-    setTimeout(() => {
-        polySynth.disconnect();
-        polySynth.connect(reverb);
-    }, 100);
+    const { synth } = getAudioNode(pan);
+    synth.triggerAttackRelease(note, "32n", undefined, velocity);
 }
 
 function init() {
@@ -112,12 +91,11 @@ function init() {
         camera.lookAt(0, 200, 0);
 
         // 创建渲染器
-        renderer = new THREE.WebGLRenderer({ 
-            antialias: true,
-            alpha: true
+        renderer = new THREE.WebGLRenderer({
+            antialias: true
         });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         renderer.setClearColor(0x0a192f, 1);
         document.body.appendChild(renderer.domElement);
 
@@ -200,36 +178,10 @@ function setupLights() {
 
 function createPlatform() {
     const segments = 48;
-    
-    // 创建径向线
-    const radialLines = [];
-    for (let i = 0; i < segments; i++) {
-        const angle = (i / segments) * Math.PI * 2;
-        const points = [];
-        const opacities = []; // 存储每个点的透明度
-        
-        // 为每条径向线创建点和对应的透明度
-        for (let r = 0; r <= radius + 100; r += 5) {  // 延长一点以实现平滑淡出
-            const x = Math.cos(angle) * r;
-            const z = Math.sin(angle) * r;
-            const y = 400 - Math.pow(r/radius, 2) * 200;
-            points.push(new THREE.Vector3(x, y, z));
-            
-            // 计算透明度
-            const fadeStart = radius - 50;  // 开始淡出的位置
-            const opacity = r > fadeStart ? 
-                Math.max(0, 1 - (r - fadeStart) / 100) : 1;  // 线性淡出
-            opacities.push(opacity);
-        }
-        
-        const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
-        
-        // 添加透明度属性
-        const alphas = new Float32Array(opacities);
-        lineGeometry.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1));
-        
-        // 使用自定义着色器材质
-        const lineMaterial = new THREE.ShaderMaterial({
+
+    // 共享的网格线着色器材质创建函数
+    function createGridMaterial() {
+        return new THREE.ShaderMaterial({
             uniforms: {
                 color: { value: new THREE.Color(0x64ffda) },
                 baseOpacity: { value: 0.2 },
@@ -255,10 +207,41 @@ function createPlatform() {
             transparent: true,
             blending: THREE.AdditiveBlending
         });
+    }
+
+    // 创建径向线
+    const radialLines = [];
+    for (let i = 0; i < segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        const points = [];
+        const opacities = []; // 存储每个点的透明度
+
+        // 为每条径向线创建点和对应的透明度
+        for (let r = 0; r <= radius + 100; r += 5) {  // 延长一点以实现平滑淡出
+            const x = Math.cos(angle) * r;
+            const z = Math.sin(angle) * r;
+            const y = 400 - Math.pow(r/radius, 2) * 200;
+            points.push(new THREE.Vector3(x, y, z));
+
+            // 计算透明度
+            const fadeStart = radius - 50;  // 开始淡出的位置
+            const opacity = r > fadeStart ?
+                Math.max(0, 1 - (r - fadeStart) / 100) : 1;  // 线性淡出
+            opacities.push(opacity);
+        }
+
+        const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+
+        // 添加透明度属性
+        const alphas = new Float32Array(opacities);
+        lineGeometry.setAttribute('alpha', new THREE.BufferAttribute(alphas, 1));
+
+        const lineMaterial = createGridMaterial();
 
         const line = new THREE.Line(lineGeometry, lineMaterial);
         line.userData.baseOpacity = 0.2;
         line.userData.glowTime = 0;
+        line.userData.angle = angle;
         scene.add(line);
         radialLines.push(line);
     }
@@ -274,10 +257,10 @@ function createPlatform() {
             const z = Math.sin(angle) * r;
             const y = 400 - Math.pow(r/radius, 2) * 200;
             points.push(new THREE.Vector3(x, y, z));
-            
+
             // 圆环的透明度基于半径
             const fadeStart = radius - 50;
-            const opacity = r > fadeStart ? 
+            const opacity = r > fadeStart ?
                 Math.max(0, 1 - (r - fadeStart) / 100) : 1;
             opacities.push(opacity);
         }
@@ -285,32 +268,7 @@ function createPlatform() {
         const circleGeometry = new THREE.BufferGeometry().setFromPoints(points);
         circleGeometry.setAttribute('alpha', new THREE.BufferAttribute(new Float32Array(opacities), 1));
 
-        const circleMaterial = new THREE.ShaderMaterial({
-            uniforms: {
-                color: { value: new THREE.Color(0x64ffda) },
-                baseOpacity: { value: 0.2 },
-                glowIntensity: { value: 0.0 }
-            },
-            vertexShader: `
-                attribute float alpha;
-                varying float vAlpha;
-                void main() {
-                    vAlpha = alpha;
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                }
-            `,
-            fragmentShader: `
-                uniform vec3 color;
-                uniform float baseOpacity;
-                uniform float glowIntensity;
-                varying float vAlpha;
-                void main() {
-                    gl_FragColor = vec4(color, (baseOpacity + glowIntensity) * vAlpha);
-                }
-            `,
-            transparent: true,
-            blending: THREE.AdditiveBlending
-        });
+        const circleMaterial = createGridMaterial();
 
         const circle = new THREE.Line(circleGeometry, circleMaterial);
         circle.userData.baseOpacity = 0.2;
@@ -323,25 +281,24 @@ function createPlatform() {
     platform = {
         radialLines: radialLines,
         circles: circles,
+        allLines: radialLines.concat(circles),
         glowNearbyGrid: function(position, radius = 200) {
             const x = position.x;
             const z = position.z;
-            
+
             // 点亮径向线
+            const hitAngle = Math.atan2(z, x);
+            const hitDist = Math.sqrt(x * x + z * z);
+
             this.radialLines.forEach(line => {
-                const points = line.geometry.attributes.position.array;
-                let minDist = Infinity;
-                // 计算碰撞点到线的最短距离
-                for(let i = 0; i < points.length; i += 3) {
-                    const dx = points[i] - x;
-                    const dz = points[i + 2] - z;
-                    const dist = Math.sqrt(dx * dx + dz * dz);
-                    minDist = Math.min(minDist, dist);
-                }
-                // 如果在发光范围内，更新发光强度
-                if(minDist < radius) {
-                    const intensity = Math.pow(1 - (minDist / radius), 2);  // 平方函数使发光更集中
-                    line.material.uniforms.glowIntensity.value = intensity * 3.0;  // 增强发光效果
+                // 用角度差判断距离，避免逐点遍历
+                let angleDiff = Math.abs(hitAngle - line.userData.angle);
+                if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+                // 将角度差转换为弧长距离（近似）
+                const arcDist = angleDiff * hitDist;
+                if (arcDist < radius) {
+                    const intensity = Math.pow(1 - (arcDist / radius), 2);
+                    line.material.uniforms.glowIntensity.value = intensity * 3.0;
                 }
             });
 
@@ -351,7 +308,7 @@ function createPlatform() {
                 const points = circle.geometry.attributes.position.array;
                 const circleR = Math.sqrt(points[0] * points[0] + points[2] * points[2]);  // 圆环的半径
                 const dist = Math.abs(circleRadius - circleR);  // 碰撞点到圆环的距离
-                
+
                 // 如果在发光范围内，更新发光强度
                 if(dist < radius * 0.5) {  // 使用更小的范围使圆环发光更集中
                     const intensity = Math.pow(1 - (dist / (radius * 0.5)), 2);
@@ -361,7 +318,7 @@ function createPlatform() {
         },
         update: function() {
             // 更新所有线条的发光效果
-            [...this.radialLines, ...this.circles].forEach(line => {
+            this.allLines.forEach(line => {
                 if (line.material.uniforms && line.material.uniforms.glowIntensity.value > 0) {
                     // 使用更慢的衰减
                     line.material.uniforms.glowIntensity.value *= 0.95;
