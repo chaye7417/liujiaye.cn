@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git push origin master)",
+      "Bash(wc -l /Users/liujiaye/Developer/liujiaye.cn/exam-factory/app/**/*.py)",
+      "Bash(python -m py_compile app/routers/tasks.py)",
+      "Bash(python -m mypy app/routers/tasks.py --ignore-missing-imports)",
+      "Bash(for branch in worktree-agent-a1e393a6 worktree-agent-a9681adc worktree-agent-a70168d9 worktree-agent-a0862509 worktree-agent-a07e4aae)",
+      "Bash(do echo \"=== $branch ===\")",
+      "Bash(done)"
+    ]
+  }
+}
