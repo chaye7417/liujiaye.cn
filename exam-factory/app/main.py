@@ -16,7 +16,6 @@ from app.routers.download import router as download_router
 from app.routers.pages import router as pages_router
 from app.profile.router import router as profile_router
 from app.admin.router import router as admin_router
-from app.routers.tools import router as tools_router
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +29,6 @@ app.include_router(download_router)
 app.include_router(pages_router)
 app.include_router(profile_router)
 app.include_router(admin_router)
-app.include_router(tools_router)
 
 
 async def _cleanup_old_data() -> None:
