@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from app.config import TEMPLATE_DIR, UserStatus
+from app.config import TEMPLATE_DIR, DEFAULT_PAGE_SIZE, UserStatus
 from app.database import db_session
 from app.admin.auth import (
     verify_admin_login,
@@ -150,7 +150,7 @@ async def api_admin_stats(
 @router.get("/api/admin/users")
 async def api_admin_users(
     page: int = Query(default=1, ge=1),
-    per_page: int = Query(default=20, ge=1, le=100),
+    per_page: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=100),
     search: Optional[str] = Query(default=None),
     _admin: dict = Depends(require_admin),
 ) -> JSONResponse:
@@ -173,21 +173,18 @@ async def api_admin_users(
             where_clause = "WHERE email LIKE ?"
             params.append(f"%{search}%")
 
-        # 总数
-        cursor = await db.execute(
-            f"SELECT COUNT(*) FROM users {where_clause}", params
-        )
-        total = (await cursor.fetchone())[0]
-
-        # 分页数据
+        # 单次查询：使用 window function 同时获取分页数据和总数
         cursor = await db.execute(
             f"SELECT id, email, nickname, login_method, created_at, "
-            f"COALESCE(status, '{UserStatus.ACTIVE}') as status "
+            f"COALESCE(status, '{UserStatus.ACTIVE}') as status, "
+            f"COUNT(*) OVER() AS total_count "
             f"FROM users {where_clause} "
             f"ORDER BY id DESC LIMIT ? OFFSET ?",
             params + [per_page, offset],
         )
         rows = await cursor.fetchall()
+
+        total = rows[0][6] if rows else 0
         users = [
             {
                 "id": row[0],
@@ -266,7 +263,7 @@ async def api_admin_delete_user(
 @router.get("/api/admin/tasks")
 async def api_admin_tasks(
     page: int = Query(default=1, ge=1),
-    per_page: int = Query(default=20, ge=1, le=100),
+    per_page: int = Query(default=DEFAULT_PAGE_SIZE, ge=1, le=100),
     status: Optional[str] = Query(default=None),
     mode: Optional[str] = Query(default=None),
     user_id: Optional[int] = Query(default=None),
@@ -303,21 +300,18 @@ async def api_admin_tasks(
         if conditions:
             where_clause = "WHERE " + " AND ".join(conditions)
 
-        # 总数
+        # 单次查询：使用 window function 同时获取分页数据和总数
         cursor = await db.execute(
-            f"SELECT COUNT(*) FROM tasks t {where_clause}", params
-        )
-        total = (await cursor.fetchone())[0]
-
-        # 分页数据（JOIN users 获取邮箱）
-        cursor = await db.execute(
-            f"SELECT t.id, u.email, t.title, t.mode, t.status, t.created_at "
+            f"SELECT t.id, u.email, t.title, t.mode, t.status, t.created_at, "
+            f"COUNT(*) OVER() AS total_count "
             f"FROM tasks t LEFT JOIN users u ON t.user_id = u.id "
             f"{where_clause} "
             f"ORDER BY t.id DESC LIMIT ? OFFSET ?",
             params + [per_page, offset],
         )
         rows = await cursor.fetchall()
+
+        total = rows[0][6] if rows else 0
         tasks = [
             {
                 "id": row[0],

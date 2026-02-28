@@ -1,5 +1,7 @@
 """用户资料补全模块路由。"""
 
+import re
+
 from fastapi import APIRouter, Form, HTTPException, Request, Depends
 
 from app.auth import verify_token, hash_password
@@ -58,6 +60,8 @@ async def api_setup(
     nickname = nickname.strip()
     if len(nickname) < 2 or len(nickname) > 16:
         raise HTTPException(status_code=400, detail="用户名需要 2-16 个字符")
+    if not re.match(r'^[\w\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\s]+$', nickname):
+        raise HTTPException(status_code=400, detail="昵称包含非法字符")
 
     # 验证密码长度
     if len(password) < 6:
@@ -152,6 +156,8 @@ async def api_update_profile(
     nickname = nickname.strip()
     if len(nickname) < 2 or len(nickname) > 16:
         raise HTTPException(status_code=400, detail="用户名需要 2-16 个字符")
+    if not re.match(r'^[\w\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff\s]+$', nickname):
+        raise HTTPException(status_code=400, detail="昵称包含非法字符")
 
     # 验证头像 ID
     avatar = get_avatar_by_id(avatar_id)

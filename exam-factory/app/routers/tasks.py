@@ -3,10 +3,11 @@
 import asyncio
 import json
 import logging
+import re
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import AsyncGenerator, Optional
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -14,6 +15,7 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from app.config import (
     UPLOAD_DIR, OUTPUT_DIR, MAX_FILE_SIZE_MB,
     AI_MODELS, DEFAULT_MODEL, QUIZ_BANK_DIR,
+    DEFAULT_PAGE_SIZE,
     TaskStatus, TaskMode, UsageAction,
 )
 from app.database import db_session
@@ -119,6 +121,9 @@ async def api_upload(
     user_id = int(user["sub"])
     await check_daily_limit(user_id)
 
+    if not re.match(r'^[0-9a-fA-F]{6}$', theme):
+        theme = "4e9b86"
+
     if mode not in VALID_MODES:
         raise HTTPException(status_code=400, detail=f"无效模式: {mode}")
 
@@ -145,7 +150,7 @@ async def api_upload(
         quiz_bank_resolved = QUIZ_BANK_DIR.resolve()
         for topic_path in selected:
             csv_path = (QUIZ_BANK_DIR / topic_path).resolve()
-            if not str(csv_path).startswith(str(quiz_bank_resolved) + "/"):
+            if not csv_path.is_relative_to(quiz_bank_resolved):
                 raise HTTPException(
                     status_code=400,
                     detail=f"非法的题库路径: {topic_path}",
@@ -214,6 +219,161 @@ async def api_upload(
     return {"task_id": task_id, "text_length": len(text)}
 
 
+# ----------------------------------------------------------
+# 内容构建器（按 task_mode 分派）
+# ----------------------------------------------------------
+
+async def _build_music_history_content(
+    text: Optional[str],
+    task_id: int,
+    gen_params: Optional[dict],
+    task_model: str,
+    task_mode: str,
+    result_holder: list[str],
+) -> AsyncGenerator[str, None]:
+    """构建音乐史模式的 SSE 流。
+
+    解析 CSV 题库，随机选题并打乱选项，生成 Markdown 格式的试题。
+    完成后将 full_md 写入 result_holder[0]。
+
+    Args:
+        text: 原始 CSV 文本
+        task_id: 任务 ID
+        gen_params: 生成参数
+        task_model: AI 模型 key（本模式未使用，保持签名一致）
+        task_mode: 任务模式（本模式未使用，保持签名一致）
+        result_holder: 可变列表，函数结束时 result_holder[0] 存放最终 Markdown
+
+    Yields:
+        SSE 格式的字符串
+    """
+    from app.modes.music_history import (
+        parse_csv_questions, select_questions, shuffle_options,
+        format_questions_markdown, format_questions_latex_csv,
+    )
+
+    yield sse({"type": "chunk", "text": "正在解析 CSV 题库...\n"})
+
+    params = gen_params or {}
+    questions = parse_csv_questions(text)
+    count = params.get("question_count", 0)
+    do_shuffle = params.get("shuffle", True)
+    points = params.get("points_per_question", 2)
+    title = params.get("title", "音乐史选择题")
+
+    selected = select_questions(questions, count)
+
+    latex_csv = format_questions_latex_csv(selected)
+    quiz_csv_path = UPLOAD_DIR / f"{task_id}_quiz.csv"
+    quiz_csv_path.write_text(latex_csv, encoding="utf-8")
+
+    if do_shuffle:
+        selected = [shuffle_options(q) for q in selected]
+    full_md = format_questions_markdown(selected, points, title)
+
+    yield sse({"type": "chunk", "text": full_md})
+    result_holder.append(full_md)
+
+
+async def _build_music_theory_content(
+    text: Optional[str],
+    task_id: int,
+    gen_params: Optional[dict],
+    task_model: str,
+    task_mode: str,
+    result_holder: list[str],
+) -> AsyncGenerator[str, None]:
+    """构建乐理模式的 SSE 流。
+
+    根据 build_user_content 的返回值，分三种子情况处理：
+    - __PRECOMPUTED__：预计算结果直接输出
+    - __MIXED__：部分预计算 + 部分 AI 流式生成
+    - 其他：完全 AI 流式生成
+
+    完成后将 full_md 写入 result_holder[0]。
+
+    Args:
+        text: 原始文本（可选）
+        task_id: 任务 ID（本模式未使用，保持签名一致）
+        gen_params: 生成参数
+        task_model: AI 模型 key
+        task_mode: 任务模式
+        result_holder: 可变列表，函数结束时 result_holder[0] 存放最终 Markdown
+
+    Yields:
+        SSE 格式的字符串
+    """
+    from app.modes.music_theory import build_user_content as _build_mt
+
+    collected: list[str] = []
+    user_content = _build_mt(gen_params or {}, text)
+
+    if user_content.startswith("__PRECOMPUTED__"):
+        full_md = user_content[len("__PRECOMPUTED__\n"):]
+        yield sse({"type": "chunk", "text": full_md})
+    elif user_content.startswith("__MIXED__"):
+        payload = json.loads(user_content[len("__MIXED__\n"):])
+        computed_md = payload["computed_md"]
+        ai_prompt = payload["ai_prompt"]
+
+        collected.append(computed_md + "\n\n")
+        yield sse({"type": "chunk", "text": computed_md + "\n\n"})
+
+        async for chunk in stream_ai_chunks(
+            text, task_mode, gen_params, task_model,
+            override_user_content=ai_prompt,
+        ):
+            collected.append(chunk)
+            yield sse({"type": "chunk", "text": chunk})
+        full_md = clean_markdown("".join(collected))
+    else:
+        async for chunk in stream_ai_chunks(text, task_mode, gen_params, task_model):
+            collected.append(chunk)
+            yield sse({"type": "chunk", "text": chunk})
+        full_md = clean_markdown("".join(collected))
+
+    result_holder.append(full_md)
+
+
+async def _build_default_content(
+    text: Optional[str],
+    task_id: int,
+    gen_params: Optional[dict],
+    task_model: str,
+    task_mode: str,
+    result_holder: list[str],
+) -> AsyncGenerator[str, None]:
+    """构建默认模式（排版/通用出题）的 SSE 流。
+
+    直接调用 AI 流式生成 Markdown 内容。
+    完成后将 full_md 写入 result_holder[0]。
+
+    Args:
+        text: 原始文本
+        task_id: 任务 ID（本模式未使用，保持签名一致）
+        gen_params: 生成参数
+        task_model: AI 模型 key
+        task_mode: 任务模式
+        result_holder: 可变列表，函数结束时 result_holder[0] 存放最终 Markdown
+
+    Yields:
+        SSE 格式的字符串
+    """
+    collected: list[str] = []
+    async for chunk in stream_ai_chunks(text, task_mode, gen_params, task_model):
+        collected.append(chunk)
+        yield sse({"type": "chunk", "text": chunk})
+    full_md = clean_markdown("".join(collected))
+    result_holder.append(full_md)
+
+
+# 内容构建器调度表
+_CONTENT_BUILDERS = {
+    TaskMode.MUSIC_HISTORY: _build_music_history_content,
+    TaskMode.MUSIC_THEORY: _build_music_theory_content,
+}
+
+
 @router.get("/api/tasks/{task_id}/parse")
 async def api_parse_stream(task_id: int, user: dict = Depends(get_current_user)):
     """SSE 流式 AI 解析，支持三种模式。"""
@@ -246,65 +406,14 @@ async def api_parse_stream(task_id: int, user: dict = Depends(get_current_user))
         raise HTTPException(status_code=404, detail="原始文本不存在，请重新上传")
 
     async def generate():
-        collected: list[str] = []
         try:
-            if task_mode == TaskMode.MUSIC_HISTORY:
-                from app.modes.music_history import (
-                    parse_csv_questions, select_questions, shuffle_options,
-                    format_questions_markdown, format_questions_latex_csv,
-                )
-                yield sse({"type": "chunk", "text": "正在解析 CSV 题库...\n"})
-
-                params = gen_params or {}
-                questions = parse_csv_questions(text)
-                count = params.get("question_count", 0)
-                do_shuffle = params.get("shuffle", True)
-                points = params.get("points_per_question", 2)
-                title = params.get("title", "音乐史选择题")
-
-                selected = select_questions(questions, count)
-
-                latex_csv = format_questions_latex_csv(selected)
-                quiz_csv_path = UPLOAD_DIR / f"{task_id}_quiz.csv"
-                quiz_csv_path.write_text(latex_csv, encoding="utf-8")
-
-                if do_shuffle:
-                    selected = [shuffle_options(q) for q in selected]
-                full_md = format_questions_markdown(selected, points, title)
-
-                yield sse({"type": "chunk", "text": full_md})
-            elif task_mode == TaskMode.MUSIC_THEORY:
-                from app.modes.music_theory import build_user_content as _build_mt
-                user_content = _build_mt(gen_params or {}, text)
-
-                if user_content.startswith("__PRECOMPUTED__"):
-                    full_md = user_content[len("__PRECOMPUTED__\n"):]
-                    yield sse({"type": "chunk", "text": full_md})
-                elif user_content.startswith("__MIXED__"):
-                    payload = json.loads(user_content[len("__MIXED__\n"):])
-                    computed_md = payload["computed_md"]
-                    ai_prompt = payload["ai_prompt"]
-
-                    collected.append(computed_md + "\n\n")
-                    yield sse({"type": "chunk", "text": computed_md + "\n\n"})
-
-                    async for chunk in stream_ai_chunks(
-                        text, task_mode, gen_params, task_model,
-                        override_user_content=ai_prompt,
-                    ):
-                        collected.append(chunk)
-                        yield sse({"type": "chunk", "text": chunk})
-                    full_md = clean_markdown("".join(collected))
-                else:
-                    async for chunk in stream_ai_chunks(text, task_mode, gen_params, task_model):
-                        collected.append(chunk)
-                        yield sse({"type": "chunk", "text": chunk})
-                    full_md = clean_markdown("".join(collected))
-            else:
-                async for chunk in stream_ai_chunks(text, task_mode, gen_params, task_model):
-                    collected.append(chunk)
-                    yield sse({"type": "chunk", "text": chunk})
-                full_md = clean_markdown("".join(collected))
+            builder = _CONTENT_BUILDERS.get(task_mode, _build_default_content)
+            result_holder: list[str] = []
+            async for event in builder(
+                text, task_id, gen_params, task_model, task_mode, result_holder,
+            ):
+                yield event
+            full_md = result_holder[0] if result_holder else ""
 
             async with db_session() as db2:
                 await db2.execute(
@@ -367,6 +476,8 @@ async def api_generate_pdf(
     title = task["title"]
     school = task["school"] or ""
     theme = task["theme"] or "4e9b86"
+    if not re.match(r'^[0-9a-fA-F]{6}$', theme):
+        theme = "4e9b86"
     task_mode = task["mode"] or TaskMode.FORMAT
 
     gen_params = None
@@ -399,10 +510,14 @@ async def api_generate_pdf(
             else:
                 from app.pdf_generator import _compile_single
                 yield sse({"type": "progress", "pct": 15, "msg": "正在并行生成试题卷和答案卷..."})
-                await asyncio.gather(
+                results = await asyncio.gather(
                     _compile_single(task_id, markdown, title, school, theme, False, "exam", task_mode, music_font),
                     _compile_single(task_id, markdown, title, school, theme, True, "answer", task_mode, music_font),
+                    return_exceptions=True,
                 )
+                errors = [r for r in results if isinstance(r, Exception)]
+                if errors:
+                    raise errors[0]
 
             async with db_session() as db3:
                 await db3.execute(
@@ -442,7 +557,7 @@ async def api_tasks(
 ):
     """获取当前用户的任务历史列表。"""
     user_id = int(user["sub"])
-    limit = 20
+    limit = DEFAULT_PAGE_SIZE
     offset = (page - 1) * limit
 
     async with db_session() as db:

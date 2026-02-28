@@ -1,16 +1,29 @@
 """认证路由 + 用户依赖。"""
 
 from fastapi import APIRouter, Form, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.auth import (
     generate_code, send_verify_code, save_code, check_code,
     get_or_create_user, create_token, verify_token, login_by_password,
 )
-from app.config import UserStatus
+from app.config import UserStatus, COOKIE_MAX_AGE
 from app.database import db_session
 
 router = APIRouter(tags=["auth"])
+
+
+def _set_auth_cookie(response: Response, token: str) -> None:
+    """设置认证 Cookie。
+
+    Args:
+        response: FastAPI 响应对象
+        token: JWT token 字符串
+    """
+    response.set_cookie(
+        key="token", value=token, httponly=True,
+        secure=True, max_age=COOKIE_MAX_AGE, samesite="lax",
+    )
 
 
 async def get_current_user(request: Request) -> dict:
@@ -58,7 +71,7 @@ async def api_login(email: str = Form(...), code: str = Form(...)):
     user = await get_or_create_user(email)
     token = create_token(user["id"], email)
     response = JSONResponse({"message": "登录成功", "email": email, "nickname": user["nickname"]})
-    response.set_cookie(key="token", value=token, httponly=True, secure=True, max_age=86400, samesite="lax")
+    _set_auth_cookie(response, token)
     return response
 
 
@@ -70,7 +83,7 @@ async def api_login_password(nickname: str = Form(...), password: str = Form(...
         raise HTTPException(status_code=400, detail="用户名或密码错误")
     token = create_token(user["id"], user["email"])
     response = JSONResponse({"message": "登录成功", "email": user["email"], "nickname": user["nickname"]})
-    response.set_cookie(key="token", value=token, httponly=True, secure=True, max_age=86400, samesite="lax")
+    _set_auth_cookie(response, token)
     return response
 
 

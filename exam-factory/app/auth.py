@@ -1,6 +1,7 @@
 """认证模块 - 邮箱验证码登录 + 用户名密码登录。"""
 
 import hashlib
+import logging
 import os
 import random
 import string
@@ -16,6 +17,10 @@ from app.config import (
     SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS,
 )
 from app.database import db_session
+
+logger = logging.getLogger(__name__)
+
+PBKDF2_ITERATIONS = 100_000
 
 
 def generate_code() -> str:
@@ -88,7 +93,7 @@ async def send_verify_code(email: str, code: str) -> bool:
         )
         return True
     except Exception as e:
-        print(f"邮件发送失败: {e}")
+        logger.error("邮件发送失败: %s", e)
         return False
 
 
@@ -134,7 +139,7 @@ def hash_password(password: str) -> str:
         salt:hash 格式的哈希字符串
     """
     salt = os.urandom(16).hex()
-    h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000).hex()
+    h = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), PBKDF2_ITERATIONS).hex()
     return f"{salt}:{h}"
 
 
@@ -150,7 +155,7 @@ def verify_password(password: str, password_hash: str) -> bool:
     """
     try:
         salt, h = password_hash.split(":", 1)
-        return hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100000).hex() == h
+        return hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), PBKDF2_ITERATIONS).hex() == h
     except Exception:
         return False
 

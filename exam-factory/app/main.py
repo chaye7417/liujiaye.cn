@@ -8,7 +8,7 @@ import time
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.config import BASE_DIR, UPLOAD_DIR, OUTPUT_DIR
+from app.config import BASE_DIR, UPLOAD_DIR, OUTPUT_DIR, DATA_RETENTION_DAYS, CLEANUP_INTERVAL_HOURS
 from app.database import init_db
 from app.routers.auth import router as auth_router
 from app.routers.tasks import router as tasks_router
@@ -18,9 +18,6 @@ from app.profile.router import router as profile_router
 from app.admin.router import router as admin_router
 
 logger = logging.getLogger(__name__)
-
-DATA_RETENTION_DAYS = 3
-CLEANUP_INTERVAL_HOURS = 1
 
 app = FastAPI(title="试卷工厂", version="2.0.0")
 

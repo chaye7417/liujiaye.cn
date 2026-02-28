@@ -1,7 +1,10 @@
 """应用配置模块。"""
 
+import logging
 import os
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # 项目根目录
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -60,6 +63,9 @@ JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 24
 
+if JWT_SECRET == "change-me-in-production":
+    logger.warning("JWT_SECRET 使用默认值，请在生产环境中设置 JWT_SECRET 环境变量")
+
 # 数据库
 DATABASE_URL = str(DATA_DIR / "exam_factory.db")
 
@@ -74,6 +80,16 @@ QUIZ_BANK_DIR = BASE_DIR / "app" / "modes" / "music_history" / "quiz_bank"
 LATEX_TEMPLATE_DIR = BASE_DIR / "latex_templates"
 MD2LATEX_SCRIPT = BASE_DIR / "scripts" / "md2latex.py"
 FONT_SETTINGS_ILY = LATEX_TEMPLATE_DIR / "font-settings.ily"
+
+# 数据保留
+DATA_RETENTION_DAYS: int = int(os.getenv("DATA_RETENTION_DAYS", "3"))
+CLEANUP_INTERVAL_HOURS: int = int(os.getenv("CLEANUP_INTERVAL_HOURS", "1"))
+
+# Cookie
+COOKIE_MAX_AGE: int = JWT_EXPIRE_HOURS * 3600
+
+# 分页
+DEFAULT_PAGE_SIZE: int = 20
 
 # 管理员配置
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")

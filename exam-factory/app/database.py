@@ -114,4 +114,18 @@ async def init_db() -> None:
         if "password_hash" not in user_columns:
             await db.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
 
+        # 创建索引以加速常用查询
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tasks_user_created "
+            "ON tasks(user_id, created_at DESC)"
+        )
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tasks_user_id "
+            "ON tasks(user_id)"
+        )
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_tasks_created_at "
+            "ON tasks(created_at)"
+        )
+
         await db.commit()

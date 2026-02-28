@@ -118,6 +118,18 @@ _LATEX_ERROR_PATTERNS: list[tuple[str, str]] = [
 ]
 
 
+def _sanitize_error_msg(msg: str) -> str:
+    """过滤错误消息中的系统路径信息，防止信息泄露。
+
+    Args:
+        msg: 原始错误消息
+
+    Returns:
+        过滤掉敏感路径后的消息
+    """
+    return re.sub(r'/[^\s:]+/', '.../', msg)
+
+
 def _parse_latex_error(log_content: str) -> str:
     """解析 LaTeX 编译日志，返回中文友好错误提示。
 
@@ -258,7 +270,7 @@ async def _compile_with_lilypond(
     stdout, stderr = await proc.communicate()
     if proc.returncode != 0:
         error_msg = stderr.decode(errors="replace")
-        raise RuntimeError(f"lilypond-book 失败:\n{error_msg[-2000:]}")
+        raise RuntimeError(f"lilypond-book 失败:\n{_sanitize_error_msg(error_msg[-2000:])}")
 
     # 复制所有需要的资源到 lilypond-out 目录
     for f in work_dir.iterdir():
@@ -286,7 +298,7 @@ async def _compile_with_lilypond(
     if not out_pdf.exists():
         log_content = stdout.decode(errors="replace")
         hint = _parse_latex_error(log_content)
-        raise RuntimeError(f"XeLaTeX 编译失败（LilyPond 模式）- {hint}\n{log_content[-2000:]}")
+        raise RuntimeError(f"XeLaTeX 编译失败（LilyPond 模式）- {hint}\n{_sanitize_error_msg(log_content[-2000:])}")
 
     # 复制 PDF 回工作目录
     final_pdf = work_dir / "main.pdf"
@@ -409,7 +421,7 @@ async def _compile_mh_exam(
     if not pdf_path.exists():
         log_content = stdout.decode(errors="replace")
         hint = _parse_latex_error(log_content)
-        raise RuntimeError(f"试题卷编译失败 - {hint}\n{log_content[-2000:]}")
+        raise RuntimeError(f"试题卷编译失败 - {hint}\n{_sanitize_error_msg(log_content[-2000:])}")
 
     # 重命名为 main.pdf（下载端点期望的文件名）
     final_pdf = work_dir / "main.pdf"
@@ -487,7 +499,7 @@ async def _compile_mh_answer(
     if not pdf_path.exists():
         log_content = stdout.decode(errors="replace")
         hint = _parse_latex_error(log_content)
-        raise RuntimeError(f"答案卷编译失败 - {hint}\n{log_content[-2000:]}")
+        raise RuntimeError(f"答案卷编译失败 - {hint}\n{_sanitize_error_msg(log_content[-2000:])}")
 
     final_pdf = work_dir / "main.pdf"
     shutil.copy2(pdf_path, final_pdf)
@@ -660,7 +672,7 @@ async def _run_jianpu_ly(jianpu_text: str, name: str, work_dir: Path) -> str:
             return stdout
 
     raise RuntimeError(
-        f"jianpu-ly 转换失败（已尝试自动修复）:\n{stderr[-1000:]}"
+        f"jianpu-ly 转换失败（已尝试自动修复）:\n{_sanitize_error_msg(stderr[-1000:])}"
     )
 
 
@@ -748,7 +760,7 @@ async def _compile_single(
     )
     stdout, stderr = await proc.communicate()
     if proc.returncode != 0:
-        raise RuntimeError(f"MD->LaTeX 转换失败: {stderr.decode()}")
+        raise RuntimeError(f"MD->LaTeX 转换失败: {_sanitize_error_msg(stderr.decode())}")
 
     # 检测是否需要 LilyPond 编译
     # 读取生成的 exam.tex 检查是否包含 lilypond 环境
@@ -804,7 +816,7 @@ async def _compile_single(
         if not pdf_path.exists():
             log_content = stdout.decode(errors="replace")
             hint = _parse_latex_error(log_content)
-            raise RuntimeError(f"XeLaTeX 编译失败 - {hint}\n{log_content[-2000:]}")
+            raise RuntimeError(f"XeLaTeX 编译失败 - {hint}\n{_sanitize_error_msg(log_content[-2000:])}")
 
         return pdf_path
 
