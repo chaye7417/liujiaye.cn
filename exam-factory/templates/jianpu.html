@@ -668,26 +668,14 @@
             return;
         }
 
+        // Sparks NMN 从 localStorage key "sparks-nmn-demo-src" 读取内容
+        localStorage.setItem('sparks-nmn-demo-src', spnmnText);
+
+        // 刷新 iframe 让编辑器重新从 localStorage 加载
         const iframe = document.getElementById('sparks-preview');
+        iframe.src = '/static/sparks-nmn/index.html';
 
-        // 方法 1：通过 postMessage 传递内容
-        try {
-            iframe.contentWindow.postMessage({
-                type: 'load-content',
-                content: spnmnText
-            }, '*');
-        } catch (e) {
-            // postMessage 可能不被 Sparks NMN 支持
-        }
-
-        // 方法 2：通过 localStorage 传递
-        try {
-            localStorage.setItem('sparks-nmn-content', spnmnText);
-        } catch (e) {
-            // localStorage 不可用
-        }
-
-        showToast('已发送到预览（如未生效，请手动粘贴到 Sparks NMN 编辑器）');
+        showToast('已加载到预览');
     }
 
     /* ===== 在 Sparks NMN 中打开 ===== */
@@ -698,12 +686,7 @@
             return;
         }
 
-        // 存入 localStorage 后打开新窗口
-        try {
-            localStorage.setItem('sparks-nmn-content', spnmnText);
-        } catch (e) {
-            // ignored
-        }
+        localStorage.setItem('sparks-nmn-demo-src', spnmnText);
         window.open('/static/sparks-nmn/index.html', '_blank');
     }
 
