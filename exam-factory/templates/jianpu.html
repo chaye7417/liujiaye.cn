@@ -1,55 +1,41 @@
 {% extends "base.html" %}
-{% block title %}MusicXML 转简谱 - Sparks NMN{% endblock %}
+{% block title %}MusicXML 转 Sparks NMN{% endblock %}
 
 {% block head %}
 <style>
-    /* 页面整体布局 */
-    .jianpu-layout {
-        display: flex;
-        height: calc(100vh - 56px);
-        overflow: hidden;
+    .simple-wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 24px 16px 32px;
     }
 
-    /* 左栏 */
-    .jianpu-left {
-        width: 40%;
-        min-width: 360px;
-        display: flex;
-        flex-direction: column;
-        border-right: 1px solid var(--border);
+    .simple-card {
         background: var(--card-bg);
-        overflow-y: auto;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px;
     }
 
-    .jianpu-left-inner {
-        padding: 24px;
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-    }
-
-    .section-title {
-        font-size: 15px;
-        font-weight: 600;
+    .page-title {
+        margin: 0 0 6px;
+        font-size: 20px;
+        font-weight: 700;
         color: var(--text);
-        margin-bottom: 12px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
     }
 
-    .section-title .icon {
-        font-size: 18px;
+    .page-desc {
+        margin: 0 0 16px;
+        color: var(--text-muted);
+        font-size: 14px;
     }
 
-    /* 上传区域 */
     .upload-area {
         border: 2px dashed var(--border);
-        border-radius: var(--radius);
-        padding: 36px 24px;
+        border-radius: 10px;
+        padding: 30px 20px;
         text-align: center;
         cursor: pointer;
-        transition: all 0.2s;
+        transition: all 0.18s ease;
     }
 
     .upload-area:hover,
@@ -58,73 +44,33 @@
         background: var(--primary-light);
     }
 
-    .upload-area .icon {
-        font-size: 40px;
-        margin-bottom: 8px;
+    .upload-icon {
+        font-size: 38px;
+        margin-bottom: 6px;
     }
 
-    .upload-area .text {
+    .upload-main {
         font-size: 15px;
-        color: var(--text-muted);
+        color: var(--text);
     }
 
-    .upload-area .hint {
+    .upload-hint {
+        margin-top: 6px;
         font-size: 12px;
         color: var(--text-muted);
-        margin-top: 6px;
     }
 
-    .upload-area .filename {
-        font-size: 14px;
-        color: var(--primary);
-        font-weight: 500;
-        margin-top: 8px;
-        word-break: break-all;
-    }
-
-    /* 转换控制行 */
-    .convert-row {
-        display: flex;
-        gap: 12px;
-        align-items: flex-end;
-    }
-
-    .convert-row .form-group {
-        flex: 1;
-        margin-bottom: 0;
-    }
-
-    .convert-row .form-group select {
-        width: 100%;
-        padding: 9px 12px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        font-size: 14px;
-        background: white;
-    }
-
-    .convert-row .form-group select:focus {
-        outline: none;
-        border-color: var(--primary);
-        box-shadow: 0 0 0 3px var(--primary-light);
-    }
-
-    .convert-row .form-group label {
-        display: block;
+    .upload-file {
+        margin-top: 10px;
         font-size: 13px;
-        font-weight: 500;
-        margin-bottom: 4px;
-        color: var(--text-muted);
+        color: var(--primary);
+        word-break: break-all;
+        display: none;
     }
 
-    .btn-convert {
-        white-space: nowrap;
-        height: 38px;
-    }
-
-    /* 状态提示 */
-    .status-bar {
-        padding: 8px 12px;
+    .status {
+        margin-top: 12px;
+        padding: 9px 12px;
         border-radius: 8px;
         font-size: 13px;
         display: none;
@@ -132,104 +78,57 @@
         gap: 8px;
     }
 
-    .status-bar.show {
+    .status.show {
         display: flex;
     }
 
-    .status-bar.loading {
+    .status.loading {
         background: #fff8e1;
         color: #e6a700;
         border: 1px solid #ffe082;
     }
 
-    .status-bar.success {
+    .status.success {
         background: #d4edda;
         color: var(--success);
         border: 1px solid #c3e6cb;
     }
 
-    .status-bar.error {
+    .status.error {
         background: #fde8e8;
         color: var(--danger);
         border: 1px solid #f5c6cb;
     }
 
-    .status-spinner {
+    .spinner {
         width: 14px;
         height: 14px;
         border: 2px solid #ffe082;
         border-top-color: #e6a700;
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
+        display: none;
     }
 
-    /* 元数据区域 */
-    .metadata-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 8px;
-    }
-
-    .meta-item {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 10px;
-        background: var(--bg);
-        border-radius: 6px;
-        font-size: 13px;
-    }
-
-    .meta-item .meta-label {
-        color: var(--text-muted);
-        white-space: nowrap;
-    }
-
-    .meta-item .meta-value {
+    .editor-label {
+        margin: 16px 0 8px;
+        font-size: 14px;
+        font-weight: 600;
         color: var(--text);
-        font-weight: 500;
-    }
-
-    .warnings-list {
-        margin-top: 8px;
-    }
-
-    .warning-item {
-        display: flex;
-        align-items: flex-start;
-        gap: 6px;
-        padding: 4px 0;
-        font-size: 12px;
-        color: #e6a700;
-    }
-
-    .warning-item .warn-icon {
-        flex-shrink: 0;
-        margin-top: 1px;
-    }
-
-    /* 编辑器区域 */
-    .editor-section {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
     }
 
     .spnmn-editor {
-        flex: 1;
         width: 100%;
-        min-height: 200px;
+        min-height: 56vh;
         padding: 12px 14px;
         border: 1px solid var(--border);
         border-radius: 8px;
+        background: var(--bg);
+        color: var(--text);
         font-family: "SF Mono", "Fira Code", "Consolas", monospace;
         font-size: 13px;
-        line-height: 1.6;
+        line-height: 1.55;
         resize: vertical;
-        color: var(--text);
-        background: var(--bg);
-        transition: border-color 0.2s;
     }
 
     .spnmn-editor:focus {
@@ -238,30 +137,25 @@
         box-shadow: 0 0 0 3px var(--primary-light);
     }
 
-    .spnmn-editor::placeholder {
-        color: #bbb;
-    }
-
-    .editor-actions {
+    .actions {
+        margin-top: 12px;
         display: flex;
         gap: 8px;
-        margin-top: 12px;
         flex-wrap: wrap;
     }
 
-    .editor-actions .btn {
+    .actions .btn {
         font-size: 13px;
         padding: 7px 14px;
     }
 
-    /* 复制成功提示 */
     .toast {
         position: fixed;
         bottom: 24px;
         left: 50%;
         transform: translateX(-50%) translateY(20px);
         background: var(--text);
-        color: white;
+        color: #fff;
         padding: 10px 24px;
         border-radius: 8px;
         font-size: 14px;
@@ -276,106 +170,20 @@
         transform: translateX(-50%) translateY(0);
     }
 
-    /* 右栏 */
-    .jianpu-right {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        min-width: 0;
-        background: white;
-    }
-
-    .preview-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 10px 20px;
-        border-bottom: 1px solid var(--border);
-        background: var(--bg);
-    }
-
-    .preview-header .section-title {
-        margin-bottom: 0;
-    }
-
-    .preview-header .btn {
-        font-size: 12px;
-        padding: 5px 12px;
-    }
-
-    .sparks-iframe {
-        flex: 1;
-        width: 100%;
-        border: none;
-        background: white;
-    }
-
-    /* 分隔线拖拽手柄（视觉装饰） */
-    .jianpu-left::-webkit-scrollbar {
-        width: 6px;
-    }
-
-    .jianpu-left::-webkit-scrollbar-track {
-        background: transparent;
-    }
-
-    .jianpu-left::-webkit-scrollbar-thumb {
-        background: var(--border);
-        border-radius: 3px;
-    }
-
-    .jianpu-left::-webkit-scrollbar-thumb:hover {
-        background: var(--text-muted);
-    }
-
-    /* 响应式 */
-    @media (max-width: 900px) {
-        .jianpu-layout {
-            flex-direction: column;
-            height: auto;
-            overflow: auto;
-        }
-
-        .jianpu-left {
-            width: 100%;
-            min-width: 0;
-            border-right: none;
-            border-bottom: 1px solid var(--border);
-            overflow-y: visible;
-        }
-
-        .jianpu-right {
-            height: 70vh;
-        }
-
-        .metadata-grid {
-            grid-template-columns: 1fr 1fr;
-        }
-    }
-
     @media (max-width: 480px) {
-        .jianpu-left-inner {
-            padding: 16px;
+        .simple-wrap {
+            padding: 16px 10px 24px;
         }
 
-        .convert-row {
-            flex-direction: column;
-            align-items: stretch;
+        .simple-card {
+            padding: 14px;
         }
 
-        .btn-convert {
-            width: 100%;
-        }
-
-        .metadata-grid {
-            grid-template-columns: 1fr;
-        }
-
-        .editor-actions {
+        .actions {
             flex-direction: column;
         }
 
-        .editor-actions .btn {
+        .actions .btn {
             width: 100%;
         }
     }
@@ -383,340 +191,150 @@
 {% endblock %}
 
 {% block body %}
-<!-- 导航栏 -->
 <nav class="navbar">
-    <a href="/" class="logo">MusicXML 转简谱</a>
-    <div class="user-info">
-        <span>Sparks NMN 在线工具</span>
-    </div>
+    <a href="/" class="logo">MusicXML 转 Sparks NMN</a>
 </nav>
 
-<div class="jianpu-layout">
-    <!-- 左栏：上传 + 编辑器 -->
-    <div class="jianpu-left">
-        <div class="jianpu-left-inner">
+<div class="simple-wrap">
+    <div class="simple-card">
+        <h1 class="page-title">拖入 MusicXML，自动转换为 SPNMN</h1>
+        <p class="page-desc">只保留核心流程：上传文件后直接转换，不显示额外信息。</p>
 
-            <!-- 上传区域 -->
-            <div>
-                <div class="section-title">
-                    <span class="icon">&#x1F4C4;</span> 上传 MusicXML
-                </div>
-                <div class="upload-area" id="upload-area" onclick="document.getElementById('musicxml-file').click()">
-                    <div class="icon">&#x1F4E5;</div>
-                    <div class="text">点击选择或拖拽文件到此处</div>
-                    <div class="hint">支持 .musicxml / .xml / .mxl</div>
-                    <div class="filename" id="upload-filename" style="display:none"></div>
-                    <input type="file" id="musicxml-file" accept=".musicxml,.xml,.mxl" style="display:none" onchange="handleFileSelect(this)">
-                </div>
-            </div>
-
-            <!-- 转换控制 -->
-            <div class="convert-row">
-                <div class="form-group">
-                    <label for="part-select">声部选择</label>
-                    <select id="part-select">
-                        <option value="auto">自动</option>
-                    </select>
-                </div>
-                <button class="btn btn-primary btn-convert" id="btn-convert" onclick="handleConvert()" disabled>
-                    转换
-                </button>
-            </div>
-
-            <!-- 状态提示 -->
-            <div class="status-bar" id="status-bar">
-                <div class="status-spinner" id="status-spinner"></div>
-                <span id="status-text"></span>
-            </div>
-
-            <!-- 元数据 -->
-            <div id="metadata-section" style="display:none">
-                <div class="section-title">
-                    <span class="icon">&#x2139;&#xFE0F;</span> 乐谱信息
-                </div>
-                <div class="metadata-grid" id="metadata-grid"></div>
-                <div class="warnings-list" id="warnings-list"></div>
-            </div>
-
-            <!-- 编辑器 -->
-            <div class="editor-section">
-                <div class="section-title">
-                    <span class="icon">&#x270F;&#xFE0F;</span> SPNMN 文本
-                </div>
-                <textarea
-                    class="spnmn-editor"
-                    id="spnmn-editor"
-                    placeholder="转换后的 .spnmn 文本将显示在这里&#10;&#10;你也可以手动输入或粘贴 Sparks NMN 格式的内容..."
-                ></textarea>
-                <div class="editor-actions">
-                    <button class="btn btn-primary" onclick="refreshPreview()">
-                        &#x1F504; 刷新预览
-                    </button>
-                    <button class="btn btn-secondary" onclick="downloadSpnmn()">
-                        &#x1F4BE; 下载 .spnmn
-                    </button>
-                    <button class="btn btn-secondary" onclick="copyText()">
-                        &#x1F4CB; 复制文本
-                    </button>
-                    <button class="btn btn-secondary" onclick="openInSparks()">
-                        &#x1F517; 在 Sparks NMN 中打开
-                    </button>
-                </div>
-            </div>
-
+        <div class="upload-area" id="upload-area" onclick="document.getElementById('musicxml-file').click()">
+            <div class="upload-icon">&#x1F4E5;</div>
+            <div class="upload-main">点击选择或拖拽 MusicXML 文件到这里</div>
+            <div class="upload-hint">支持 .musicxml / .xml / .mxl</div>
+            <div class="upload-file" id="upload-file"></div>
+            <input type="file" id="musicxml-file" accept=".musicxml,.xml,.mxl" style="display:none">
         </div>
-    </div>
 
-    <!-- 右栏：Sparks NMN 预览 -->
-    <div class="jianpu-right">
-        <div class="preview-header">
-            <div class="section-title">
-                <span class="icon">&#x1F3B5;</span> Sparks NMN 预览
-            </div>
-            <button class="btn btn-secondary" onclick="reloadIframe()">
-                &#x21BB; 重新加载
-            </button>
+        <div class="status" id="status">
+            <div class="spinner" id="spinner"></div>
+            <span id="status-text"></span>
         </div>
-        <iframe
-            id="sparks-preview"
-            class="sparks-iframe"
-            src="/static/sparks-nmn/index.html"
-        ></iframe>
+
+        <div class="editor-label">SPNMN 文本</div>
+        <textarea id="spnmn-editor" class="spnmn-editor" placeholder="转换结果会显示在这里..."></textarea>
+
+        <div class="actions">
+            <button class="btn btn-secondary" onclick="copyText()">&#x1F4CB; 复制文本</button>
+            <button class="btn btn-secondary" onclick="downloadSpnmn()">&#x1F4BE; 下载 .spnmn</button>
+            <button class="btn btn-primary" onclick="openInSparks()">&#x1F517; 在 Sparks NMN 打开</button>
+        </div>
     </div>
 </div>
 
-<!-- Toast 提示 -->
 <div class="toast" id="toast"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    /* ===== 全局状态 ===== */
-    let currentTitle = '';
+    let currentTitle = "score";
     let currentFile = null;
 
-    /* ===== 文件上传 ===== */
     const uploadArea = document.getElementById('upload-area');
     const fileInput = document.getElementById('musicxml-file');
 
-    // 拖拽事件
-    uploadArea.addEventListener('dragover', function(e) {
+    fileInput.addEventListener('change', function () {
+        if (fileInput.files && fileInput.files[0]) {
+            selectFile(fileInput.files[0]);
+        }
+    });
+
+    uploadArea.addEventListener('dragover', function (e) {
         e.preventDefault();
         uploadArea.classList.add('dragover');
     });
 
-    uploadArea.addEventListener('dragleave', function(e) {
+    uploadArea.addEventListener('dragleave', function (e) {
         e.preventDefault();
         uploadArea.classList.remove('dragover');
     });
 
-    uploadArea.addEventListener('drop', function(e) {
+    uploadArea.addEventListener('drop', function (e) {
         e.preventDefault();
         uploadArea.classList.remove('dragover');
         const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            const file = files[0];
-            const ext = file.name.split('.').pop().toLowerCase();
-            if (['musicxml', 'xml', 'mxl'].includes(ext)) {
-                fileInput.files = e.dataTransfer.files;
-                handleFileSelect(fileInput);
-            } else {
-                showToast('请上传 .musicxml / .xml / .mxl 文件');
-            }
-        }
+        if (!files || !files.length) return;
+        selectFile(files[0]);
     });
 
-    function handleFileSelect(input) {
-        const file = input.files[0];
-        if (!file) return;
-
-        currentFile = file;
-        currentTitle = file.name.replace(/\.(musicxml|xml|mxl)$/i, '');
-
-        const filenameEl = document.getElementById('upload-filename');
-        filenameEl.textContent = file.name;
-        filenameEl.style.display = 'block';
-
-        document.getElementById('btn-convert').disabled = false;
+    function isXmlFile(name) {
+        const ext = name.split('.').pop().toLowerCase();
+        return ['musicxml', 'xml', 'mxl'].includes(ext);
     }
 
-    /* ===== 转换 ===== */
-    async function handleConvert() {
-        const file = currentFile;
-        if (!file) {
-            showToast('请先选择文件');
+    function selectFile(file) {
+        if (!isXmlFile(file.name)) {
+            showToast('请上传 .musicxml / .xml / .mxl 文件');
             return;
         }
 
-        const btn = document.getElementById('btn-convert');
-        btn.disabled = true;
-        btn.textContent = '转换中...';
+        currentFile = file;
+        currentTitle = file.name.replace(/\.(musicxml|xml|mxl)$/i, '') || 'score';
 
-        showStatus('loading', '正在转换，请稍候...');
+        const uploadFile = document.getElementById('upload-file');
+        uploadFile.textContent = file.name;
+        uploadFile.style.display = 'block';
 
+        convertFile(file);
+    }
+
+    async function convertFile(file) {
         const formData = new FormData();
         formData.append('file', file);
 
-        const partSelect = document.getElementById('part-select');
-        if (partSelect.value !== 'auto') {
-            formData.append('part_index', partSelect.value);
-        }
+        showStatus('loading', '正在转换，请稍候...');
 
         try {
             const resp = await fetch('/api/musicxml/convert', {
                 method: 'POST',
-                body: formData
+                body: formData,
             });
             const data = await resp.json();
 
-            if (resp.ok) {
-                document.getElementById('spnmn-editor').value = data.spnmn_text;
-                updateMetadata(data);
-                refreshPreview();
-                showStatus('success', '转换完成');
-            } else {
+            if (!resp.ok) {
                 showStatus('error', '转换失败: ' + (data.detail || data.message || '未知错误'));
+                return;
             }
+
+            document.getElementById('spnmn-editor').value = data.spnmn_text || '';
+            showStatus('success', '转换完成');
         } catch (err) {
             showStatus('error', '请求失败: ' + err.message);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = '转换';
         }
     }
 
-    /* ===== 状态显示 ===== */
     function showStatus(type, text) {
-        const bar = document.getElementById('status-bar');
-        const spinner = document.getElementById('status-spinner');
+        const bar = document.getElementById('status');
+        const spinner = document.getElementById('spinner');
         const textEl = document.getElementById('status-text');
 
-        bar.className = 'status-bar show ' + type;
+        bar.className = 'status show ' + type;
         textEl.textContent = text;
         spinner.style.display = type === 'loading' ? 'block' : 'none';
 
-        // 成功/错误提示自动消失
         if (type !== 'loading') {
-            setTimeout(function() {
+            setTimeout(function () {
                 bar.classList.remove('show');
-            }, 5000);
+            }, 4500);
         }
     }
 
-    /* ===== 元数据更新 ===== */
-    function updateMetadata(data) {
-        const section = document.getElementById('metadata-section');
-        const grid = document.getElementById('metadata-grid');
-        const warningsList = document.getElementById('warnings-list');
-
-        const items = [];
-
-        if (data.key_name) {
-            items.push({ label: '调号', value: data.key_name });
-        }
-        if (data.time_signature) {
-            items.push({ label: '拍号', value: data.time_signature });
-        }
-        if (data.total_measures !== undefined) {
-            items.push({ label: '小节数', value: data.total_measures });
-        }
-        if (data.part_name) {
-            items.push({ label: '声部', value: data.part_name });
-        }
-        if (data.num_parts > 1) {
-            // 更新声部选择下拉框
-            const partSelect = document.getElementById('part-select');
-            const currentVal = partSelect.value;
-            partSelect.innerHTML = '<option value="auto">自动</option>';
-            for (let i = 0; i < data.num_parts; i++) {
-                const opt = document.createElement('option');
-                opt.value = i;
-                opt.textContent = 'Part ' + (i + 1);
-                partSelect.appendChild(opt);
-            }
-            partSelect.value = currentVal;
-            items.push({ label: '总声部', value: data.num_parts });
-        }
-
-        if (items.length > 0) {
-            grid.innerHTML = items.map(function(item) {
-                return '<div class="meta-item">' +
-                    '<span class="meta-label">' + item.label + '</span>' +
-                    '<span class="meta-value">' + escapeHtml(String(item.value)) + '</span>' +
-                '</div>';
-            }).join('');
-            section.style.display = 'block';
-        }
-
-        // 警告
-        warningsList.innerHTML = '';
-        if (data.warnings && data.warnings.length > 0) {
-            warningsList.innerHTML = data.warnings.map(function(w) {
-                return '<div class="warning-item">' +
-                    '<span class="warn-icon">&#x26A0;</span>' +
-                    '<span>' + escapeHtml(w) + '</span>' +
-                '</div>';
-            }).join('');
-        }
-    }
-
-    /* ===== 预览刷新 ===== */
-    function refreshPreview() {
-        const spnmnText = document.getElementById('spnmn-editor').value;
-        if (!spnmnText.trim()) {
-            showToast('编辑器内容为空');
-            return;
-        }
-
-        // Sparks NMN 从 localStorage key "sparks-nmn-demo-src" 读取内容
-        localStorage.setItem('sparks-nmn-demo-src', spnmnText);
-
-        // 先清空 iframe，确保旧页面完全卸载，避免 localStorage 读取时序问题
-        const iframe = document.getElementById('sparks-preview');
-        iframe.src = 'about:blank';
-
-        // 等旧页面卸载完毕后，用带时间戳的 URL 重新加载（防止浏览器缓存）
-        setTimeout(function() {
-            iframe.onload = function() {
-                // iframe 加载完成后清除 onload，避免重复触发
-                iframe.onload = null;
-                showToast('预览已加载');
-            };
-            iframe.src = '/static/sparks-nmn/index.html?t=' + Date.now();
-        }, 100);
-    }
-
-    /* ===== 在 Sparks NMN 中打开 ===== */
     function openInSparks() {
         const spnmnText = document.getElementById('spnmn-editor').value;
         if (!spnmnText.trim()) {
-            showToast('编辑器内容为空');
+            showToast('没有可打开的内容');
             return;
         }
-
         localStorage.setItem('sparks-nmn-demo-src', spnmnText);
         window.open('/static/sparks-nmn/index.html?t=' + Date.now(), '_blank');
     }
 
-    /* ===== 重新加载 iframe ===== */
-    function reloadIframe() {
-        const iframe = document.getElementById('sparks-preview');
-        // 先清空再加载，用时间戳避免缓存
-        iframe.src = 'about:blank';
-        setTimeout(function() {
-            iframe.onload = function() {
-                iframe.onload = null;
-                showToast('预览已重新加载');
-            };
-            iframe.src = '/static/sparks-nmn/index.html?t=' + Date.now();
-        }, 100);
-    }
-
-    /* ===== 下载 .spnmn ===== */
     function downloadSpnmn() {
         const text = document.getElementById('spnmn-editor').value;
         if (!text.trim()) {
-            showToast('编辑器内容为空');
+            showToast('没有可下载的内容');
             return;
         }
 
@@ -729,22 +347,19 @@
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-
-        showToast('文件已下载');
     }
 
-    /* ===== 复制文本 ===== */
     function copyText() {
         const text = document.getElementById('spnmn-editor').value;
         if (!text.trim()) {
-            showToast('编辑器内容为空');
+            showToast('没有可复制的内容');
             return;
         }
 
         if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(function() {
+            navigator.clipboard.writeText(text).then(function () {
                 showToast('已复制到剪贴板');
-            }).catch(function() {
+            }).catch(function () {
                 fallbackCopy(text);
             });
         } else {
@@ -754,26 +369,19 @@
 
     function fallbackCopy(text) {
         const editor = document.getElementById('spnmn-editor');
+        editor.focus();
         editor.select();
         document.execCommand('copy');
         showToast('已复制到剪贴板');
     }
 
-    /* ===== Toast 提示 ===== */
     function showToast(msg) {
         const toast = document.getElementById('toast');
         toast.textContent = msg;
         toast.classList.add('show');
-        setTimeout(function() {
+        setTimeout(function () {
             toast.classList.remove('show');
         }, 2500);
-    }
-
-    /* ===== HTML 转义 ===== */
-    function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.appendChild(document.createTextNode(str));
-        return div.innerHTML;
     }
 </script>
 {% endblock %}
