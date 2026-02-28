@@ -2,12 +2,19 @@
 
 解析 MusicXML 文件，提取单声部旋律信息，
 转换为 jianpu-ly 格式文本供后续渲染。
+
+支持：音符、休止符、附点、连音线、三连音、调号、拍号、
+      弱起小节、高低音谱号。
 """
 
+from fractions import Fraction
 from pathlib import Path
 
 import music21
-from music21 import clef as m21clef, converter, key, meter, note, stream
+from music21 import (
+    clef as m21clef, converter, duration, key,
+    meter, note, stream, tie,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -47,25 +54,18 @@ def _pitch_to_jianpu_degree(
 ) -> tuple[int, str]:
     """将 music21 Pitch 转换为简谱音级和变化记号。
 
-    Args:
-        pitch_obj: music21 音高对象
-        scale_pcs: 当前调式的 7 个 pitch class
-
     Returns:
         (degree 1-7, accidental "" / "#" / "b")
     """
     pc = pitch_obj.pitchClass
     if pc in scale_pcs:
         return scale_pcs.index(pc) + 1, ""
-    # 半音上方
     lower_pc = (pc - 1) % 12
     if lower_pc in scale_pcs:
         return scale_pcs.index(lower_pc) + 1, "#"
-    # 半音下方
     upper_pc = (pc + 1) % 12
     if upper_pc in scale_pcs:
         return scale_pcs.index(upper_pc) + 1, "b"
-    # 兜底：最近的音阶音
     for offset in range(2, 4):
         for direction in (-1, 1):
             test_pc = (pc + direction * offset) % 12
@@ -76,15 +76,7 @@ def _pitch_to_jianpu_degree(
 
 
 def _octave_mark(pitch_obj: music21.pitch.Pitch, tonic_octave: int) -> str:
-    """计算八度标记。
-
-    Args:
-        pitch_obj: 音高
-        tonic_octave: 主音的中心八度
-
-    Returns:
-        "" / "'" / "''" / "," / ",,"
-    """
+    """计算八度标记（高点/低点）。"""
     note_oct = pitch_obj.octave or 4
     diff = note_oct - tonic_octave
     if diff > 0:
@@ -94,53 +86,249 @@ def _octave_mark(pitch_obj: music21.pitch.Pitch, tonic_octave: int) -> str:
     return ""
 
 
-def _dur_to_jianpu(ql: float) -> tuple[str, str]:
-    """quarterLength → (prefix, suffix) for jianpu-ly.
+# ---------------------------------------------------------------------------
+# 时值转换 — 使用 Fraction 精确匹配，支持三连音
+# ---------------------------------------------------------------------------
+# (quarterLength as Fraction, prefix, suffix)
+_DURATION_MAP: list[tuple[Fraction, str, str]] = [
+    (Fraction(1, 4), "s", ""),       # 十六分
+    (Fraction(3, 8), "s", "."),      # 附点十六分
+    (Fraction(1, 2), "q", ""),       # 八分
+    (Fraction(3, 4), "q", "."),      # 附点八分
+    (Fraction(1, 1), "",  ""),       # 四分
+    (Fraction(3, 2), "",  "."),      # 附点四分
+    (Fraction(2, 1), "",  " -"),     # 二分
+    (Fraction(3, 1), "",  " - ."),   # 附点二分
+    (Fraction(4, 1), "",  " - - -"), # 全音符
+]
 
-    Returns:
-        (prefix, suffix) 其中 prefix 为 "s"/"q"/"", suffix 为 ""/"."/" -" 等
+
+def _dur_to_jianpu(ql: float) -> tuple[str, str]:
+    """quarterLength → (prefix, suffix) for jianpu-ly。
+
+    使用 Fraction 精确比较，避免浮点误差。
     """
-    if abs(ql - 0.25) < 0.01:
-        return "s", ""
-    if abs(ql - 0.5) < 0.01:
-        return "q", ""
-    if abs(ql - 0.75) < 0.01:
-        return "q", "."
-    if abs(ql - 1.0) < 0.01:
-        return "", ""
-    if abs(ql - 1.5) < 0.01:
-        return "", "."
-    if abs(ql - 2.0) < 0.01:
-        return "", " -"
-    if abs(ql - 3.0) < 0.01:
-        return "", " - ."
-    if abs(ql - 4.0) < 0.01:
-        return "", " - - -"
-    # 非标准时值：近似到最近的标准时值
-    standard = [0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, 4.0]
-    best = min(standard, key=lambda x: abs(x - ql))
-    return _dur_to_jianpu(best)
+    frac = Fraction(ql).limit_denominator(64)
+    for target, prefix, suffix in _DURATION_MAP:
+        if frac == target:
+            return prefix, suffix
+    # 非标准时值：取最近的
+    best = min(_DURATION_MAP, key=lambda t: abs(t[0] - frac))
+    return best[1], best[2]
 
 
 def _rest_to_jianpu(ql: float) -> str:
     """休止符的 jianpu-ly 表示。"""
-    if abs(ql - 0.25) < 0.01:
-        return "s0"
-    if abs(ql - 0.5) < 0.01:
-        return "q0"
-    if abs(ql - 0.75) < 0.01:
-        return "q0."
-    if abs(ql - 1.0) < 0.01:
-        return "0"
-    if abs(ql - 1.5) < 0.01:
-        return "0."
-    if abs(ql - 2.0) < 0.01:
-        return "0 -"
-    if abs(ql - 3.0) < 0.01:
-        return "0 - ."
-    if abs(ql - 4.0) < 0.01:
-        return "0 - - -"
-    return "0"
+    prefix, suffix = _dur_to_jianpu(ql)
+    return f"{prefix}0{suffix}"
+
+
+def _is_tuplet(el: music21.base.Music21Object) -> bool:
+    """检查元素是否属于连音组（三连音等）。"""
+    return bool(el.duration.tuplets)
+
+
+def _get_tuplet_ratio(el: music21.base.Music21Object) -> tuple[int, int]:
+    """获取连音比例，如三连音返回 (3, 2)。"""
+    if el.duration.tuplets:
+        t = el.duration.tuplets[0]
+        return t.numberNotesActual, t.numberNotesNormal
+    return 1, 1
+
+
+def _note_to_token(
+    el: note.Note,
+    scale_pcs: list[int],
+    tonic_octave: int,
+    in_tuplet: bool,
+) -> str:
+    """将单个 Note 转换为 jianpu-ly token。"""
+    degree, acc = _pitch_to_jianpu_degree(el.pitch, scale_pcs)
+    oct = _octave_mark(el.pitch, tonic_octave)
+
+    if in_tuplet:
+        # 三连音内部：用 tuplet 的「写出时值」计算 prefix
+        actual, normal = _get_tuplet_ratio(el)
+        # 三连音八分：实际 ql=1/3，写出时值=1/2（八分），所以用 q
+        written_ql = float(el.quarterLength) * actual / normal
+        prefix, suffix = _dur_to_jianpu(written_ql)
+    else:
+        prefix, suffix = _dur_to_jianpu(el.quarterLength)
+
+    token = f"{prefix}{acc}{degree}{oct}{suffix}"
+
+    if el.tie and el.tie.type in ("start", "continue"):
+        token += " ~"
+
+    return token
+
+
+def _rest_token(el: note.Rest, in_tuplet: bool) -> str:
+    """将 Rest 转换为 jianpu-ly token。"""
+    if in_tuplet:
+        actual, normal = _get_tuplet_ratio(el)
+        written_ql = float(el.quarterLength) * actual / normal
+        prefix, suffix = _dur_to_jianpu(written_ql)
+        return f"{prefix}0{suffix}"
+    return _rest_to_jianpu(el.quarterLength)
+
+
+def _element_to_token(
+    el: music21.base.Music21Object,
+    scale_pcs: list[int],
+    tonic_octave: int,
+    in_tuplet: bool,
+    warnings: list[str],
+    chord_warned: list[bool],
+) -> str:
+    """将单个元素转换为 jianpu-ly token。"""
+    if isinstance(el, note.Rest):
+        return _rest_token(el, in_tuplet)
+    elif isinstance(el, note.Note):
+        return _note_to_token(el, scale_pcs, tonic_octave, in_tuplet)
+    elif hasattr(el, "pitches") and el.pitches:
+        top = el.pitches[-1]
+        degree, acc = _pitch_to_jianpu_degree(top, scale_pcs)
+        oct = _octave_mark(top, tonic_octave)
+        if in_tuplet:
+            actual, normal = _get_tuplet_ratio(el)
+            written_ql = float(el.quarterLength) * actual / normal
+            prefix, suffix = _dur_to_jianpu(written_ql)
+        else:
+            prefix, suffix = _dur_to_jianpu(el.quarterLength)
+        if not chord_warned[0]:
+            warnings.append("和弦已简化为最高音")
+            chord_warned[0] = True
+        return f"{prefix}{acc}{degree}{oct}{suffix}"
+    return ""
+
+
+def _deduplicate_by_offset(
+    elements: list[music21.base.Music21Object],
+) -> list[music21.base.Music21Object]:
+    """去除同一 offset 上的重复元素。
+
+    当音符和休止符重叠在同一时间位置时（常见于多声部 MusicXML），
+    优先保留音符，过滤掉多余的休止符。
+    """
+    from collections import defaultdict
+    by_offset: dict[float, list[music21.base.Music21Object]] = defaultdict(list)
+    for el in elements:
+        by_offset[float(el.offset)].append(el)
+
+    result: list[music21.base.Music21Object] = []
+    for offset_val in sorted(by_offset.keys()):
+        group = by_offset[offset_val]
+        if len(group) == 1:
+            result.append(group[0])
+        else:
+            # 同一 offset 有多个元素：优先保留音符
+            notes_at = [e for e in group if not isinstance(e, note.Rest)]
+            if notes_at:
+                result.extend(notes_at)
+            else:
+                result.append(group[0])
+    return result
+
+
+def _process_measure(
+    m: stream.Measure,
+    scale_pcs: list[int],
+    tonic_octave: int,
+    warnings: list[str],
+    chord_warned: list[bool],
+) -> list[str]:
+    """处理单小节，返回 jianpu-ly token 列表。
+
+    三连音分组策略：收集连续 tuplet 音符，按 numberNotesActual 个一组输出。
+    """
+    tokens: list[str] = []
+    # 如果有多个声部，只取第一个声部，避免混合多声部内容
+    voices = list(m.voices)
+    if voices:
+        raw = list(voices[0].flatten().notesAndRests)
+    else:
+        raw = list(m.flatten().notesAndRests)
+    # 去重：同一 offset 有音符和休止符重叠时，优先保留音符
+    elements = _deduplicate_by_offset(raw)
+    i = 0
+
+    while i < len(elements):
+        el = elements[i]
+
+        if _is_tuplet(el):
+            actual, normal = _get_tuplet_ratio(el)
+
+            # 收集所有连续的同 ratio tuplet 音符
+            all_tuplet: list[music21.base.Music21Object] = []
+            j = i
+            while j < len(elements) and _is_tuplet(elements[j]):
+                a2, n2 = _get_tuplet_ratio(elements[j])
+                if a2 != actual or n2 != normal:
+                    break
+                all_tuplet.append(elements[j])
+                j += 1
+
+            # 按 actual 个一组输出
+            for k in range(0, len(all_tuplet), actual):
+                group = all_tuplet[k:k + actual]
+                if len(group) == actual:
+                    # 完整的 tuplet 组
+                    inner = [
+                        _element_to_token(
+                            g, scale_pcs, tonic_octave, True,
+                            warnings, chord_warned,
+                        )
+                        for g in group
+                    ]
+                    tokens.append(f"{actual}[ {' '.join(inner)} ]")
+                else:
+                    # 不完整组（跨小节残余）：作为普通音符输出
+                    for g in group:
+                        token = _element_to_token(
+                            g, scale_pcs, tonic_octave, False,
+                            warnings, chord_warned,
+                        )
+                        if token:
+                            tokens.append(token)
+
+            i = j
+            continue
+
+        # 普通音符/休止符
+        token = _element_to_token(
+            el, scale_pcs, tonic_octave, False,
+            warnings, chord_warned,
+        )
+        if token:
+            tokens.append(token)
+        i += 1
+
+    return tokens
+
+
+def _pickup_rests(padding_ql: float) -> str:
+    """为弱起小节生成前置休止符。
+
+    将 paddingLeft 的时值拆成标准休止符组合。
+    """
+    if padding_ql <= 0:
+        return ""
+
+    rests: list[str] = []
+    remaining = Fraction(padding_ql).limit_denominator(64)
+    # 从大到小尝试标准时值
+    standard = [
+        Fraction(4), Fraction(3), Fraction(2), Fraction(3, 2),
+        Fraction(1), Fraction(3, 4), Fraction(1, 2),
+        Fraction(3, 8), Fraction(1, 4),
+    ]
+    for std in standard:
+        while remaining >= std:
+            rests.append(_rest_to_jianpu(float(std)))
+            remaining -= std
+
+    return " ".join(rests)
 
 
 def convert_musicxml_to_jianpu(
@@ -183,7 +371,9 @@ def convert_musicxml_to_jianpu(
         warnings.append("请求的声部不存在，已使用第 1 声部")
 
     if num_parts > 1:
-        warnings.append(f"文件包含 {num_parts} 个声部，当前仅转换第 {part_index + 1} 声部")
+        warnings.append(
+            f"文件包含 {num_parts} 个声部，当前仅转换第 {part_index + 1} 声部"
+        )
 
     part = score.parts[part_index]
     part_name = part.partName or f"声部 {part_index + 1}"
@@ -216,7 +406,7 @@ def convert_musicxml_to_jianpu(
         ts_str = "4/4"
         warnings.append("未检测到拍号，默认使用 4/4")
 
-    # 检测谱号，决定中心八度
+    # 检测谱号
     tonic_octave = 4
     clef_str = ""
     clefs = part.flatten().getElementsByClass(m21clef.Clef)
@@ -232,40 +422,25 @@ def convert_musicxml_to_jianpu(
         raise ValueError("文件中没有找到小节")
 
     bar_strings: list[str] = []
-    chord_warned = False
+    chord_warned: list[bool] = [False]
 
     for m in measures:
-        tokens: list[str] = []
+        tokens = _process_measure(
+            m, scale_pcs, tonic_octave, warnings, chord_warned,
+        )
 
-        for el in m.flatten().notesAndRests:
-            if isinstance(el, note.Rest):
-                tokens.append(_rest_to_jianpu(el.quarterLength))
+        if not tokens:
+            continue
 
-            elif isinstance(el, note.Note):
-                degree, acc = _pitch_to_jianpu_degree(el.pitch, scale_pcs)
-                oct = _octave_mark(el.pitch, tonic_octave)
-                prefix, suffix = _dur_to_jianpu(el.quarterLength)
+        bar_text = " ".join(tokens)
 
-                token = f"{prefix}{acc}{degree}{oct}{suffix}"
+        # 弱起小节：在前面补休止符
+        if m.paddingLeft > 0:
+            pickup = _pickup_rests(float(m.paddingLeft))
+            if pickup:
+                bar_text = f"{pickup} {bar_text}"
 
-                if el.tie and el.tie.type in ("start", "continue"):
-                    token += " ~"
-
-                tokens.append(token)
-
-            elif hasattr(el, "pitches") and el.pitches:
-                # Chord: 取最高音
-                top = el.pitches[-1]
-                degree, acc = _pitch_to_jianpu_degree(top, scale_pcs)
-                oct = _octave_mark(top, tonic_octave)
-                prefix, suffix = _dur_to_jianpu(el.quarterLength)
-                tokens.append(f"{prefix}{acc}{degree}{oct}{suffix}")
-                if not chord_warned:
-                    warnings.append("和弦已简化为最高音")
-                    chord_warned = True
-
-        if tokens:
-            bar_strings.append(" ".join(tokens))
+        bar_strings.append(bar_text)
 
     if not bar_strings:
         raise ValueError("未提取到任何音符")
