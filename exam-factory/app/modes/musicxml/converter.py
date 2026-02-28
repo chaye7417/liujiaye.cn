@@ -107,7 +107,7 @@ def convert_musicxml_to_spnmn(
     all_lyrics: List[Tuple[str, str]] = []
     for _, m_lyrics in measure_results:
         all_lyrics.extend(m_lyrics)
-    has_lyrics = any(t[0].strip() and t[0] != "_" for t in all_lyrics)
+    has_lyrics = any(t[0].strip() and t[0] != "%" for t in all_lyrics)
     is_cjk = _is_cjk_lyrics([t[0] for t in all_lyrics]) if has_lyrics else True
 
     # ---------- 按行分组（每行 4 小节） ----------
@@ -137,7 +137,7 @@ def convert_musicxml_to_spnmn(
             for _, m_lyrics in chunk:
                 line_lyrics.extend(m_lyrics)
 
-            if any(t[0].strip() and t[0] != "_" for t in line_lyrics):
+            if any(t[0].strip() and t[0] != "%" for t in line_lyrics):
                 if is_cjk:
                     lyric_text = "".join(t[0] for t in line_lyrics)
                     spnmn_lines.append(f"Lc: {lyric_text}")
@@ -196,10 +196,10 @@ def _convert_measure(
         return [], []
 
     num_beats = ts.numerator
-    # 每一拍存储该拍内的亚拍音符: (token, ql, lyric_tuple, is_tied)
-    beats: List[List[Tuple[str, float, Tuple[str, str], bool]]] = [
-        [] for _ in range(num_beats)
-    ]
+    # 每一拍存储该拍内的亚拍音符:
+    # (token, ql, lyric_tuple, is_tied, is_tie_rhs)
+    BeatEntry = Tuple[str, float, Tuple[str, str], bool, bool]
+    beats: List[List[BeatEntry]] = [[] for _ in range(num_beats)]
     # 标记哪些拍被前面的长音符占用（用延时线填充）
     consumed: List[bool] = [False] * num_beats
 
@@ -209,6 +209,7 @@ def _convert_measure(
             el, scale_pc_map, tonic_octave, warnings,
         )
         is_tied = _has_tie_continue(el)
+        is_tie_rhs = _is_tie_right_side(el)
         ql = float(el.duration.quarterLength)
 
         if is_grace:
@@ -224,7 +225,9 @@ def _convert_measure(
 
         if sub_offset < 0.01 and ql >= beat_ql:
             # 音符从拍头开始且 >= 1 拍 → 占据整拍或多拍
-            beats[beat_idx].append((token, ql, lyric_char, is_tied))
+            beats[beat_idx].append(
+                (token, ql, lyric_char, is_tied, is_tie_rhs),
+            )
             # 标记后续被占用的拍
             occupied_beats = int(ql / beat_ql)
             # 附点判断：如果占用 n.5 拍，多占一拍
@@ -234,7 +237,9 @@ def _convert_measure(
                     consumed[beat_idx + i] = True
         else:
             # 亚拍音符（八分、十六分等）
-            beats[beat_idx].append((token, ql, lyric_char, is_tied))
+            beats[beat_idx].append(
+                (token, ql, lyric_char, is_tied, is_tie_rhs),
+            )
 
     # 逐拍输出
     result_tokens: List[str] = []
@@ -249,24 +254,26 @@ def _convert_measure(
             continue
 
         if len(beat_group) == 1:
-            tok, ql, lyric_tup, is_tied = beat_group[0]
+            tok, ql, lyric_tup, is_tied, is_tie_rhs = beat_group[0]
             expanded = expand_to_beat_tokens(tok, ql, beat_ql, is_tied)
             result_tokens.extend(expanded)
-            if tok != "0":
+            # 歌词：跳过休止符和 ~ 连音线右侧音符（Sparks NMN 自动跳过）
+            if tok != "0" and not is_tie_rhs:
                 if lyric_tup[0]:
                     result_lyrics.append(lyric_tup)
                 else:
-                    result_lyrics.append(("_", "single"))
+                    result_lyrics.append(("%", "single"))
         else:
             sub_tokens: List[Tuple[str, float]] = []
-            for tok, ql, lyric_tup, is_tied in beat_group:
+            for tok, ql, lyric_tup, is_tied, is_tie_rhs in beat_group:
                 full_tok = tok + ("~" if is_tied else "")
                 sub_tokens.append((full_tok, ql))
-                if tok != "0":
+                # 歌词：跳过休止符和 ~ 连音线右侧音符
+                if tok != "0" and not is_tie_rhs:
                     if lyric_tup[0]:
                         result_lyrics.append(lyric_tup)
                     else:
-                        result_lyrics.append(("_", "single"))
+                        result_lyrics.append(("%", "single"))
             grouped = group_sub_beat_tokens(sub_tokens, beat_ql)
             result_tokens.append(grouped)
 
@@ -332,8 +339,8 @@ def _build_lw_line(lyric_tuples: List[Tuple[str, str]]) -> str:
     parts: List[str] = []
     for text, syl in lyric_tuples:
         text = text.strip()
-        if not text or text == "_":
-            parts.append("_")
+        if not text or text == "%":
+            parts.append("%")
             continue
         if syl in ("begin", "middle"):
             parts.append(text + "-")
@@ -375,4 +382,21 @@ def _has_tie_continue(el: Any) -> bool:
     """检查元素是否有 tie start（需要 ~ 标记）。"""
     if hasattr(el, "tie") and el.tie is not None:
         return el.tie.type in ("start", "continue")
+    return False
+
+
+def _is_tie_right_side(el: Any) -> bool:
+    """检查元素是否为延长连音线右侧音符。
+
+    在 Sparks NMN 中，~ 连音线右侧的音符会被自动跳过，
+    不参与歌词配对，因此不需要为它们生成歌词条目。
+
+    Args:
+        el: music21 元素。
+
+    Returns:
+        True 表示是连音线右侧（stop 或 continue）。
+    """
+    if hasattr(el, "tie") and el.tie is not None:
+        return el.tie.type in ("stop", "continue")
     return False
