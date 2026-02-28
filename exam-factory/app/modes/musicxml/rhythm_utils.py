@@ -238,15 +238,16 @@ def group_sub_beat_tokens(tokens_with_ql: List[Tuple[str, float]], beat_ql: floa
         if all(_is_close(q, sixteenth) for _, q in tokens_with_ql):
             return f"(({t1}{t2})({t3}{t4}))"
 
-        # 附点十六分 + 三十二分 + 十六分 + 十六分 → ((a.(b))(cd))
+        # 附点十六分 + 三十二分 + 十六分 + 十六分 → ((a.b)(cd))
+        # 附点 `.` 让 a 占 3/4、b 占 1/4，无需额外括号包裹 b
         if (_is_close(q1, sixteenth * 1.5) and _is_close(q2, thirtysecond)
                 and _is_close(q3, sixteenth) and _is_close(q4, sixteenth)):
-            return f"(({t1}.({t2}))({t3}{t4}))"
+            return f"(({t1}.{t2})({t3}{t4}))"
 
-        # 十六分 + 十六分 + 附点十六分 + 三十二分 → ((ab)(c.(d)))
+        # 十六分 + 十六分 + 附点十六分 + 三十二分 → ((ab)(c.d))
         if (_is_close(q1, sixteenth) and _is_close(q2, sixteenth)
                 and _is_close(q3, sixteenth * 1.5) and _is_close(q4, thirtysecond)):
-            return f"(({t1}{t2})({t3}.({t4})))"
+            return f"(({t1}{t2})({t3}.{t4}))"
 
         # 通用 4 音符
         inner = "".join(tok for tok, _ in tokens_with_ql)
