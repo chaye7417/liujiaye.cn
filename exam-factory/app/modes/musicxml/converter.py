@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -33,6 +34,8 @@ from app.modes.musicxml.rhythm_utils import (
     group_sub_beat_tokens,
     remove_overlapping_rests,
 )
+
+_NOTE_ATOM_RE = re.compile(r"[#b]*[1-7][ed]*")
 
 
 def convert_musicxml_to_spnmn(
@@ -292,7 +295,42 @@ def _convert_measure(
             grouped = group_sub_beat_tokens(sub_tokens, beat_ql)
             result_tokens.append(grouped)
 
+    result_tokens = _normalize_syncopation_tokens(result_tokens)
     return result_tokens, result_lyrics
+
+
+def _split_note_atoms(text: str) -> List[str]:
+    """拆分无分隔的音符串，如 '1e1e' -> ['1e','1e']。"""
+    atoms = _NOTE_ATOM_RE.findall(text)
+    return atoms if "".join(atoms) == text else []
+
+
+def _normalize_syncopation_tokens(tokens: List[str]) -> List[str]:
+    """将常见切分写法标准化。
+
+    目标格式示例：
+      (33~) (-2) -> (3)3(2)
+    """
+    normalized: List[str] = []
+    i = 0
+    while i < len(tokens):
+        if i + 1 < len(tokens):
+            left = tokens[i]
+            right = tokens[i + 1]
+            if left.startswith("(") and left.endswith("~)") and right.startswith("(-") and right.endswith(")"):
+                left_body = left[1:-2]   # 去掉 '(' 与 '~)'
+                right_body = right[2:-1]  # 去掉 '(-' 与 ')'
+                left_atoms = _split_note_atoms(left_body)
+                right_atoms = _split_note_atoms(right_body)
+                if len(left_atoms) == 2 and left_atoms[0] == left_atoms[1] and len(right_atoms) == 1:
+                    n = left_atoms[0]
+                    m = right_atoms[0]
+                    normalized.append(f"({n}){n}({m})")
+                    i += 2
+                    continue
+        normalized.append(tokens[i])
+        i += 1
+    return normalized
 
 
 # ============================================================
