@@ -250,6 +250,7 @@
             <div class="icon-actions">
                 <button class="icon-btn" onclick="copyText()" title="复制文本" aria-label="复制文本">&#x1F4CB;</button>
                 <button class="icon-btn" onclick="downloadSpnmn()" title="下载 .spnmn" aria-label="下载 .spnmn">&#x1F4BE;</button>
+                <button class="icon-btn" onclick="exportPdf()" title="导出 PDF" aria-label="导出 PDF">&#x1F4C4;</button>
             </div>
             <div class="preview-wrap">
                 <iframe id="sparks-preview" class="preview-frame" src="/static/sparks-nmn/index.html"></iframe>
@@ -363,12 +364,32 @@
         const doc = iframe && iframe.contentDocument;
         if (!doc) return;
 
-        // 移除试用模式顶部提示块。
-        const banner = doc.querySelector('.demo-important-warning-title');
-        if (banner && banner.parentElement) {
-            const container = banner.closest('div[style*=\"height\"]') || banner.parentElement;
-            container.remove();
+        // CSS 注入：即时隐藏横幅，无论 React 何时渲染
+        if (!doc.getElementById('hide-trial-banner')) {
+            const style = doc.createElement('style');
+            style.id = 'hide-trial-banner';
+            style.textContent = '.demo-important-warning-title { display: none !important; }';
+            doc.head.appendChild(style);
         }
+
+        // 如果横幅已经存在，直接移除
+        const existingBanner = doc.querySelector('.demo-important-warning-title');
+        if (existingBanner) {
+            const container = existingBanner.closest('div[style*=\"height\"]') || existingBanner.parentElement;
+            if (container) container.remove();
+            return;
+        }
+
+        // MutationObserver 保底：监听 DOM 变化，横幅出现时立即移除
+        const observer = new MutationObserver(function () {
+            const banner = doc.querySelector('.demo-important-warning-title');
+            if (banner) {
+                const container = banner.closest('div[style*=\"height\"]') || banner.parentElement;
+                if (container) container.remove();
+                observer.disconnect();
+            }
+        });
+        observer.observe(doc.body, { childList: true, subtree: true });
     }
 
     function showStatus(type, text) {
@@ -403,6 +424,27 @@
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+    }
+
+    function exportPdf() {
+        const iframe = document.getElementById('sparks-preview');
+        if (!iframe || !iframe.contentWindow) {
+            showToast('预览未加载');
+            return;
+        }
+        const text = document.getElementById('spnmn-editor').value;
+        if (!text.trim()) {
+            showToast('没有可导出的内容');
+            return;
+        }
+        const doc = iframe.contentDocument;
+        if (doc && !doc.getElementById('pdf-export-style')) {
+            const style = doc.createElement('style');
+            style.id = 'pdf-export-style';
+            style.textContent = '@media print { .demo-important-warning-title { display: none !important; } }';
+            doc.head.appendChild(style);
+        }
+        iframe.contentWindow.print();
     }
 
     function copyText() {
