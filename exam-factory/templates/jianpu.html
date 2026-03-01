@@ -219,6 +219,151 @@
             height: 34px;
         }
     }
+
+    /* === 高级设置面板样式 === */
+    .settings-toggle {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 10px;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--card-bg);
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        user-select: none;
+        transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+    }
+
+    .settings-toggle:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+        background: var(--primary-light);
+    }
+
+    #settings-arrow {
+        font-size: 10px;
+        display: inline-block;
+        transition: transform 0.2s ease;
+    }
+
+    .settings-panel {
+        display: none;
+        margin-top: 6px;
+        padding: 10px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--card-bg);
+    }
+
+    .settings-section {
+        margin-bottom: 12px;
+    }
+
+    .settings-section:last-child {
+        margin-bottom: 0;
+    }
+
+    .settings-label {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .settings-hint {
+        font-size: 11px;
+        font-weight: 400;
+        color: var(--text-muted);
+        opacity: 0.75;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+
+    .settings-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+    }
+
+    .settings-row:last-child {
+        margin-bottom: 0;
+    }
+
+    .setting-group {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px;
+        flex: 1 1 280px;
+    }
+
+    .setting-group label,
+    .settings-row > label {
+        font-size: 13px;
+        color: var(--text);
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .settings-panel select,
+    .settings-panel input[type="text"] {
+        height: 34px;
+        padding: 0 10px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--card-bg);
+        color: var(--text);
+        font-size: 13px;
+        outline: none;
+        transition: border-color 0.16s ease;
+        box-sizing: border-box;
+    }
+
+    .settings-panel select {
+        padding-right: 28px;
+        appearance: none;
+        -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%23888' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 8px center;
+        cursor: pointer;
+    }
+
+    .settings-panel input[type="text"] {
+        flex: 1 1 90px;
+        min-width: 80px;
+    }
+
+    .settings-panel select:focus,
+    .settings-panel input[type="text"]:focus {
+        border-color: var(--primary);
+    }
+
+    @media (max-width: 480px) {
+        .settings-row {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .setting-group {
+            flex: 1 1 100%;
+        }
+
+        .settings-panel input[type="text"] {
+            flex: 1 1 100%;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -243,6 +388,67 @@
         <div class="status" id="status">
             <div class="spinner" id="spinner"></div>
             <span id="status-text"></span>
+        </div>
+
+        <!-- 高级设置面板 -->
+        <div class="settings-toggle" onclick="toggleSettings()">
+            <span id="settings-arrow">&#9654;</span> 高级设置
+        </div>
+        <div class="settings-panel" id="settings-panel">
+            <div class="settings-section">
+                <div class="settings-label">字体设置</div>
+                <div class="settings-row">
+                    <div class="setting-group">
+                        <label for="font-lyrics">歌词字体</label>
+                        <select id="font-lyrics" onchange="refreshPreview()">
+                            <option value="CommonSerif" selected>宋体</option>
+                            <option value="CommonBlack">黑体</option>
+                            <option value="NotoSansSCLight">思源黑体</option>
+                            <option value="Kaiti">楷体</option>
+                            <option value="Fangsong">仿宋</option>
+                            <option value="Roman">西文衬线</option>
+                        </select>
+                        <label for="font-lyrics-weight">字重</label>
+                        <select id="font-lyrics-weight" onchange="refreshPreview()">
+                            <option value="400">400 常规</option>
+                            <option value="600" selected>600 半粗</option>
+                            <option value="700">700 粗体</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="font-title">标题字体</label>
+                        <select id="font-title" onchange="refreshPreview()">
+                            <option value="CommonSerif" selected>宋体</option>
+                            <option value="CommonBlack">黑体</option>
+                            <option value="NotoSansSCLight">思源黑体</option>
+                            <option value="Kaiti">楷体</option>
+                            <option value="Fangsong">仿宋</option>
+                            <option value="Roman">西文衬线</option>
+                        </select>
+                        <label for="font-title-weight">字重</label>
+                        <select id="font-title-weight" onchange="refreshPreview()">
+                            <option value="400">400 常规</option>
+                            <option value="600">600 半粗</option>
+                            <option value="700" selected>700 粗体</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-section">
+                <div class="settings-label">页眉页脚 <span class="settings-hint">（仅导出 PDF 时显示）</span></div>
+                <div class="settings-row">
+                    <label>页眉</label>
+                    <input type="text" id="header-left" placeholder="左侧内容">
+                    <input type="text" id="header-center" placeholder="居中内容">
+                    <input type="text" id="header-right" placeholder="右侧内容">
+                </div>
+                <div class="settings-row">
+                    <label>页脚</label>
+                    <input type="text" id="footer-left" placeholder="左侧内容">
+                    <input type="text" id="footer-center" value="页码" placeholder="居中内容">
+                    <input type="text" id="footer-right" placeholder="右侧内容">
+                </div>
+            </div>
         </div>
 
         <textarea id="spnmn-editor" class="spnmn-editor"></textarea>
@@ -341,13 +547,65 @@
         }
     }
 
+    function toggleSettings() {
+        const panel = document.getElementById('settings-panel');
+        const arrow = document.getElementById('settings-arrow');
+        if (panel.style.display === 'none' || !panel.style.display) {
+            panel.style.display = 'block';
+            arrow.textContent = '▼';
+        } else {
+            panel.style.display = 'none';
+            arrow.textContent = '▶';
+        }
+    }
+
+    function injectCustomFonts() {
+        const iframe = document.getElementById('sparks-preview');
+        const doc = iframe && iframe.contentDocument;
+        if (!doc || doc.getElementById('custom-fonts')) return;
+
+        const style = doc.createElement('style');
+        style.id = 'custom-fonts';
+        style.textContent = `
+            @font-face {
+                font-family: 'Kaiti';
+                src: url('/static/sparks-nmn/core-resources/font/kaiti/kaiti.woff2') format('woff2');
+                font-weight: 400;
+                font-display: swap;
+            }
+            @font-face {
+                font-family: 'Fangsong';
+                src: url('/static/sparks-nmn/core-resources/font/fangsong/fangsong.woff2') format('woff2');
+                font-weight: 400;
+                font-display: swap;
+            }
+        `;
+        doc.head.appendChild(style);
+    }
+
+    function applyFontSettings(spnmnText) {
+        const lyricsFont = document.getElementById('font-lyrics').value;
+        const lyricsWeight = document.getElementById('font-lyrics-weight').value;
+        const titleFont = document.getElementById('font-title').value;
+        const titleWeight = document.getElementById('font-title-weight').value;
+
+        const rpLine = 'Rp: page=A4 font_lyrics=' + lyricsFont + '/' + lyricsWeight + '/0.95 font_title=' + titleFont + '/' + titleWeight;
+
+        if (spnmnText.match(/^Rp:/m)) {
+            return spnmnText.replace(/^Rp:.*$/m, rpLine);
+        } else {
+            return spnmnText.replace(/^====/m, rpLine + '\n====');
+        }
+    }
+
     function refreshPreview() {
-        const spnmnText = document.getElementById('spnmn-editor').value;
+        let spnmnText = document.getElementById('spnmn-editor').value;
         if (!spnmnText.trim()) {
             showToast('没有可预览的内容');
             return;
         }
 
+        spnmnText = applyFontSettings(spnmnText);
         localStorage.setItem('sparks-nmn-demo-src', spnmnText);
         const iframe = document.getElementById('sparks-preview');
         iframe.onload = function () {
@@ -390,6 +648,7 @@
             }
         });
         observer.observe(doc.body, { childList: true, subtree: true });
+        injectCustomFonts();
     }
 
     function showStatus(type, text) {
@@ -437,13 +696,83 @@
             showToast('没有可导出的内容');
             return;
         }
+
         const doc = iframe.contentDocument;
-        if (doc && !doc.getElementById('pdf-export-style')) {
-            const style = doc.createElement('style');
-            style.id = 'pdf-export-style';
-            style.textContent = '@media print { .demo-important-warning-title { display: none !important; } }';
-            doc.head.appendChild(style);
+
+        // 读取页眉页脚设置
+        const headerLeft = document.getElementById('header-left').value.trim();
+        const headerCenter = document.getElementById('header-center').value.trim();
+        const headerRight = document.getElementById('header-right').value.trim();
+        const footerLeft = document.getElementById('footer-left').value.trim();
+        const footerCenter = document.getElementById('footer-center').value.trim();
+        const footerRight = document.getElementById('footer-right').value.trim();
+
+        const hasHeader = headerLeft || headerCenter || headerRight;
+        const hasFooter = footerLeft || footerCenter || footerRight;
+
+        // 构建打印 CSS
+        let printCSS = '@media print { .demo-important-warning-title { display: none !important; }';
+
+        if (hasHeader || hasFooter) {
+            printCSS += ' @page { margin: 20mm 15mm; }';
         }
+
+        if (hasHeader) {
+            printCSS += ' .print-header { display: flex !important; justify-content: space-between; position: fixed; top: 0; left: 0; right: 0; font-size: 10pt; color: #666; border-bottom: 0.5pt solid #ccc; padding-bottom: 4pt; }';
+        }
+
+        if (hasFooter) {
+            printCSS += ' .print-footer { display: flex !important; justify-content: space-between; position: fixed; bottom: 0; left: 0; right: 0; font-size: 10pt; color: #666; border-top: 0.5pt solid #ccc; padding-top: 4pt; }';
+        }
+
+        printCSS += ' }';
+
+        // 注入或更新打印样式
+        let styleEl = doc.getElementById('pdf-export-style');
+        if (!styleEl) {
+            styleEl = doc.createElement('style');
+            styleEl.id = 'pdf-export-style';
+            doc.head.appendChild(styleEl);
+        }
+        styleEl.textContent = printCSS;
+
+        // 清除旧的页眉页脚元素
+        var oldHeader = doc.querySelector('.print-header');
+        if (oldHeader) oldHeader.remove();
+        var oldFooter = doc.querySelector('.print-footer');
+        if (oldFooter) oldFooter.remove();
+
+        // 注入页眉 HTML
+        if (hasHeader) {
+            var headerEl = doc.createElement('div');
+            headerEl.className = 'print-header';
+            headerEl.style.display = 'none';
+            headerEl.innerHTML = '<span>' + headerLeft + '</span><span>' + headerCenter + '</span><span>' + headerRight + '</span>';
+            doc.body.prepend(headerEl);
+        }
+
+        // 注入页脚 HTML（"页码"特殊处理为 CSS counter）
+        if (hasFooter) {
+            var footerEl = doc.createElement('div');
+            footerEl.className = 'print-footer';
+            footerEl.style.display = 'none';
+
+            if (footerCenter === '页码') {
+                var counterStyle = doc.getElementById('page-counter-style');
+                if (!counterStyle) {
+                    counterStyle = doc.createElement('style');
+                    counterStyle.id = 'page-counter-style';
+                    counterStyle.textContent = '@media print { .print-footer .page-number::after { content: counter(page); } }';
+                    doc.head.appendChild(counterStyle);
+                }
+                footerEl.innerHTML = '<span>' + footerLeft + '</span><span class="page-number"></span><span>' + footerRight + '</span>';
+            } else {
+                footerEl.innerHTML = '<span>' + footerLeft + '</span><span>' + footerCenter + '</span><span>' + footerRight + '</span>';
+            }
+
+            doc.body.appendChild(footerEl);
+        }
+
         iframe.contentWindow.print();
     }
 
