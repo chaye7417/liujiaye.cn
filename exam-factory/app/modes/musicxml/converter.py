@@ -240,8 +240,10 @@ def _convert_measure(
             # 若跨拍，则把后续拍的延续段补成 '-'，避免时值丢失。
             first_seg_ql = min(ql, max(beat_ql - sub_offset, 0.0))
             remaining = max(0.0, ql - first_seg_ql)
+            # 跨拍切分时，仅起始音添加 ~，明确与后续 '-' 的延续关系。
+            first_seg_tied = is_tied or (remaining > 0.01)
             beats[beat_idx].append(
-                (token, first_seg_ql, lyric_char, is_tied, is_tie_rhs),
+                (token, first_seg_ql, lyric_char, first_seg_tied, is_tie_rhs),
             )
 
             cont_beat = beat_idx + 1
