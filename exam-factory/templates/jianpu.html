@@ -435,18 +435,16 @@
                 </div>
             </div>
             <div class="settings-section">
-                <div class="settings-label">页眉页脚 <span class="settings-hint">（仅导出 PDF 时显示）</span></div>
+                <div class="settings-label">页眉页脚 <span class="settings-hint">（修改后点击预览可实时查看）</span></div>
                 <div class="settings-row">
                     <label>页眉</label>
-                    <input type="text" id="header-left" placeholder="左侧内容">
-                    <input type="text" id="header-center" placeholder="居中内容">
-                    <input type="text" id="header-right" placeholder="右侧内容">
+                    <input type="text" id="header-left" placeholder="左侧（Dp:）" onchange="refreshPreview()">
+                    <input type="text" id="header-right" placeholder="右侧（Dv:）" onchange="refreshPreview()">
                 </div>
                 <div class="settings-row">
                     <label>页脚</label>
-                    <input type="text" id="footer-left" placeholder="左侧内容">
-                    <input type="text" id="footer-center" value="页码" placeholder="居中内容">
-                    <input type="text" id="footer-right" placeholder="右侧内容">
+                    <input type="text" id="footer-left" placeholder="左侧（Dl:）" onchange="refreshPreview()">
+                    <input type="text" id="footer-right" placeholder="右侧（Dr:），留空默认显示页码" onchange="refreshPreview()">
                 </div>
             </div>
         </div>
@@ -559,31 +557,8 @@
         }
     }
 
-    function injectCustomFonts() {
-        const iframe = document.getElementById('sparks-preview');
-        const doc = iframe && iframe.contentDocument;
-        if (!doc || doc.getElementById('custom-fonts')) return;
-
-        const style = doc.createElement('style');
-        style.id = 'custom-fonts';
-        style.textContent = `
-            @font-face {
-                font-family: 'Kaiti';
-                src: url('/static/sparks-nmn/core-resources/font/kaiti/kaiti.woff2') format('woff2');
-                font-weight: 400;
-                font-display: swap;
-            }
-            @font-face {
-                font-family: 'Fangsong';
-                src: url('/static/sparks-nmn/core-resources/font/fangsong/fangsong.woff2') format('woff2');
-                font-weight: 400;
-                font-display: swap;
-            }
-        `;
-        doc.head.appendChild(style);
-    }
-
-    function applyFontSettings(spnmnText) {
+    function applyCustomSettings(spnmnText) {
+        // 字体设置 → 修改 Rp: 行
         const lyricsFont = document.getElementById('font-lyrics').value;
         const lyricsWeight = document.getElementById('font-lyrics-weight').value;
         const titleFont = document.getElementById('font-title').value;
@@ -592,10 +567,46 @@
         const rpLine = 'Rp: page=A4 font_lyrics=' + lyricsFont + '/' + lyricsWeight + '/0.95 font_title=' + titleFont + '/' + titleWeight;
 
         if (spnmnText.match(/^Rp:/m)) {
-            return spnmnText.replace(/^Rp:.*$/m, rpLine);
+            spnmnText = spnmnText.replace(/^Rp:.*$/m, rpLine);
         } else {
-            return spnmnText.replace(/^====/m, rpLine + '\n====');
+            spnmnText = spnmnText.replace(/^====/m, rpLine + '\n====');
         }
+
+        // 页眉页脚 → 修改/插入 Dp:/Dv:/Dl:/Dr: 行
+        const headerLeft = document.getElementById('header-left').value.trim();
+        const headerRight = document.getElementById('header-right').value.trim();
+        const footerLeft = document.getElementById('footer-left').value.trim();
+        const footerRight = document.getElementById('footer-right').value.trim();
+
+        var directives = [
+            { key: 'Dp', value: headerLeft },
+            { key: 'Dv', value: headerRight },
+            { key: 'Dl', value: footerLeft },
+            { key: 'Dr', value: footerRight }
+        ];
+
+        for (var i = 0; i < directives.length; i++) {
+            var d = directives[i];
+            var regex = new RegExp('^' + d.key + ':.*$', 'm');
+            if (d.value) {
+                if (spnmnText.match(regex)) {
+                    spnmnText = spnmnText.replace(regex, d.key + ': ' + d.value);
+                } else {
+                    // 在 Rp: 行之后或 ==== 之前插入
+                    if (spnmnText.match(/^Rp:/m)) {
+                        spnmnText = spnmnText.replace(/^(Rp:.*$)/m, '$1\n' + d.key + ': ' + d.value);
+                    } else {
+                        spnmnText = spnmnText.replace(/^====/m, d.key + ': ' + d.value + '\n====');
+                    }
+                }
+            } else {
+                // 值为空时移除该行
+                spnmnText = spnmnText.replace(regex, '');
+                spnmnText = spnmnText.replace(/\n\n+/g, '\n');
+            }
+        }
+
+        return spnmnText;
     }
 
     function refreshPreview() {
@@ -605,7 +616,7 @@
             return;
         }
 
-        spnmnText = applyFontSettings(spnmnText);
+        spnmnText = applyCustomSettings(spnmnText);
         localStorage.setItem('sparks-nmn-demo-src', spnmnText);
         const iframe = document.getElementById('sparks-preview');
         iframe.onload = function () {
@@ -648,7 +659,6 @@
             }
         });
         observer.observe(doc.body, { childList: true, subtree: true });
-        injectCustomFonts();
     }
 
     function showStatus(type, text) {
@@ -696,83 +706,13 @@
             showToast('没有可导出的内容');
             return;
         }
-
         const doc = iframe.contentDocument;
-
-        // 读取页眉页脚设置
-        const headerLeft = document.getElementById('header-left').value.trim();
-        const headerCenter = document.getElementById('header-center').value.trim();
-        const headerRight = document.getElementById('header-right').value.trim();
-        const footerLeft = document.getElementById('footer-left').value.trim();
-        const footerCenter = document.getElementById('footer-center').value.trim();
-        const footerRight = document.getElementById('footer-right').value.trim();
-
-        const hasHeader = headerLeft || headerCenter || headerRight;
-        const hasFooter = footerLeft || footerCenter || footerRight;
-
-        // 构建打印 CSS
-        let printCSS = '@media print { .demo-important-warning-title { display: none !important; }';
-
-        if (hasHeader || hasFooter) {
-            printCSS += ' @page { margin: 20mm 15mm; }';
+        if (doc && !doc.getElementById('pdf-export-style')) {
+            const style = doc.createElement('style');
+            style.id = 'pdf-export-style';
+            style.textContent = '@media print { .demo-important-warning-title { display: none !important; } }';
+            doc.head.appendChild(style);
         }
-
-        if (hasHeader) {
-            printCSS += ' .print-header { display: flex !important; justify-content: space-between; position: fixed; top: 0; left: 0; right: 0; font-size: 10pt; color: #666; border-bottom: 0.5pt solid #ccc; padding-bottom: 4pt; }';
-        }
-
-        if (hasFooter) {
-            printCSS += ' .print-footer { display: flex !important; justify-content: space-between; position: fixed; bottom: 0; left: 0; right: 0; font-size: 10pt; color: #666; border-top: 0.5pt solid #ccc; padding-top: 4pt; }';
-        }
-
-        printCSS += ' }';
-
-        // 注入或更新打印样式
-        let styleEl = doc.getElementById('pdf-export-style');
-        if (!styleEl) {
-            styleEl = doc.createElement('style');
-            styleEl.id = 'pdf-export-style';
-            doc.head.appendChild(styleEl);
-        }
-        styleEl.textContent = printCSS;
-
-        // 清除旧的页眉页脚元素
-        var oldHeader = doc.querySelector('.print-header');
-        if (oldHeader) oldHeader.remove();
-        var oldFooter = doc.querySelector('.print-footer');
-        if (oldFooter) oldFooter.remove();
-
-        // 注入页眉 HTML
-        if (hasHeader) {
-            var headerEl = doc.createElement('div');
-            headerEl.className = 'print-header';
-            headerEl.style.display = 'none';
-            headerEl.innerHTML = '<span>' + headerLeft + '</span><span>' + headerCenter + '</span><span>' + headerRight + '</span>';
-            doc.body.prepend(headerEl);
-        }
-
-        // 注入页脚 HTML（"页码"特殊处理为 CSS counter）
-        if (hasFooter) {
-            var footerEl = doc.createElement('div');
-            footerEl.className = 'print-footer';
-            footerEl.style.display = 'none';
-
-            if (footerCenter === '页码') {
-                var counterStyle = doc.getElementById('page-counter-style');
-                if (!counterStyle) {
-                    counterStyle = doc.createElement('style');
-                    counterStyle.id = 'page-counter-style';
-                    counterStyle.textContent = '@media print { .print-footer .page-number::after { content: counter(page); } }';
-                    doc.head.appendChild(counterStyle);
-                }
-                footerEl.innerHTML = '<span>' + footerLeft + '</span><span class="page-number"></span><span>' + footerRight + '</span>';
-            } else {
-                footerEl.innerHTML = '<span>' + footerLeft + '</span><span>' + footerCenter + '</span><span>' + footerRight + '</span>';
-            }
-
-            doc.body.appendChild(footerEl);
-        }
-
         iframe.contentWindow.print();
     }
 
