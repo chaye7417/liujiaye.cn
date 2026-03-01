@@ -401,11 +401,11 @@
                     <div class="setting-group">
                         <label for="font-lyrics">歌词字体</label>
                         <select id="font-lyrics" onchange="refreshPreview()">
-                            <option value="CommonSerif" selected>宋体</option>
+                            <option value="CommonSerif">宋体</option>
                             <option value="CommonBlack">黑体</option>
                             <option value="NotoSansSCLight">思源黑体</option>
-                            <option value="Kaiti">楷体</option>
-                            <option value="Fangsong">仿宋</option>
+                            <option value="STKaiti">华文楷体</option>
+                            <option value="Fangsong" selected>仿宋</option>
                             <option value="Roman">西文衬线</option>
                         </select>
                         <label for="font-lyrics-weight">字重</label>
@@ -418,11 +418,12 @@
                     <div class="setting-group">
                         <label for="font-title">标题字体</label>
                         <select id="font-title" onchange="refreshPreview()">
-                            <option value="CommonSerif" selected>宋体</option>
+                            <option value="CommonSerif">宋体</option>
                             <option value="CommonBlack">黑体</option>
                             <option value="NotoSansSCLight">思源黑体</option>
-                            <option value="Kaiti">楷体</option>
+                            <option value="STKaiti">华文楷体</option>
                             <option value="Fangsong">仿宋</option>
+                            <option value="FZXiaoBiaoSong-B05S" selected>方正小标宋</option>
                             <option value="Roman">西文衬线</option>
                         </select>
                         <label for="font-title-weight">字重</label>
@@ -637,7 +638,19 @@
         if (!doc.getElementById('hide-trial-banner')) {
             const style = doc.createElement('style');
             style.id = 'hide-trial-banner';
-            style.textContent = '.demo-important-warning-title { display: none !important; }';
+            style.textContent = `
+                @font-face {
+                    font-family: "STKaiti";
+                    src: url("/static/sparks-nmn/core-resources/font/custom/STKAITI.TTF") format("truetype");
+                    font-display: swap;
+                }
+                @font-face {
+                    font-family: "FZXiaoBiaoSong-B05S";
+                    src: url("/static/sparks-nmn/core-resources/font/custom/FZXiaoBiaoSong-B05S.ttf") format("truetype");
+                    font-display: swap;
+                }
+                .demo-important-warning-title { display: none !important; }
+            `;
             doc.head.appendChild(style);
         }
 
