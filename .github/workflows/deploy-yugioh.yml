@@ -1,0 +1,47 @@
+name: Deploy Yugioh SAV Editor
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'yugioh-sav-editor'
+      - '.github/workflows/deploy-yugioh.yml'
+  repository_dispatch:
+    types: [yugioh-sav-editor-updated]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Update submodule to latest
+        run: |
+          git submodule update --remote yugioh-sav-editor
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: yugioh-sav-editor/package-lock.json
+
+      - name: Install and Build
+        working-directory: yugioh-sav-editor
+        run: |
+          npm ci
+          npm run build-only
+
+      - name: Deploy to server
+        uses: burnett01/rsync-deployments@7.0.1
+        with:
+          switches: -avz --delete
+          path: yugioh-sav-editor/dist/
+          remote_path: /home/ubuntu/website/yugioh/
+          remote_host: ${{ secrets.SERVER_HOST }}
+          remote_user: ${{ secrets.SERVER_USER }}
+          remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
