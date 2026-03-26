@@ -39,7 +39,7 @@ jobs:
       - name: Deploy to server
         uses: burnett01/rsync-deployments@7.0.1
         with:
-          switches: -avz --delete
+          switches: -avz --delete --exclude='rom/'
           path: yugioh-sav-editor/dist/
           remote_path: /home/ubuntu/website/yugioh/
           remote_host: ${{ secrets.SERVER_HOST }}
