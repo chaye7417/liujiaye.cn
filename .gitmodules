@@ -1,0 +1,3 @@
+[submodule "yugioh-sav-editor"]
+	path = yugioh-sav-editor
+	url = https://github.com/chaye7417/yugioh-sav-editor.git
