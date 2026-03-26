@@ -33,7 +33,7 @@ jobs:
       - name: Install and Build
         working-directory: yugioh-sav-editor
         run: |
-          npm ci
+          npm ci --legacy-peer-deps
           npm run build-only
 
       - name: Deploy to server
